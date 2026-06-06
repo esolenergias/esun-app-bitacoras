@@ -294,13 +294,13 @@ export function Hero() {
   return (
     <div 
       ref={containerRef} 
-      className="relative w-full bg-dark-1 topo-bg pt-24" 
+      className="relative w-full bg-dark-1 topo-bg pt-24 flex flex-col lg:block" 
       id="hero"
     >
       
       {/* 3D Canvas Container: Sticky on desktop (lg), absolute on mobile */}
       <div 
-        className="absolute top-24 lg:top-0 right-0 w-full lg:w-[50vw] h-[calc(100vh-6rem)] lg:h-full select-none pointer-events-none z-10 bg-dark-1"
+        className="relative lg:absolute lg:top-0 right-0 w-full lg:w-[50vw] h-[75vw] sm:h-[60vw] lg:h-full select-none pointer-events-none z-10 bg-dark-1 order-2 lg:order-none"
       >
         <div 
           ref={canvasContainerRef}
@@ -312,11 +312,11 @@ export function Hero() {
           />
 
           {/* Transition vignette to blend the left side of the canvas smoothly with the dark background */}
-          <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-dark-1 via-dark-1/20 to-transparent pointer-events-none z-15" />
+          <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-dark-1 via-dark-1/20 to-transparent pointer-events-none z-15 hidden lg:block" />
           
           {/* Top & Bottom Vignette masks */}
-          <div className="absolute top-0 left-0 w-full h-28 bg-gradient-to-b from-dark-1 to-transparent pointer-events-none z-15" />
-          <div className="absolute bottom-0 left-0 w-full h-28 bg-gradient-to-t from-dark-1 to-transparent pointer-events-none z-15" />
+          <div className="absolute top-0 left-0 w-full h-12 lg:h-28 bg-gradient-to-b from-dark-1 to-transparent pointer-events-none z-15" />
+          <div className="absolute bottom-0 left-0 w-full h-12 lg:h-28 bg-gradient-to-t from-dark-1 to-transparent pointer-events-none z-15" />
 
           {/* Loading Overlay */}
           <AnimatePresence>
@@ -361,7 +361,7 @@ export function Hero() {
           </AnimatePresence>
         </div>
       </div>      {/* Foreground Content Container (Restricted to Left Column lg:col-span-6 on Desktop) */}
-      <div className="relative z-20 w-full max-w-7xl mx-auto px-6 lg:px-12 pointer-events-none">
+      <div className="relative z-20 w-full max-w-7xl mx-auto px-6 lg:px-12 pointer-events-none order-1 lg:order-none">
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           
@@ -369,7 +369,7 @@ export function Hero() {
           <div className="lg:col-span-6 flex flex-col pointer-events-auto">
             
             {/* Hero Text block */}
-            <div className="h-[calc(100vh-96px)] min-h-[450px] lg:min-h-0 flex items-center mb-16 lg:mb-0">
+            <div className="h-auto lg:h-[calc(100vh-96px)] min-h-0 lg:min-h-0 flex items-center py-6 lg:py-0 mb-8 lg:mb-0">
               <motion.div
                 variants={containerVariants}
                 initial="hidden"
@@ -475,7 +475,7 @@ export function Hero() {
       </div>
 
       {/* Services Section Header (Outside the grid, animated layout) */}
-      <div id="servicios" className="relative z-20 w-full max-w-7xl mx-auto px-6 lg:px-12 pointer-events-auto flex flex-col pt-16 pb-8 select-none lg:mt-[calc(20vh-100px)]">
+      <div id="servicios" className="relative z-20 w-full max-w-7xl mx-auto px-6 lg:px-12 pointer-events-auto flex flex-col pt-16 pb-8 select-none lg:mt-[calc(20vh-100px)] order-3 lg:order-none">
         {/* Backlight elements */}
         <div className="absolute top-1/2 left-1/4 w-72 h-72 rounded-full bg-gold/5 blur-[100px] pointer-events-none -z-10" />
 
@@ -498,7 +498,7 @@ export function Hero() {
       </div>
 
       {/* Services Cards Container (Back inside the grid for left column alignment) */}
-      <div className="relative z-20 w-full max-w-7xl mx-auto px-6 lg:px-12 pointer-events-none pb-20">
+      <div className="relative z-20 w-full max-w-7xl mx-auto px-6 lg:px-12 pointer-events-none pb-20 order-4 lg:order-none">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           
           <div className="lg:col-span-6 flex flex-col pointer-events-auto">
