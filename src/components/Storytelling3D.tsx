@@ -94,10 +94,15 @@ export function Storytelling3D() {
         if (img && img.complete) {
           draw(img);
         }
-        frame = (frame + 1) % 73;
-        lastTime = time - (elapsed % interval);
+        
+        if (frame < 72) {
+          frame++;
+          lastTime = time - (elapsed % interval);
+          timerId = requestAnimationFrame(animate);
+        }
+      } else {
+        timerId = requestAnimationFrame(animate);
       }
-      timerId = requestAnimationFrame(animate);
     };
 
     timerId = requestAnimationFrame(animate);
