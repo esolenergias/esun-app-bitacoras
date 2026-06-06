@@ -1,0 +1,43 @@
+<h2>¿Qué estilo de inmersión visual (3D/Scroll) buscamos para eSol?</h2>
+<p class="subtitle">He investigado las tendencias 2024-2025 para empresas de energía solar (sitios galardonados en Awwwards). Estas son las 3 rutas principales. Haz clic en la que más te guste.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>El Recorrido Narrativo (Scroll Storytelling)</h3>
+      <p><strong>Enfoque:</strong> Énfasis en animaciones vinculadas al scroll (Parallax multicapa). Los elementos (paneles, textos, fondo) se mueven a distintas velocidades. El usuario "viaja" por el proceso solar a medida que hace scroll.</p>
+      <ul>
+        <li><small>Perfecto para explicar el Anteproyecto 3D paso a paso.</small></li>
+        <li><small>Tecnología: GSAP (ScrollTrigger) + CSS Parallax.</small></li>
+        <li><small>Rendimiento: Muy bueno y fluido en móviles.</small></li>
+      </ul>
+    </div>
+  </div>
+  
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Modelos 3D Interactivos (WebGL)</h3>
+      <p><strong>Enfoque:</strong> En lugar de imágenes planas, integramos modelos 3D reales (ej. un panel solar o un inversor) que el usuario puede rotar con el ratón. Esto da una vibra tecnológica ("Tech/Premium").</p>
+      <ul>
+        <li><small>Ideal para mostrar los "Productos de Primera Línea".</small></li>
+        <li><small>Tecnología: Three.js o Spline3D.</small></li>
+        <li><small>Rendimiento: Requiere optimización cuidadosa para no afectar el SEO.</small></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Bento Grid "Glassmorphism" + Micro-interacciones</h3>
+      <p><strong>Enfoque:</strong> Un diseño altamente modular (cajas con bordes redondeados tipo Apple/Tesla) sobre fondos oscuros desenfocados. Interacciones sutiles al pasar el cursor (brillos, contadores que suben).</p>
+      <ul>
+        <li><small>La ruta más limpia y moderna para mostrar datos técnicos sin abrumar.</small></li>
+        <li><small>Tecnología: Vanilla CSS + Framer Motion / animaciones CSS.</small></li>
+        <li><small>Rendimiento: Excelente, el "sweet spot" entre moderno y rápido.</small></li>
+      </ul>
+    </div>
+  </div>
+</div>

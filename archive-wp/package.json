@@ -1,0 +1,13 @@
+{
+  "name": "esolenergias",
+  "version": "1.0.0",
+  "description": "eSol Energías — Landing page para ingeniería solar y venta de accesorios fotovoltaicos en México",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve . -p 3000",
+    "preview": "npx serve . -p 3000"
+  },
+  "keywords": ["solar", "energia-solar", "paneles-solares", "inversores", "mexico"],
+  "author": "eSol Energías",
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+@theme {
+  /* Dark Colors (Anthracite / Slate Olive) */
+  --color-dark-1: #141410;
+  --color-dark-2: #1C1C17;
+  --color-dark-3: #252520;
+  --color-dark-4: #2E2E28;
+  --color-dark-5: #3A3A32;
+
+  /* eSol Solar Golds */
+  --color-gold: #C49825;
+  --color-gold-light: #D4AE3A;
+  --color-gold-dim: #8B6C1A;
+  --color-gold-muted: rgba(196, 152, 37, 0.12);
+
+  /* Cream Off-Whites */
+  --color-cream: #F0EFE8;
+  --color-cream-muted: #9A9A8A;
+  --color-cream-dim: #6A6A5E;
+
+  /* Typography */
+  --font-display: "Cinzel", serif;
+  --font-body: "Josefin Sans", sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-body);
+    background-color: var(--color-dark-1);
+    color: var(--color-cream);
+  }
+  
+  body {
+    margin: 0;
+    overflow-x: hidden;
+  }
+  
+  /* Modern custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #141410;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2E2E28;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #C49825;
+  }
+}
+
+/* Custom Animation Utility Classes */
+.shimmer-text {
+  background: linear-gradient(120deg, #8B6C1A 0%, #F0EFE8 50%, #C49825 100%);
+  background-size: 200% auto;
+  color: #C49825;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 5s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.topo-bg {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 1200 600'%3E%3Cg fill='none' stroke='rgba(196,152,37,0.065)' stroke-width='0.75'%3E%3C!-- Vertical grid lines --%3E%3Cpath d='M100 0v600M300 0v600M500 0v600M700 0v600' stroke-dasharray='2 6'/%3E%3C!-- Horizontal grid lines --%3E%3Cpath d='M0 150h1200M0 300h1200M0 450h1200' stroke-dasharray='2 6'/%3E%3C!-- Isometric projection lines at 30 degrees --%3E%3Cpath d='M-600 0 l1200 693 M-400 0 l1200 693 M-200 0 l1200 693 M0 0 l1200 693 M200 0 l1200 693 M400 0 l1200 693 M600 0 l1200 693'/%3E%3C!-- Isometric projection lines at 150 degrees --%3E%3Cpath d='M600 0 l-1200 693 M800 0 l-1200 693 M1000 0 l-1200 693 M1200 0 l-1200 693 M1400 0 l-1200 693 M1600 0 l-1200 693 M1800 0 l-1200 693'/%3E%3C!-- Technical target/blueprint markings --%3E%3Ccircle cx='700' cy='300' r='80'/%3E%3Ccircle cx='700' cy='300' r='140' stroke-dasharray='4 8'/%3E%3Ccircle cx='200' cy='200' r='60'/%3E%3Ccircle cx='200' cy='200' r='120' stroke-dasharray='4 8'/%3E%3C/g%3E%3C/svg%3E");
+  background-position: center;
+  background-size: cover;
+}

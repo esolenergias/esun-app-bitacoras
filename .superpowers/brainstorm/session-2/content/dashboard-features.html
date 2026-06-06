@@ -1,0 +1,36 @@
+<h2>Diseño del Cotizador: Tablero Maestro (Single Screen)</h2>
+<p class="subtitle">Todo se ajusta en tiempo real mediante controles reactivos. ¿Qué elementos principales incluimos?</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="map" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Selector de Ubicación</h3>
+      <p>Mapa interactivo o selector de estado para ajustar la radiación solar real según la zona de México.</p>
+    </div>
+  </div>
+  
+  <div class="option" data-choice="3d_house" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Visualizador de Techo 3D</h3>
+      <p>Una representación 3D simple que añade o quita paneles a medida que el usuario ajusta el sistema.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="roi_graph" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Gráfica de Retorno (ROI)</h3>
+      <p>Gráfica dinámica que muestra en cuántos años se paga el sistema y el ahorro a 25 años.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="lead_capture" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Boton "Descargar Memoria Técnica"</h3>
+      <p>Un CTA al final del tablero para enviar el resumen del cálculo al correo del usuario.</p>
+    </div>
+  </div>
+</div>
