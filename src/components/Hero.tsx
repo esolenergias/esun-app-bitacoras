@@ -5,7 +5,8 @@ import { ChevronRight, Zap, Sun, Eye, ShieldCheck, ArrowRight } from 'lucide-rea
 const FRAME_COUNT = 360;
 const AUTOPLAY_END_FRAME = 90; // Frame 90 = 3 seconds at 30fps
 const BASE_URL = '/Paneles intro/anim_eso1_';
-const SCROLL_RANGE = 1250; // Scroll distance in pixels to complete the animation
+const DESKTOP_SCROLL_RANGE = 1250; // Scroll distance in pixels for desktop
+const MOBILE_SCROLL_RANGE = 400; // Scroll distance in pixels for mobile
 
 const padZero = (num: number, size: number) => {
   let s = num + '';
@@ -219,7 +220,8 @@ export function Hero() {
       const rect = container.getBoundingClientRect();
       const scrolledAmount = -rect.top;
 
-      let progress = scrolledAmount / SCROLL_RANGE;
+      const scrollRange = window.innerWidth >= 1024 ? DESKTOP_SCROLL_RANGE : MOBILE_SCROLL_RANGE;
+      let progress = scrolledAmount / scrollRange;
       progress = Math.max(0, Math.min(1, progress));
 
       const frameIndex = Math.round(
