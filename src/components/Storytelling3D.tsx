@@ -1,9 +1,112 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Camera, Layers, Box, Sparkles } from 'lucide-react';
 
 export function Storytelling3D() {
   const [currentStep, setCurrentStep] = useState(1); // 1: Base, 2: Mesh, 3: Final
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imagesRef = useRef<HTMLImageElement[]>([]);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  // Preload the 73 WebP animation frames
+  useEffect(() => {
+    let loadedCount = 0;
+    const totalFrames = 73;
+    const padZero = (num: number, size: number) => {
+      let s = num + '';
+      while (s.length < size) s = '0' + s;
+      return s;
+    };
+
+    for (let i = 0; i < totalFrames; i++) {
+      const img = new Image();
+      img.src = `/Plano paneles/plano_paneles_${padZero(i, 5)}.webp`;
+      img.onload = () => {
+        imagesRef.current[i] = img;
+        loadedCount++;
+        if (loadedCount === totalFrames) {
+          setImagesLoaded(true);
+        }
+      };
+      img.onerror = () => {
+        loadedCount++;
+        if (loadedCount === totalFrames) {
+          setImagesLoaded(true);
+        }
+      };
+    }
+  }, []);
+
+  // Canvas drawing loop for step 2 (Ingeniería 3D)
+  useEffect(() => {
+    if (currentStep !== 2 || !imagesLoaded) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let frame = 0;
+    let timerId: number;
+    let lastTime = performance.now();
+    const fps = 25; // Play smooth at 25 fps
+    const interval = 1000 / fps;
+
+    const resizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+    };
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const draw = (img: HTMLImageElement) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const imgRatio = img.width / img.height;
+      const canvasRatio = canvas.width / canvas.height;
+      let drawWidth = canvas.width;
+      let drawHeight = canvas.height;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (imgRatio > canvasRatio) {
+        drawWidth = canvas.height * imgRatio;
+        drawHeight = canvas.height;
+        offsetX = (canvas.width - drawWidth) / 2;
+        offsetY = 0;
+      } else {
+        drawWidth = canvas.width;
+        drawHeight = canvas.width / imgRatio;
+        offsetX = 0;
+        offsetY = (canvas.height - drawHeight) / 2;
+      }
+
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    };
+
+    const animate = (time: number) => {
+      const elapsed = time - lastTime;
+      if (elapsed >= interval) {
+        const img = imagesRef.current[frame];
+        if (img && img.complete) {
+          draw(img);
+        }
+        frame = (frame + 1) % 73;
+        lastTime = time - (elapsed % interval);
+      }
+      timerId = requestAnimationFrame(animate);
+    };
+
+    timerId = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(timerId);
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, [currentStep, imagesLoaded]);
 
   const steps = [
     {
@@ -49,6 +152,20 @@ export function Storytelling3D() {
                 className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
                 alt="Fotografía original con dron"
               />
+
+              {/* Layer 1.5: Animated Plano Paneles Sequence (Visible only in Step 2) */}
+              <AnimatePresence>
+                {currentStep === 2 && (
+                  <motion.canvas
+                    ref={canvasRef}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="absolute inset-0 w-full h-full pointer-events-none z-10"
+                  />
+                )}
+              </AnimatePresence>
 
               {/* Layer 2: Wireframe Grid Mesh Overlay (Visible in Step 2 & 3) */}
               <AnimatePresence>
