@@ -1,0 +1,6 @@
+{
+  "name": "Esol CFE Manager",
+  "description": "Gestor de trámites de interconexión con CFE y generación de expedientes técnicos para sistemas fotovoltaicos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

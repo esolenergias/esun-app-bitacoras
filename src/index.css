@@ -1,12 +1,62 @@
 @import "tailwindcss";
 
+:root {
+  /* Default Dark Theme variables */
+  --theme-bg-1: #141410;
+  --theme-bg-2: #1C1C17;
+  --theme-bg-3: #252520;
+  --theme-border-1: #2E2E28;
+  --theme-border-2: #3A3A32;
+  --theme-text-1: #F0EFE8;
+  --theme-text-2: #9A9A8A;
+  --theme-text-3: #6A6A5E;
+}
+
+/* System Light Theme */
+@media (prefers-color-scheme: light) {
+  :root:not(.dark-mode) {
+    --theme-bg-1: #F8F7F2;
+    --theme-bg-2: #EFEFE8;
+    --theme-bg-3: #E5E4DB;
+    --theme-border-1: #D5D4C7;
+    --theme-border-2: #C4C3B4;
+    --theme-text-1: #141410;
+    --theme-text-2: #3A3A32;
+    --theme-text-3: #6A6A5E;
+  }
+}
+
+/* Explicit Light Mode Override class */
+:root.light-mode {
+  --theme-bg-1: #F8F7F2;
+  --theme-bg-2: #EFEFE8;
+  --theme-bg-3: #E5E4DB;
+  --theme-border-1: #D5D4C7;
+  --theme-border-2: #C4C3B4;
+  --theme-text-1: #141410;
+  --theme-text-2: #3A3A32;
+  --theme-text-3: #6A6A5E;
+}
+
+/* Explicit Dark Mode Override class */
+:root.dark-mode {
+  --theme-bg-1: #141410;
+  --theme-bg-2: #1C1C17;
+  --theme-bg-3: #252520;
+  --theme-border-1: #2E2E28;
+  --theme-border-2: #3A3A32;
+  --theme-text-1: #F0EFE8;
+  --theme-text-2: #9A9A8A;
+  --theme-text-3: #6A6A5E;
+}
+
 @theme {
   /* Dark Colors (Anthracite / Slate Olive) */
-  --color-dark-1: #141410;
-  --color-dark-2: #1C1C17;
-  --color-dark-3: #252520;
-  --color-dark-4: #2E2E28;
-  --color-dark-5: #3A3A32;
+  --color-dark-1: var(--theme-bg-1);
+  --color-dark-2: var(--theme-bg-2);
+  --color-dark-3: var(--theme-bg-3);
+  --color-dark-4: var(--theme-border-1);
+  --color-dark-5: var(--theme-border-2);
 
   /* eSol Solar Golds */
   --color-gold: #C49825;
@@ -15,13 +65,32 @@
   --color-gold-muted: rgba(196, 152, 37, 0.12);
 
   /* Cream Off-Whites */
-  --color-cream: #F0EFE8;
-  --color-cream-muted: #9A9A8A;
-  --color-cream-dim: #6A6A5E;
+  --color-cream: var(--theme-text-1);
+  --color-cream-muted: var(--theme-text-2);
+  --color-cream-dim: var(--theme-text-3);
 
   /* Typography */
   --font-display: "Cinzel", serif;
   --font-body: "Josefin Sans", sans-serif;
+
+  /* Custom Animations & Keyframes */
+  --animate-fadeIn: fadeIn 0.4s ease-out;
+  --animate-scaleUp: scaleUp 0.25s ease-out;
+  --animate-shake: shake 0.4s ease-in-out;
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scaleUp {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
 }
 
 @layer base {
@@ -30,6 +99,7 @@
     font-family: var(--font-body);
     background-color: var(--color-dark-1);
     color: var(--color-cream);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   }
   
   body {
@@ -42,10 +112,10 @@
     width: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: #141410;
+    background: var(--theme-bg-1);
   }
   ::-webkit-scrollbar-thumb {
-    background: #2E2E28;
+    background: var(--theme-border-1);
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {

@@ -8,18 +8,14 @@ interface Brand {
 }
 
 const BRANDS_LIST: Brand[] = [
-  { name: 'JA SOLAR', category: 'Paneles Solares', tagline: 'Módulos Tier 1 de alta eficiencia a nivel mundial.', country: 'China' },
-  { name: 'SOLIS', category: 'Inversores', tagline: 'Líder en inversores de cadena residenciales e industriales.', country: 'China' },
-  { name: 'SUNGROW', category: 'Inversores', tagline: 'Tecnología pionera en inversores comerciales e industriales.', country: 'China' },
-  { name: 'HOYMILES', category: 'Microinversores', tagline: 'Los microinversores más estables y seguros del mercado.', country: 'China' },
-  { name: 'K2 SYSTEMS', category: 'Estructuras', tagline: 'Sistemas de montaje con ingeniería alemana de precisión.', country: 'Alemania' },
-  { name: 'ALUMINEXT', category: 'Estructuras', tagline: 'Estructuras nacionales de aluminio anodizado reforzado.', country: 'México' },
-  { name: 'FRONIUS', category: 'Inversores', tagline: 'Calidad premium austriaca y máxima durabilidad.', country: 'Austria' },
-  { name: 'DEYE', category: 'Micro / Híbridos', tagline: 'Inversores híbridos y microinversores de última generación.', country: 'China' },
-  { name: 'PYLONTECH', category: 'Baterías', tagline: 'Almacenamiento modular de Litio LFP para hogar y comercio.', country: 'China' },
-  { name: 'SMA', category: 'Inversores', tagline: 'Ingeniería alemana de alto estándar y monitoreo avanzado.', country: 'Alemania' },
-  { name: 'ZNSHINE', category: 'Paneles Solares', tagline: 'Módulos bifaciales con recubrimiento de grafeno autolimpiable.', country: 'China' },
-  { name: 'GROWATT', category: 'Inversores / Litio', tagline: 'Sistemas completos de inversores y almacenamiento residencial.', country: 'China' }
+  { name: 'CANADIAN SOLAR', category: 'Paneles Solares', tagline: 'Fabricante global líder de módulos solares y soluciones de almacenamiento.', country: 'Canadá' },
+  { name: 'JINKO SOLAR', category: 'Paneles Solares', tagline: 'Uno de los mayores fabricantes mundiales de módulos fotovoltaicos de tecnología N-Type.', country: 'China' },
+  { name: 'LONGI SOLAR', category: 'Paneles Solares', tagline: 'Líder mundial en tecnología monocristalina de alta eficiencia y obleas de silicio.', country: 'China' },
+  { name: 'HUAWEI', category: 'Inversores', tagline: 'Soluciones inteligentes FusionSolar con inversores residenciales e industriales.', country: 'China' },
+  { name: 'GROWATT', category: 'Inversores / Litio', tagline: 'Líder en inversores residenciales e híbridos con sistemas de almacenamiento.', country: 'China' },
+  { name: 'HOYMILES', category: 'Microinversores', tagline: 'Microinversores a nivel de módulo con la más alta seguridad y eficiencia para techos.', country: 'China' },
+  { name: 'K2 SYSTEMS', category: 'Estructuras', tagline: 'Sistemas de montaje y estructuras de aluminio con ingeniería alemana de precisión.', country: 'Alemania' },
+  { name: 'PYLONTECH', category: 'Baterías', tagline: 'Especialista líder en sistemas de almacenamiento modular de Litio Ferro-Fosfato (LFP).', country: 'China' }
 ];
 
 export function Brands() {
@@ -55,7 +51,7 @@ export function Brands() {
           <h2 className="font-display font-bold text-3xl md:text-4xl text-cream tracking-tight mb-6">
             Marcas que
             <br />
-            <span className="shimmer-text font-black italic">Distribuimos</span>
+            <span className="shimmer-text font-black">Distribuimos</span>
           </h2>
           <p className="font-body text-cream-muted text-sm md:text-base leading-relaxed tracking-wide">
             Colaboramos únicamente con los fabricantes líderes de la industria solar global, asegurando garantías reales, soporte técnico de fábrica y altos rendimientos de generación.

@@ -38,7 +38,7 @@ export function Services() {
           <h2 className="font-display font-bold text-3xl md:text-4xl text-cream tracking-tight mb-6">
             Dos soluciones,
             <br />
-            <span className="shimmer-text font-black italic">un solo aliado</span>
+            <span className="shimmer-text font-black">un solo aliado</span>
           </h2>
           <p className="font-body text-cream-muted leading-relaxed tracking-wide text-sm md:text-base">
             Servimos tanto al instalador que quiere asegurar el cierre de sus proyectos mediante planos fotorrealistas, como al profesional que necesita los mejores componentes fotovoltaicos a precio de distribución.

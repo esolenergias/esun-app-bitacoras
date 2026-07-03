@@ -172,21 +172,20 @@ export async function deleteInsumo(id: string): Promise<void> {
 export async function getMatrices(): Promise<Matriz[]> {
   const { data, error } = await supabase
     .from('matrices')
-    .select('*')
+    .select(`
+      *,
+      matriz_insumos (
+        quantity,
+        insumos (
+          *
+        )
+      )
+    `)
     .order('code', { ascending: true });
 
   if (error) throw error;
   const rows = (data || []) as DbMatriz[];
-  return rows.map((row) => ({
-    id: row.id,
-    code: row.code,
-    description: row.description,
-    unit: row.unit,
-    indirect_percentage: Number(row.indirect_percentage),
-    utility_percentage: Number(row.utility_percentage),
-    created_at: row.created_at,
-    updated_at: row.updated_at
-  }));
+  return rows.map(mapMatrizFromDb);
 }
 
 export async function getMatrizDetails(id: string): Promise<Matriz> {
@@ -229,57 +228,50 @@ export async function saveMatriz(matriz: Partial<Matriz>): Promise<Matriz> {
   if (matrixError) throw matrixError;
   const savedMatrix = savedMatrixData as DbMatriz;
 
-  // Perform a delta sync for matriz_insumos
-  const { data: currentInsumosData, error: fetchError } = await supabase
-    .from('matriz_insumos')
-    .select('insumo_id')
-    .eq('matriz_id', savedMatrix.id);
-
-  if (fetchError) throw fetchError;
-  const currentInsumos = (currentInsumosData || []) as { insumo_id: string }[];
-
-  const incomingInsumoIds = new Set(
-    (matriz.insumos || []).map((item) => item.insumo.id)
-  );
-  const insumoIdsToDelete = currentInsumos
-    .map((item) => item.insumo_id)
-    .filter((id) => !incomingInsumoIds.has(id));
-
-  const insumosToUpsert = (matriz.insumos || []).map((item) => ({
-    matriz_id: savedMatrix.id,
-    insumo_id: item.insumo.id,
-    quantity: item.quantity
-  }));
-
-  if (insumoIdsToDelete.length > 0) {
-    const { error: deleteError } = await supabase
+  if (matriz.insumos !== undefined) {
+    // Perform a delta sync for matriz_insumos
+    const { data: currentInsumosData, error: fetchError } = await supabase
       .from('matriz_insumos')
-      .delete()
-      .eq('matriz_id', savedMatrix.id)
-      .in('insumo_id', insumoIdsToDelete);
+      .select('insumo_id')
+      .eq('matriz_id', savedMatrix.id);
 
-    if (deleteError) throw deleteError;
+    if (fetchError) throw fetchError;
+    const currentInsumos = (currentInsumosData || []) as { insumo_id: string }[];
+
+    const incomingInsumoIds = new Set(
+      matriz.insumos.map((item) => item.insumo.id)
+    );
+    const insumoIdsToDelete = currentInsumos
+      .map((item) => item.insumo_id)
+      .filter((id) => !incomingInsumoIds.has(id));
+
+    const insumosToUpsert = matriz.insumos.map((item) => ({
+      matriz_id: savedMatrix.id,
+      insumo_id: item.insumo.id,
+      quantity: item.quantity
+    }));
+
+    if (insumoIdsToDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('matriz_insumos')
+        .delete()
+        .eq('matriz_id', savedMatrix.id)
+        .in('insumo_id', insumoIdsToDelete);
+
+      if (deleteError) throw deleteError;
+    }
+
+    if (insumosToUpsert.length > 0) {
+      const { error: upsertError } = await supabase
+        .from('matriz_insumos')
+        .upsert(insumosToUpsert);
+
+      if (upsertError) throw upsertError;
+    }
   }
 
-  if (insumosToUpsert.length > 0) {
-    const { error: upsertError } = await supabase
-      .from('matriz_insumos')
-      .upsert(insumosToUpsert);
-
-    if (upsertError) throw upsertError;
-  }
-
-  return {
-    id: savedMatrix.id,
-    code: savedMatrix.code,
-    description: savedMatrix.description,
-    unit: savedMatrix.unit,
-    indirect_percentage: Number(savedMatrix.indirect_percentage),
-    utility_percentage: Number(savedMatrix.utility_percentage),
-    insumos: matriz.insumos || [],
-    created_at: savedMatrix.created_at,
-    updated_at: savedMatrix.updated_at
-  };
+  // Load and return fully hydrated details
+  return getMatrizDetails(savedMatrix.id);
 }
 
 export async function deleteMatriz(id: string): Promise<void> {
@@ -336,6 +328,8 @@ export async function getPresupuestoDetails(id: string): Promise<PresupuestoDeta
       )
     `)
     .eq('id', id)
+    .order('created_at', { foreignTable: 'presupuesto_conceptos', ascending: true })
+    .order('id', { foreignTable: 'presupuesto_conceptos', ascending: true })
     .single();
 
   if (error) throw error;

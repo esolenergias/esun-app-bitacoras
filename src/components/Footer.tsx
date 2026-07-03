@@ -1,6 +1,9 @@
 
 
+import { useApp } from '../context/AppContext';
+
 export function Footer() {
+  const { theme } = useApp();
   const currentYear = new Date().getFullYear();
 
   const handleScrollTo = (id: string) => {
@@ -22,7 +25,7 @@ export function Footer() {
           <div className="lg:col-span-5 space-y-6">
             <div className="flex items-center cursor-pointer group" onClick={() => handleScrollTo('hero')}>
               <img
-                src="/Logo_esol_w.png"
+                src={theme === 'light' ? '/Logo_esol_b.png' : '/Logo_esol_w.png'}
                 alt="eSol Energías Logo"
                 className="h-8 w-auto object-contain transition-transform group-hover:scale-102"
               />
@@ -81,13 +84,13 @@ export function Footer() {
             </h4>
             <ul className="space-y-2.5 text-xs text-cream-muted font-mono leading-relaxed">
               <li>
-                Tel / WA: <span className="text-cream">+52 (33) 0000-0000</span>
+                Tel / WA: <span className="text-cream">+52 (311) 234-3034</span>
               </li>
               <li>
-                Email: <a href="mailto:ventas@esolenergias.com" className="text-cream hover:text-gold transition-colors">ventas@esolenergias.com</a>
+                Email: <a href="mailto:energiasesol@gmail.com" className="text-cream hover:text-gold transition-colors">energiasesol@gmail.com</a>
               </li>
               <li>
-                Ubicación: <span className="text-cream">Guadalajara, Jalisco, México</span>
+                Ubicación: <span className="text-cream">Insurgentes 60A, Centro, Tepic, Nayarit.</span>
               </li>
             </ul>
           </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'motion/react';
 import { ChevronRight, Zap, Sun, Eye, ShieldCheck, ArrowRight } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 const FRAME_COUNT = 360;
 const AUTOPLAY_END_FRAME = 90; // Frame 90 = 3 seconds at 30fps
@@ -14,28 +15,43 @@ const padZero = (num: number, size: number) => {
   return s;
 };
 
-// Reusable CountUp Component for animated statistics
-function CountUp({ end, duration = 2 }: { end: number; duration?: number }) {
-  const [count, setCount] = useState(0);
 
-  useEffect(() => {
-    let startTimestamp: number | null = null;
-    const step = (timestamp: number) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / (duration * 1000), 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(easeProgress * end));
-      if (progress < 1) {
-        window.requestAnimationFrame(step);
-      }
-    };
-    window.requestAnimationFrame(step);
-  }, [end, duration]);
 
-  return <span>{count}</span>;
-}
+const formatHeroTitle = (title: string) => {
+  const defaultSplit = 'DE PRECISIÓN';
+  if (title.toUpperCase().endsWith(defaultSplit)) {
+    const mainText = title.substring(0, title.length - defaultSplit.length).trim();
+    return (
+      <>
+        {mainText}
+        <br />
+        <span className="shimmer-text font-black">
+          {title.substring(title.length - defaultSplit.length)}
+        </span>
+      </>
+    );
+  }
+  
+  const lastSpaceIndex = title.lastIndexOf(' ');
+  if (lastSpaceIndex !== -1) {
+    const mainText = title.substring(0, lastSpaceIndex).trim();
+    const highlightedText = title.substring(lastSpaceIndex).trim();
+    return (
+      <>
+        {mainText}
+        <br />
+        <span className="shimmer-text font-black">
+          {highlightedText}
+        </span>
+      </>
+    );
+  }
+  
+  return title;
+};
 
 export function Hero() {
+  const { content } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -305,62 +321,59 @@ export function Hero() {
         className="relative lg:absolute lg:top-0 right-0 w-full lg:w-[50vw] h-[75vw] sm:h-[60vw] lg:h-full select-none pointer-events-none z-10 bg-dark-1 order-2 lg:order-none"
       >
         <div 
-          ref={canvasContainerRef}
-          className="relative lg:sticky lg:top-[calc(50vh+48px-14.06vw)] w-full h-full lg:h-[28.125vw]"
+          className="relative lg:sticky lg:top-[calc(50vh+48px-14.06vw)] w-full h-full lg:h-[28.125vw] p-4 lg:p-6 flex items-center justify-center"
         >
-          <canvas
-            ref={canvasRef}
-            className="w-full h-full block"
-          />
+          <div
+            ref={canvasContainerRef}
+            className="w-full aspect-video rounded-2xl border border-dark-4 bg-dark-1 overflow-hidden shadow-2xl relative"
+          >
+            <canvas
+              ref={canvasRef}
+              className="w-full h-full block"
+            />
 
-          {/* Transition vignette to blend the left side of the canvas smoothly with the dark background */}
-          <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-dark-1 via-dark-1/20 to-transparent pointer-events-none z-15 hidden lg:block" />
-          
-          {/* Top & Bottom Vignette masks */}
-          <div className="absolute top-0 left-0 w-full h-12 lg:h-28 bg-gradient-to-b from-dark-1 to-transparent pointer-events-none z-15" />
-          <div className="absolute bottom-0 left-0 w-full h-12 lg:h-28 bg-gradient-to-t from-dark-1 to-transparent pointer-events-none z-15" />
-
-          {/* Loading Overlay */}
-          <AnimatePresence>
-            {!isPreloaded && (
-              <motion.div
-                initial={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.6 }}
-                className="absolute inset-0 bg-dark-1 z-35 flex flex-col items-center justify-center gap-3 px-6"
-              >
+            {/* Loading Overlay */}
+            <AnimatePresence>
+              {!isPreloaded && (
                 <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
-                  className="w-10 h-10 rounded-full border border-gold/40 flex items-center justify-center text-gold shadow-[0_0_12px_rgba(196,152,37,0.15)]"
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="absolute inset-0 bg-dark-1 z-35 flex flex-col items-center justify-center gap-3 px-6"
                 >
-                  <Sun className="w-5 h-5 stroke-[1.5]" />
-                </motion.div>
-
-                <div className="text-center space-y-0.5 select-none">
-                  <span className="font-display font-black text-[8px] tracking-[0.25em] text-cream block">
-                    ESOL ENERGÍAS
-                  </span>
-                  <span className="text-[8px] text-cream-muted font-body tracking-wider block">
-                    Cargando simulación 3D...
-                  </span>
-                </div>
-
-                {/* Progress Bar Container */}
-                <div className="w-full max-w-[120px] h-1 bg-dark-3 rounded-full overflow-hidden border border-dark-4">
                   <motion.div
-                    className="h-full bg-gradient-to-r from-gold to-gold-light"
-                    animate={{ width: `${loadProgress}%` }}
-                    transition={{ duration: 0.2 }}
-                  />
-                </div>
-                
-                <span className="text-[8px] text-gold font-mono font-bold">
-                  {loadProgress}%
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                    className="w-10 h-10 rounded-full border border-gold/40 flex items-center justify-center text-gold shadow-[0_0_12px_rgba(196,152,37,0.15)]"
+                  >
+                    <Sun className="w-5 h-5 stroke-[1.5]" />
+                  </motion.div>
+
+                  <div className="text-center space-y-0.5 select-none">
+                    <span className="font-display font-black text-[8px] tracking-[0.25em] text-cream block">
+                      ESOL ENERGÍAS
+                    </span>
+                    <span className="text-[8px] text-cream-muted font-body tracking-wider block">
+                      Cargando simulación 3D...
+                    </span>
+                  </div>
+
+                  {/* Progress Bar Container */}
+                  <div className="w-full max-w-[120px] h-1 bg-dark-3 rounded-full overflow-hidden border border-dark-4">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-gold to-gold-light"
+                      animate={{ width: `${loadProgress}%` }}
+                      transition={{ duration: 0.2 }}
+                    />
+                  </div>
+                  
+                  <span className="text-[8px] text-gold font-mono font-bold">
+                    {loadProgress}%
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>      {/* Foreground Content Container (Restricted to Left Column lg:col-span-6 on Desktop) */}
       <div className="relative z-20 w-full max-w-7xl mx-auto px-6 lg:px-12 pointer-events-none order-1 lg:order-none">
@@ -391,22 +404,18 @@ export function Hero() {
                 {/* Main Title */}
                 <motion.h1
                   variants={itemVariants}
-                  className="font-display font-bold text-cream tracking-tight leading-[1.15] mb-4"
+                  className="font-display font-bold text-cream tracking-tight leading-[1.15] mb-4 text-pretty"
                   style={{ fontSize: 'clamp(1.8rem, 3.2vw, 2.8rem)' }}
                 >
-                  Proyectos Solares
-                  <br />
-                  <span className="shimmer-text font-black italic">
-                    de Precisión
-                  </span>
+                  {formatHeroTitle(content.hero.title)}
                 </motion.h1>
 
                 {/* Description */}
                 <motion.p
                   variants={itemVariants}
-                  className="text-xs md:text-[13px] text-cream-muted leading-relaxed tracking-wide mb-6"
+                  className="text-xs md:text-[13px] text-cream-muted leading-relaxed tracking-wide mb-6 text-balance"
                 >
-                  Anteproyectos con fotomontaje 3D para instaladores que buscan cerrar más ventas, y distribución de componentes fotovoltaicos de primer nivel para todo México.
+                  {content.hero.subtitle}
                 </motion.p>
 
                 {/* Call-to-actions */}
@@ -437,7 +446,7 @@ export function Hero() {
                   {/* Stat 1 */}
                   <div className="flex flex-col">
                     <span className="text-base md:text-lg font-display font-black text-gold">
-                      <CountUp end={150} />+
+                      {content.hero.statProjects}
                     </span>
                     <span className="text-[8px] uppercase tracking-widest text-cream-muted font-bold mt-0.5">
                       Proyectos
@@ -447,7 +456,7 @@ export function Hero() {
                   {/* Stat 2 */}
                   <div className="flex flex-col border-l border-dark-4/50 pl-4">
                     <span className="text-base md:text-lg font-display font-black text-gold">
-                      <CountUp end={15} />+
+                      {content.hero.statBrands}
                     </span>
                     <span className="text-[8px] uppercase tracking-widest text-cream-muted font-bold mt-0.5">
                       Marcas
@@ -457,7 +466,7 @@ export function Hero() {
                   {/* Stat 3 */}
                   <div className="flex flex-col border-l border-dark-4/50 pl-4">
                     <span className="text-base md:text-lg font-display font-black text-gold">
-                      <CountUp end={5} /> MW
+                      {content.hero.statCapacity}
                     </span>
                     <span className="text-[8px] uppercase tracking-widest text-cream-muted font-bold mt-0.5">
                       Instalados
@@ -491,7 +500,7 @@ export function Hero() {
           <h2 className="font-display font-bold text-2xl md:text-3xl text-cream tracking-tight mb-4 leading-tight">
             Dos soluciones,
             <br />
-            <span className="shimmer-text font-black italic">un solo aliado</span>
+            <span className="shimmer-text font-black">un solo aliado</span>
           </h2>
           <p className="font-body text-cream-muted leading-relaxed tracking-wide text-xs md:text-[13px] max-w-md">
             Servimos tanto al instalador que quiere asegurar el cierre de sus proyectos mediante planos fotorrealistas, como al profesional que necesita los mejores componentes fotovoltaicos a precio de distribución.

@@ -1,22 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingCart, Percent, Plus, Minus, FileText, Send } from 'lucide-react';
-
-interface VolumeTier {
-  minQty: number;
-  price: number;
-  label: string;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  brand: string;
-  basePrice: number;
-  specs: string[];
-  unit: string;
-  tiers: VolumeTier[];
-}
+import { ShoppingCart, Percent, Plus, Minus, Send } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import type { B2BProduct } from '../context/AppContext';
 
 const CATEGORIES = [
   'Paneles Solares',
@@ -27,153 +13,8 @@ const CATEGORIES = [
   'Baterías'
 ];
 
-const PRODUCTS_DATA: Record<string, Product[]> = {
-  'Paneles Solares': [
-    {
-      id: 'ja-550w',
-      name: 'JA Solar 550W Monocristalino PERC',
-      brand: 'JA Solar',
-      basePrice: 2800,
-      unit: 'pz',
-      specs: ['Potencia: 550W', 'Eficiencia: 21.3%', 'Celdas: 144 [Half-Cut]', 'Garantía: 12 años'],
-      tiers: [
-        { minQty: 1, price: 2800, label: 'Precio Regular' },
-        { minQty: 11, price: 2650, label: 'Mayoreo (11+ pzs)' },
-        { minQty: 30, price: 2480, label: 'Distribuidor (30+ pzs)' }
-      ]
-    },
-    {
-      id: 'zn-450w',
-      name: 'Znshine 450W Bifacial Doble Vidrio',
-      brand: 'Znshine',
-      basePrice: 2200,
-      unit: 'pz',
-      specs: ['Potencia: 450W', 'Tecnología: Bifacial', 'Eficiencia: 20.7%', 'Ideal para pérgolas'],
-      tiers: [
-        { minQty: 1, price: 2200, label: 'Precio Regular' },
-        { minQty: 11, price: 2080, label: 'Mayoreo (11+ pzs)' },
-        { minQty: 30, price: 1950, label: 'Distribuidor (30+ pzs)' }
-      ]
-    }
-  ],
-  'Inversores': [
-    {
-      id: 'solis-10kw',
-      name: 'Inversor Solis 10kW Trifásico 220V',
-      brand: 'Solis',
-      basePrice: 18500,
-      unit: 'equipo',
-      specs: ['Capacidad: 10kW', 'Voltaje: 220V Trifásico', 'MPPTs: 2 independientes', 'Monitoreo WiFi integrado'],
-      tiers: [
-        { minQty: 1, price: 18500, label: 'Precio Regular' },
-        { minQty: 4, price: 17400, label: 'Volumen (4+ equipos)' },
-        { minQty: 10, price: 16200, label: 'Distribuidor (10+ equipos)' }
-      ]
-    },
-    {
-      id: 'fronius-5kw',
-      name: 'Fronius Primo 5.0-1 5kW Monofásico',
-      brand: 'Fronius',
-      basePrice: 24500,
-      unit: 'equipo',
-      specs: ['Capacidad: 5kW', 'Voltaje: 220V Monofásico', 'Tecnología: SnapINverter', 'Fabricación: Austria'],
-      tiers: [
-        { minQty: 1, price: 24500, label: 'Precio Regular' },
-        { minQty: 4, price: 23200, label: 'Volumen (4+ equipos)' },
-        { minQty: 10, price: 21800, label: 'Distribuidor (10+ equipos)' }
-      ]
-    }
-  ],
-  'Microinversores': [
-    {
-      id: 'hoymiles-1500',
-      name: 'Microinversor Hoymiles HM-1500',
-      brand: 'Hoymiles',
-      basePrice: 6200,
-      unit: 'equipo',
-      specs: ['Capacidad: 1500W', 'Entradas: 4 módulos', 'MPPTs: 2 duales', 'Comunicación RF inalámbrica'],
-      tiers: [
-        { minQty: 1, price: 6200, label: 'Precio Regular' },
-        { minQty: 6, price: 5850, label: 'Volumen (6+ equipos)' },
-        { minQty: 16, price: 5450, label: 'Distribuidor (16+ equipos)' }
-      ]
-    },
-    {
-      id: 'deye-2000',
-      name: 'Microinversor Deye SUN-2000G3',
-      brand: 'Deye',
-      basePrice: 5800,
-      unit: 'equipo',
-      specs: ['Capacidad: 2000W', 'Entradas: 4 módulos de alta potencia', 'Certificación: UL 1741', 'Garantía: 10 años'],
-      tiers: [
-        { minQty: 1, price: 5800, label: 'Precio Regular' },
-        { minQty: 6, price: 5480, label: 'Volumen (6+ equipos)' },
-        { minQty: 16, price: 5120, label: 'Distribuidor (16+ equipos)' }
-      ]
-    }
-  ],
-  'Estructuras': [
-    {
-      id: 'alum-kit4',
-      name: 'Aluminext Kit de Montaje para 4 Paneles',
-      brand: 'Aluminext',
-      basePrice: 2400,
-      unit: 'kit',
-      specs: ['Material: Aluminio Anodizado AL6005-T5', 'Resistencia al viento: 150 km/h', 'Incluye: Rieles, clamps y tornillería'],
-      tiers: [
-        { minQty: 1, price: 2400, label: 'Precio Regular' },
-        { minQty: 6, price: 2250, label: 'Mayoreo (6+ kits)' },
-        { minQty: 16, price: 2100, label: 'Distribuidor (16+ kits)' }
-      ]
-    },
-    {
-      id: 'k2-minirail',
-      name: 'K2 Systems MiniRail Kit 2 Paneles (Lámina)',
-      brand: 'K2 Systems',
-      basePrice: 1650,
-      unit: 'kit',
-      specs: ['Diseñado para techos de lámina trapezoidal', 'Instalación ultrarrápida', 'Fabricado en Alemania'],
-      tiers: [
-        { minQty: 1, price: 1650, label: 'Precio Regular' },
-        { minQty: 6, price: 1550, label: 'Mayoreo (6+ kits)' },
-        { minQty: 16, price: 1420, label: 'Distribuidor (16+ kits)' }
-      ]
-    }
-  ],
-  'Cable Solar': [
-    {
-      id: 'cable-10awg-blk',
-      name: 'Cable Fotovoltaico Negro 10 AWG (100m)',
-      brand: 'Cobre / Solar',
-      basePrice: 2950,
-      unit: 'rollo',
-      specs: ['Calibre: 10 AWG (6 mm²)', 'Voltaje: 2000V', 'Resistencia UV y Ozono', 'Conductor: Cobre estañado'],
-      tiers: [
-        { minQty: 1, price: 2950, label: 'Precio Regular' },
-        { minQty: 4, price: 2800, label: 'Volumen (4+ rollos)' },
-        { minQty: 10, price: 2600, label: 'Distribuidor (10+ rollos)' }
-      ]
-    }
-  ],
-  'Baterías': [
-    {
-      id: 'pylontech-us3000',
-      name: 'Batería Litio Pylontech US3000C 3.5kWh',
-      brand: 'Pylontech',
-      basePrice: 28000,
-      unit: 'módulo',
-      specs: ['Tecnología: LiFePO4 (LFP)', 'Capacidad nominal: 3.55 kWh', 'Ciclos útiles: >6000 (95% DoD)', 'Voltaje: 48V'],
-      tiers: [
-        { minQty: 1, price: 28000, label: 'Precio Regular' },
-        { minQty: 3, price: 26500, label: 'Mayoreo (3+ pzs)' },
-        { minQty: 6, price: 24900, label: 'Distribuidor (6+ pzs)' }
-      ]
-    }
-  ]
-};
-
 // Helper to calculate tiered unit price
-const getUnitPrice = (product: Product, quantity: number): { price: number; tierLabel: string; percentDiscount: number } => {
+const getUnitPrice = (product: B2BProduct, quantity: number): { price: number; tierLabel: string; percentDiscount: number } => {
   let activeTier = product.tiers[0];
   for (const tier of product.tiers) {
     if (quantity >= tier.minQty) {
@@ -189,6 +30,7 @@ const getUnitPrice = (product: Product, quantity: number): { price: number; tier
 };
 
 export function CatalogB2B() {
+  const { products } = useApp();
   const [activeTab, setActiveTab] = useState<string>('Paneles Solares');
   // Hash map of product quantity selections, key = product.id
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -209,15 +51,8 @@ export function CatalogB2B() {
   const selectedItems = Object.entries(cart)
     .filter(([_, qty]) => qty > 0)
     .map(([id, qty]) => {
-      // Find product across all categories
-      let foundProduct: Product | null = null;
-      for (const catProducts of Object.values(PRODUCTS_DATA)) {
-        const prod = catProducts.find((p) => p.id === id);
-        if (prod) {
-          foundProduct = prod;
-          break;
-        }
-      }
+      // Find product
+      const foundProduct = products.find((p) => p.id === id);
 
       if (!foundProduct) return null;
 
@@ -237,7 +72,7 @@ export function CatalogB2B() {
       };
     })
     .filter(Boolean) as Array<{
-      product: Product;
+      product: B2BProduct;
       quantity: number;
       unitPrice: number;
       tierLabel: string;
@@ -251,7 +86,7 @@ export function CatalogB2B() {
 
   // Generate WhatsApp Message Link
   const handleRequestQuote = () => {
-    const phone = '5213300000000'; // Target eSol sales WhatsApp (simulated or configured)
+    const phone = '523112343034'; // Target eSol sales WhatsApp (simulated or configured)
     let message = '¡Hola eSol Energías! Me interesa cotizar los siguientes componentes B2B:\n\n';
 
     selectedItems.forEach((item) => {
@@ -278,11 +113,6 @@ export function CatalogB2B() {
     window.open(`https://wa.me/${phone}?text=${encodedText}`, '_blank');
   };
 
-  const handleRequestPdf = () => {
-    // Simulated PDF trigger
-    alert('Se está generando tu lista de precios B2B en formato PDF con la matriz de descuentos. Te enviaremos un correo de confirmación.');
-  };
-
   return (
     <section id="catalogo" className="relative py-28 px-6 lg:px-12 bg-dark-2 topo-bg">
       {/* Visual background flares */}
@@ -298,7 +128,7 @@ export function CatalogB2B() {
           <h2 className="font-display font-bold text-3xl md:text-4xl text-cream tracking-tight mb-6">
             Componentes Solares
             <br />
-            <span className="shimmer-text font-black italic">de Primera Línea</span>
+            <span className="shimmer-text font-black">de Primera Línea</span>
           </h2>
           <p className="font-body text-cream-muted text-sm md:text-base leading-relaxed tracking-wide">
             Consulta disponibilidad y simula tus descuentos por volumen en tiempo real. Ajusta las cantidades para ver cómo bajan tus precios por unidad.
@@ -344,9 +174,11 @@ export function CatalogB2B() {
                 transition={{ duration: 0.3 }}
                 className="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
-                {PRODUCTS_DATA[activeTab]?.map((prod) => {
+                {products
+                  .filter((p) => p.category === activeTab && p.active !== false)
+                  .map((prod) => {
                   const qty = cart[prod.id] || 0;
-                  const { price, tierLabel, percentDiscount } = getUnitPrice(prod, qty);
+                  const { tierLabel, percentDiscount } = getUnitPrice(prod, qty);
                   
                   return (
                     <div
@@ -359,16 +191,27 @@ export function CatalogB2B() {
                           <span className="text-[10px] uppercase font-mono tracking-widest text-cream-dim">
                             {prod.brand}
                           </span>
-                          {percentDiscount > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-black uppercase text-emerald-400">
-                              <Percent className="w-3 h-3" />
-                              -{percentDiscount}% Ahorro
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-cream-dim border border-dark-4 px-2 py-0.5 rounded bg-dark-2">
-                              Escala B2B
-                            </span>
-                          )}
+                          <div className="flex flex-col items-end gap-1.5">
+                            {prod.stock > 0 ? (
+                              <span className="text-[9px] font-bold uppercase tracking-widest text-green-400 border border-green-500/25 px-2 py-0.5 rounded bg-green-500/5">
+                                Disponible
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold uppercase tracking-widest text-amber-400 border border-amber-500/25 px-2 py-0.5 rounded bg-amber-500/5">
+                                Bajo Pedido
+                              </span>
+                            )}
+                            {percentDiscount > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-black uppercase text-emerald-400">
+                                <Percent className="w-3 h-3" />
+                                -{percentDiscount}% Ahorro
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold uppercase tracking-widest text-cream-dim border border-dark-4 px-2 py-0.5 rounded bg-dark-2">
+                                Escala B2B
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <h3 className="font-display font-bold text-lg text-cream mb-2 leading-tight">
@@ -386,28 +229,8 @@ export function CatalogB2B() {
                         </ul>
                       </div>
 
-                      {/* Pricing Calculator & Tiers */}
-                      <div className="border-t border-dark-4 pt-4 mt-auto">
-                        <div className="flex items-baseline justify-between mb-4">
-                          <span className="text-[11px] text-cream-muted uppercase font-semibold">
-                            Precio Unitario:
-                          </span>
-                          <div className="text-right">
-                            {percentDiscount > 0 && (
-                              <span className="text-xs text-cream-dim line-through mr-2 font-mono">
-                                ${prod.basePrice.toLocaleString()} MXN
-                              </span>
-                            )}
-                            <span className="text-lg font-bold text-gold font-mono">
-                              ${price.toLocaleString()} MXN
-                            </span>
-                            <span className="text-[10px] text-cream-muted uppercase ml-1">
-                              / {prod.unit}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Quantity Counter Control */}
+                      {/* Quantity Counter Control & Tier Info */}
+                      <div className="border-t border-dark-4 pt-4 mt-auto space-y-3">
                         <div className="flex items-center justify-between gap-3 bg-dark-2 border border-dark-4 rounded-lg p-2">
                           <span className="text-[10px] text-cream-muted uppercase font-bold pl-1.5 select-none">
                             Cantidad:
@@ -424,7 +247,7 @@ export function CatalogB2B() {
                               type="number"
                               min="0"
                               value={qty === 0 ? '' : qty}
-                              onChange={(e) => handleSetQuantity(prod.id, parseInt(e.target.value) || 0)}
+                              onChange={(e) => handleSetQuantity(prod.id, Math.max(0, parseInt(e.target.value) || 0))}
                               placeholder="0"
                               className="w-12 h-8 text-center bg-dark-3 text-sm font-bold text-cream border border-dark-4 rounded focus:outline-none focus:border-gold font-mono select-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
@@ -439,7 +262,7 @@ export function CatalogB2B() {
                         </div>
 
                         {/* Tier Alert Label */}
-                        <div className="text-[10px] text-cream-dim text-right mt-1.5 font-mono italic">
+                        <div className="text-[10px] text-cream-dim text-right font-mono italic">
                           Tolerancia activa: {tierLabel}
                         </div>
                       </div>
@@ -448,29 +271,6 @@ export function CatalogB2B() {
                 })}
               </motion.div>
             </AnimatePresence>
-
-            {/* Quick Catalog PDF Download banner */}
-            <div className="mt-8 rounded-xl border border-gold/20 bg-gold-muted/5 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4 text-left">
-                <div className="w-10 h-10 rounded-lg bg-gold/10 border border-gold/30 flex items-center justify-center text-gold flex-none">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-display font-semibold text-cream text-sm uppercase tracking-wider">
-                    ¿Requieres la lista completa?
-                  </h4>
-                  <p className="text-xs text-cream-muted leading-relaxed">
-                    Descarga nuestra matriz completa de precios y equivalencias técnicas en PDF.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleRequestPdf}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-gold text-gold hover:bg-gold hover:text-dark-1 transition-all duration-300"
-              >
-                Descargar Lista PDF
-              </button>
-            </div>
           </div>
 
           {/* Pricing Simulator / Order Cart Summary Card (Spans 1 column) */}
@@ -501,20 +301,14 @@ export function CatalogB2B() {
                 {/* List of items */}
                 <div className="max-h-[220px] overflow-y-auto pr-1 space-y-3.5 scrollbar-thin">
                   {selectedItems.map((item) => (
-                    <div key={item.product.id} className="flex justify-between items-start gap-4 text-xs">
+                    <div key={item.product.id} className="flex justify-between items-center gap-4 text-xs py-1">
                       <div className="flex-1">
                         <h4 className="font-semibold text-cream leading-tight">
                           {item.product.name}
                         </h4>
-                        <div className="flex items-center gap-1.5 mt-1 text-[10px] text-cream-dim font-mono">
-                          <span>{item.quantity} {item.product.unit}s x ${item.unitPrice.toLocaleString()}</span>
-                          {item.percentDiscount > 0 && (
-                            <span className="text-emerald-400">(-{item.percentDiscount}%)</span>
-                          )}
-                        </div>
                       </div>
-                      <span className="font-bold text-cream font-mono">
-                        ${item.subtotal.toLocaleString()}
+                      <span className="font-bold text-gold font-mono shrink-0">
+                        {item.quantity} {item.product.unit}s
                       </span>
                     </div>
                   ))}
@@ -522,16 +316,6 @@ export function CatalogB2B() {
 
                 {/* Subtotals & Math */}
                 <div className="border-t border-dark-4 pt-4 space-y-2">
-                  <div className="flex justify-between text-xs text-cream-muted font-sans">
-                    <span>Subtotal Regular:</span>
-                    <span className="font-mono">${(totalCost + totalSavings).toLocaleString()} MXN</span>
-                  </div>
-                  {totalSavings > 0 && (
-                    <div className="flex justify-between text-xs text-emerald-400 font-sans font-semibold">
-                      <span>Tu Ahorro B2B:</span>
-                      <span className="font-mono">-${totalSavings.toLocaleString()} MXN</span>
-                    </div>
-                  )}
                   <div className="flex justify-between text-base font-bold text-cream border-t border-dark-4/50 pt-2.5 font-display">
                     <span>TOTAL ESTIMADO:</span>
                     <span className="font-mono text-gold">${totalCost.toLocaleString()} MXN</span>
