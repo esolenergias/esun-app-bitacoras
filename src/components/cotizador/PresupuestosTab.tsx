@@ -652,7 +652,9 @@ export default function PresupuestosTab() {
                 {filteredPresupuestos.map((budget) => (
                   <tr 
                     key={budget.id} 
-                    className="hover:bg-dark-2/30 transition-colors group"
+                    className="hover:bg-gold/5 transition-colors cursor-pointer group"
+                    onClick={() => window.open(`/?presupuestoId=${budget.id}`, '_blank')}
+                    title="Ver Dashboard del Presupuesto (abre en nueva pestaña)"
                   >
                     <td className="py-3.5 px-4 font-display font-bold text-cream select-all">
                       {budget.name}
@@ -671,7 +673,7 @@ export default function PresupuestosTab() {
                     <td className="py-3.5 px-4 text-right font-mono font-bold text-gold select-all">
                       {formatCurrencyMXN(budget.totals.sellingPriceTotal)}
                     </td>
-                    <td className="py-3.5 px-4 text-center select-none">
+                    <td className="py-3.5 px-4 text-center select-none" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => handleOpenEditModal(budget.id)}

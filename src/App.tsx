@@ -10,9 +10,17 @@ import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
 import { Portal } from './components/Portal';
 import { LoginModal } from './components/LoginModal';
+import PresupuestoDashboardPage from './components/cotizador/PresupuestoDashboardPage';
 
 function AppContent() {
   const { currentView, isPortalOpen, closePortal, currentUser, content } = useApp();
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const presupuestoId = searchParams.get('presupuestoId');
+
+  if (presupuestoId) {
+    return <PresupuestoDashboardPage id={presupuestoId} />;
+  }
 
   // Automatically clean up old chatbot test leads to avoid CRM contamination
   useEffect(() => {
