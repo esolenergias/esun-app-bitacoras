@@ -1,5 +1,5 @@
 import { supabase } from '../context/supabase';
-import type { Insumo, InsumoType, Matriz, Presupuesto, PresupuestoConcepto } from '../types/cotizador';
+import type { Insumo, InsumoType, InsumoSubcategory, Matriz, Presupuesto, PresupuestoConcepto } from '../types/cotizador';
 
 // ==========================================
 // DATABASE ROW INTERFACES (Safe typing)
@@ -9,6 +9,7 @@ interface DbInsumo {
   id: string;
   code: string;
   type: string;
+  subcategory?: string | null;
   description: string;
   unit: string;
   cost: number | string;
@@ -67,6 +68,7 @@ export function mapInsumoFromDb(dbInsumo: DbInsumo): Insumo {
     id: dbInsumo.id,
     code: dbInsumo.code,
     type: dbInsumo.type as InsumoType,
+    subcategory: dbInsumo.subcategory as InsumoSubcategory | null,
     description: dbInsumo.description,
     unit: dbInsumo.unit,
     cost: Number(dbInsumo.cost),
@@ -140,6 +142,7 @@ export async function saveInsumo(insumo: Partial<Insumo>): Promise<Insumo> {
   const insumoToUpsert = {
     code: insumo.code,
     type: insumo.type,
+    subcategory: insumo.subcategory,
     description: insumo.description,
     unit: insumo.unit,
     cost: insumo.cost,
