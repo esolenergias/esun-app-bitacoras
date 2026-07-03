@@ -3,7 +3,7 @@ import {
   calculateMatrixSellingPrice,
   calculateBudgetTotals
 } from '../src/lib/cotizadorService';
-import { Insumo, PresupuestoConcepto } from '../src/types/cotizador';
+import type { Insumo, PresupuestoConcepto } from '../src/types/cotizador';
 
 function assertEquals(actual: number, expected: number, message?: string) {
   if (Math.abs(actual - expected) > 1e-9) {
@@ -30,7 +30,7 @@ function runTests() {
   const directCost = calculateMatrixDirectCost(mockInsumos);
   assertEquals(directCost, 350, 'Direct Cost of matrix');
 
-  // Test 2: Selling Price of a Matrix
+  // Test 2: Selling Price of a Matrix (with rounded math)
   console.log('\nRunning Test 2: Selling Price...');
   const indirectPercentage = 10;
   const utilityPercentage = 8;
@@ -86,7 +86,8 @@ function runTests() {
 try {
   runTests();
   process.exit(0);
-} catch (error: any) {
-  console.error('\nTests FAILED:', error.message);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error('\nTests FAILED:', message);
   process.exit(1);
 }

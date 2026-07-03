@@ -1,5 +1,125 @@
 import { supabase } from '../context/supabase';
-import { Insumo, Matriz, Presupuesto, PresupuestoConcepto } from '../types/cotizador';
+import type { Insumo, InsumoType, Matriz, Presupuesto, PresupuestoConcepto } from '../types/cotizador';
+
+// ==========================================
+// DATABASE ROW INTERFACES (Safe typing)
+// ==========================================
+
+interface DbInsumo {
+  id: string;
+  code: string;
+  type: string;
+  description: string;
+  unit: string;
+  cost: number | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface DbMatrizInsumo {
+  quantity: number | string;
+  insumos: DbInsumo | DbInsumo[] | null;
+}
+
+interface DbMatriz {
+  id: string;
+  code: string;
+  description: string;
+  unit: string;
+  indirect_percentage: number | string;
+  utility_percentage: number | string;
+  matriz_insumos?: DbMatrizInsumo[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface DbConcepto {
+  id: string;
+  presupuesto_id: string;
+  matriz_id: string | null;
+  quantity: number | string;
+  description: string;
+  unit: string;
+  cost_price: number | string;
+  indirect_percentage: number | string;
+  utility_percentage: number | string;
+  matrices: DbMatriz | DbMatriz[] | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface DbPresupuesto {
+  id: string;
+  name: string;
+  client_name: string;
+  status: string;
+  presupuesto_conceptos?: DbConcepto[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ==========================================
+// DB MAPPING HELPERS (De-duplicated logic)
+// ==========================================
+
+export function mapInsumoFromDb(dbInsumo: DbInsumo): Insumo {
+  return {
+    id: dbInsumo.id,
+    code: dbInsumo.code,
+    type: dbInsumo.type as InsumoType,
+    description: dbInsumo.description,
+    unit: dbInsumo.unit,
+    cost: Number(dbInsumo.cost),
+    created_at: dbInsumo.created_at,
+    updated_at: dbInsumo.updated_at
+  };
+}
+
+export function mapMatrizFromDb(data: DbMatriz): Matriz {
+  const insumos = data.matriz_insumos?.map((mi) => {
+    const ins = Array.isArray(mi.insumos) ? mi.insumos[0] : mi.insumos;
+    if (!ins) return null;
+    return {
+      insumo: mapInsumoFromDb(ins),
+      quantity: Number(mi.quantity)
+    };
+  }).filter((item): item is { insumo: Insumo; quantity: number } => item !== null) || [];
+
+  return {
+    id: data.id,
+    code: data.code,
+    description: data.description,
+    unit: data.unit,
+    indirect_percentage: Number(data.indirect_percentage),
+    utility_percentage: Number(data.utility_percentage),
+    insumos,
+    created_at: data.created_at,
+    updated_at: data.updated_at
+  };
+}
+
+export function mapConceptoFromDb(pc: DbConcepto): PresupuestoConcepto {
+  let hydratedMatriz: Matriz | undefined = undefined;
+  const rawMatriz = Array.isArray(pc.matrices) ? pc.matrices[0] : pc.matrices;
+  if (rawMatriz) {
+    hydratedMatriz = mapMatrizFromDb(rawMatriz);
+  }
+
+  return {
+    id: pc.id,
+    presupuesto_id: pc.presupuesto_id,
+    matriz_id: pc.matriz_id,
+    quantity: Number(pc.quantity),
+    description: pc.description,
+    unit: pc.unit,
+    cost_price: Number(pc.cost_price),
+    indirect_percentage: Number(pc.indirect_percentage),
+    utility_percentage: Number(pc.utility_percentage),
+    matriz: hydratedMatriz,
+    created_at: pc.created_at,
+    updated_at: pc.updated_at
+  };
+}
 
 // ==========================================
 // 1. INSUMOS CRUD
@@ -12,7 +132,8 @@ export async function getInsumos(): Promise<Insumo[]> {
     .order('code', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  const rows = (data || []) as DbInsumo[];
+  return rows.map(mapInsumoFromDb);
 }
 
 export async function saveInsumo(insumo: Partial<Insumo>): Promise<Insumo> {
@@ -32,7 +153,7 @@ export async function saveInsumo(insumo: Partial<Insumo>): Promise<Insumo> {
     .single();
 
   if (error) throw error;
-  return data;
+  return mapInsumoFromDb(data as DbInsumo);
 }
 
 export async function deleteInsumo(id: string): Promise<void> {
@@ -55,7 +176,17 @@ export async function getMatrices(): Promise<Matriz[]> {
     .order('code', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  const rows = (data || []) as DbMatriz[];
+  return rows.map((row) => ({
+    id: row.id,
+    code: row.code,
+    description: row.description,
+    unit: row.unit,
+    indirect_percentage: Number(row.indirect_percentage),
+    utility_percentage: Number(row.utility_percentage),
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  }));
 }
 
 export async function getMatrizDetails(id: string): Promise<Matriz> {
@@ -76,25 +207,7 @@ export async function getMatrizDetails(id: string): Promise<Matriz> {
   if (error) throw error;
   if (!data) throw new Error('Matriz not found');
 
-  const insumos = data.matriz_insumos?.map((mi: any) => {
-    const ins = Array.isArray(mi.insumos) ? mi.insumos[0] : mi.insumos;
-    return {
-      insumo: ins,
-      quantity: Number(mi.quantity)
-    };
-  }).filter((item: any) => !!item.insumo) || [];
-
-  return {
-    id: data.id,
-    code: data.code,
-    description: data.description,
-    unit: data.unit,
-    indirect_percentage: Number(data.indirect_percentage),
-    utility_percentage: Number(data.utility_percentage),
-    insumos,
-    created_at: data.created_at,
-    updated_at: data.updated_at
-  };
+  return mapMatrizFromDb(data as DbMatriz);
 }
 
 export async function saveMatriz(matriz: Partial<Matriz>): Promise<Matriz> {
@@ -107,42 +220,65 @@ export async function saveMatriz(matriz: Partial<Matriz>): Promise<Matriz> {
     ...(matriz.id ? { id: matriz.id } : {})
   };
 
-  const { data: savedMatrix, error: matrixError } = await supabase
+  const { data: savedMatrixData, error: matrixError } = await supabase
     .from('matrices')
     .upsert(matrizToUpsert)
     .select()
     .single();
 
   if (matrixError) throw matrixError;
+  const savedMatrix = savedMatrixData as DbMatriz;
 
-  // Delete pre-existing entries in matriz_insumos for that matriz_id
-  const { error: deleteError } = await supabase
+  // Perform a delta sync for matriz_insumos
+  const { data: currentInsumosData, error: fetchError } = await supabase
     .from('matriz_insumos')
-    .delete()
+    .select('insumo_id')
     .eq('matriz_id', savedMatrix.id);
 
-  if (deleteError) throw deleteError;
+  if (fetchError) throw fetchError;
+  const currentInsumos = (currentInsumosData || []) as { insumo_id: string }[];
 
-  // Insert the new ones
-  if (matriz.insumos && matriz.insumos.length > 0) {
-    const insumosToInsert = matriz.insumos.map((item) => ({
-      matriz_id: savedMatrix.id,
-      insumo_id: item.insumo.id,
-      quantity: item.quantity
-    }));
+  const incomingInsumoIds = new Set(
+    (matriz.insumos || []).map((item) => item.insumo.id)
+  );
+  const insumoIdsToDelete = currentInsumos
+    .map((item) => item.insumo_id)
+    .filter((id) => !incomingInsumoIds.has(id));
 
-    const { error: insertError } = await supabase
+  const insumosToUpsert = (matriz.insumos || []).map((item) => ({
+    matriz_id: savedMatrix.id,
+    insumo_id: item.insumo.id,
+    quantity: item.quantity
+  }));
+
+  if (insumoIdsToDelete.length > 0) {
+    const { error: deleteError } = await supabase
       .from('matriz_insumos')
-      .insert(insumosToInsert);
+      .delete()
+      .eq('matriz_id', savedMatrix.id)
+      .in('insumo_id', insumoIdsToDelete);
 
-    if (insertError) throw insertError;
+    if (deleteError) throw deleteError;
+  }
+
+  if (insumosToUpsert.length > 0) {
+    const { error: upsertError } = await supabase
+      .from('matriz_insumos')
+      .upsert(insumosToUpsert);
+
+    if (upsertError) throw upsertError;
   }
 
   return {
-    ...savedMatrix,
+    id: savedMatrix.id,
+    code: savedMatrix.code,
+    description: savedMatrix.description,
+    unit: savedMatrix.unit,
     indirect_percentage: Number(savedMatrix.indirect_percentage),
     utility_percentage: Number(savedMatrix.utility_percentage),
-    insumos: matriz.insumos || []
+    insumos: matriz.insumos || [],
+    created_at: savedMatrix.created_at,
+    updated_at: savedMatrix.updated_at
   };
 }
 
@@ -166,7 +302,15 @@ export async function getPresupuestos(): Promise<Presupuesto[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  const rows = (data || []) as DbPresupuesto[];
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    client_name: row.client_name,
+    status: row.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  }));
 }
 
 export interface PresupuestoDetalle extends Presupuesto {
@@ -197,54 +341,17 @@ export async function getPresupuestoDetails(id: string): Promise<PresupuestoDeta
   if (error) throw error;
   if (!data) throw new Error('Presupuesto not found');
 
-  const conceptos = data.presupuesto_conceptos?.map((pc: any) => {
-    let hydratedMatriz: Matriz | undefined = undefined;
-    if (pc.matrices) {
-      const insumos = pc.matrices.matriz_insumos?.map((mi: any) => {
-        const ins = Array.isArray(mi.insumos) ? mi.insumos[0] : mi.insumos;
-        return {
-          insumo: ins,
-          quantity: Number(mi.quantity)
-        };
-      }).filter((item: any) => !!item.insumo) || [];
-      
-      hydratedMatriz = {
-        id: pc.matrices.id,
-        code: pc.matrices.code,
-        description: pc.matrices.description,
-        unit: pc.matrices.unit,
-        indirect_percentage: Number(pc.matrices.indirect_percentage),
-        utility_percentage: Number(pc.matrices.utility_percentage),
-        insumos,
-        created_at: pc.matrices.created_at,
-        updated_at: pc.matrices.updated_at
-      };
-    }
-
-    return {
-      id: pc.id,
-      presupuesto_id: pc.presupuesto_id,
-      matriz_id: pc.matriz_id,
-      quantity: Number(pc.quantity),
-      description: pc.description,
-      unit: pc.unit,
-      cost_price: Number(pc.cost_price),
-      indirect_percentage: Number(pc.indirect_percentage),
-      utility_percentage: Number(pc.utility_percentage),
-      matriz: hydratedMatriz,
-      created_at: pc.created_at,
-      updated_at: pc.updated_at
-    };
-  }) || [];
+  const dbPresupuesto = data as DbPresupuesto;
+  const conceptos = dbPresupuesto.presupuesto_conceptos?.map(mapConceptoFromDb) || [];
 
   return {
-    id: data.id,
-    name: data.name,
-    client_name: data.client_name,
-    status: data.status,
+    id: dbPresupuesto.id,
+    name: dbPresupuesto.name,
+    client_name: dbPresupuesto.client_name,
+    status: dbPresupuesto.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
     conceptos,
-    created_at: data.created_at,
-    updated_at: data.updated_at
+    created_at: dbPresupuesto.created_at,
+    updated_at: dbPresupuesto.updated_at
   };
 }
 
@@ -259,28 +366,48 @@ export async function savePresupuesto(
     ...(presupuesto.id ? { id: presupuesto.id } : {})
   };
 
-  const { data: savedPresupuesto, error: presupuestoError } = await supabase
+  const { data: savedPresupuestoData, error: presupuestoError } = await supabase
     .from('presupuestos')
     .upsert(presupuestoToUpsert)
     .select()
     .single();
 
   if (presupuestoError) throw presupuestoError;
-
-  let savedConceptos: PresupuestoConcepto[] = [];
+  const savedPresupuesto = savedPresupuestoData as DbPresupuesto;
 
   if (conceptos !== undefined) {
-    // Delete pre-existing concepts for that presupuesto_id
-    const { error: deleteError } = await supabase
+    // Delta updates for concepts:
+    // 1. Fetch existing concepts for this budget
+    const { data: existingConceptosData, error: fetchError } = await supabase
       .from('presupuesto_conceptos')
-      .delete()
+      .select('id')
       .eq('presupuesto_id', savedPresupuesto.id);
 
-    if (deleteError) throw deleteError;
+    if (fetchError) throw fetchError;
+    const existingConceptos = (existingConceptosData || []) as { id: string }[];
+    const existingIds = existingConceptos.map((ec) => ec.id);
 
-    // Insert the new ones
-    if (conceptos.length > 0) {
-      const conceptosToInsert = conceptos.map((c) => ({
+    // Split incoming concepts
+    const incomingWithId = conceptos.filter((c) => !!c.id);
+    const incomingWithoutId = conceptos.filter((c) => !c.id);
+    const incomingIdsSet = new Set(incomingWithId.map((c) => c.id));
+
+    // 2. Identify concepts to delete
+    const idsToDelete = existingIds.filter((id) => !incomingIdsSet.has(id));
+
+    // 3. Delete old concepts
+    if (idsToDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('presupuesto_conceptos')
+        .delete()
+        .in('id', idsToDelete);
+
+      if (deleteError) throw deleteError;
+    }
+
+    // 4. Insert new concepts (without ID)
+    if (incomingWithoutId.length > 0) {
+      const newConceptsToInsert = incomingWithoutId.map((c) => ({
         presupuesto_id: savedPresupuesto.id,
         matriz_id: c.matriz_id || null,
         quantity: c.quantity || 0,
@@ -288,83 +415,40 @@ export async function savePresupuesto(
         unit: c.unit || '',
         cost_price: c.cost_price || 0,
         indirect_percentage: c.indirect_percentage || 0,
-        utility_percentage: c.utility_percentage || 0,
-        ...(c.id ? { id: c.id } : {})
+        utility_percentage: c.utility_percentage || 0
       }));
 
-      const { data: insertedConceptos, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('presupuesto_conceptos')
-        .insert(conceptosToInsert)
-        .select(`
-          *,
-          matrices (
-            *,
-            matriz_insumos (
-              quantity,
-              insumos (
-                *
-              )
-            )
-          )
-        `);
+        .insert(newConceptsToInsert);
 
       if (insertError) throw insertError;
-
-      savedConceptos = insertedConceptos?.map((pc: any) => {
-        let hydratedMatriz: Matriz | undefined = undefined;
-        if (pc.matrices) {
-          const insumos = pc.matrices.matriz_insumos?.map((mi: any) => {
-            const ins = Array.isArray(mi.insumos) ? mi.insumos[0] : mi.insumos;
-            return {
-              insumo: ins,
-              quantity: Number(mi.quantity)
-            };
-          }).filter((item: any) => !!item.insumo) || [];
-          
-          hydratedMatriz = {
-            id: pc.matrices.id,
-            code: pc.matrices.code,
-            description: pc.matrices.description,
-            unit: pc.matrices.unit,
-            indirect_percentage: Number(pc.matrices.indirect_percentage),
-            utility_percentage: Number(pc.matrices.utility_percentage),
-            insumos,
-            created_at: pc.matrices.created_at,
-            updated_at: pc.matrices.updated_at
-          };
-        }
-
-        return {
-          id: pc.id,
-          presupuesto_id: pc.presupuesto_id,
-          matriz_id: pc.matriz_id,
-          quantity: Number(pc.quantity),
-          description: pc.description,
-          unit: pc.unit,
-          cost_price: Number(pc.cost_price),
-          indirect_percentage: Number(pc.indirect_percentage),
-          utility_percentage: Number(pc.utility_percentage),
-          matriz: hydratedMatriz,
-          created_at: pc.created_at,
-          updated_at: pc.updated_at
-        };
-      }) || [];
     }
-  } else {
-    // Fetch existing concepts
-    const existingDetails = await getPresupuestoDetails(savedPresupuesto.id);
-    savedConceptos = existingDetails.conceptos;
+
+    // 5. Update existing concepts (with ID)
+    if (incomingWithId.length > 0) {
+      const conceptsToUpdate = incomingWithId.map((c) => ({
+        id: c.id,
+        presupuesto_id: savedPresupuesto.id,
+        matriz_id: c.matriz_id || null,
+        quantity: c.quantity || 0,
+        description: c.description || '',
+        unit: c.unit || '',
+        cost_price: c.cost_price || 0,
+        indirect_percentage: c.indirect_percentage || 0,
+        utility_percentage: c.utility_percentage || 0
+      }));
+
+      const { error: updateError } = await supabase
+        .from('presupuesto_conceptos')
+        .upsert(conceptsToUpdate);
+
+      if (updateError) throw updateError;
+    }
   }
 
-  return {
-    id: savedPresupuesto.id,
-    name: savedPresupuesto.name,
-    client_name: savedPresupuesto.client_name,
-    status: savedPresupuesto.status,
-    conceptos: savedConceptos,
-    created_at: savedPresupuesto.created_at,
-    updated_at: savedPresupuesto.updated_at
-  };
+  // Load fully hydrated details to return
+  return getPresupuestoDetails(savedPresupuesto.id);
 }
 
 export async function deletePresupuesto(id: string): Promise<void> {
@@ -390,7 +474,8 @@ export function calculateMatrixSellingPrice(
   utilityPercentage: number
 ): number {
   const subtotal = Number(directCost) * (1 + Number(indirectPercentage) / 100);
-  return subtotal * (1 + Number(utilityPercentage) / 100);
+  const sellingPrice = subtotal * (1 + Number(utilityPercentage) / 100);
+  return Math.round((sellingPrice + Number.EPSILON) * 100) / 100;
 }
 
 export interface BudgetTotals {
@@ -416,7 +501,7 @@ export function calculateBudgetTotals(conceptos: PresupuestoConcepto[]): BudgetT
   }
 
   return {
-    directCostTotal,
-    sellingPriceTotal
+    directCostTotal: Math.round((directCostTotal + Number.EPSILON) * 100) / 100,
+    sellingPriceTotal: Math.round((sellingPriceTotal + Number.EPSILON) * 100) / 100
   };
 }
