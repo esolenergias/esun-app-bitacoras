@@ -7,6 +7,11 @@ import {
 } from '../../lib/cotizadorService';
 import type { Presupuesto, PresupuestoConcepto, Insumo, Matriz, InsumoType, InsumoSubcategory } from '../../types/cotizador';
 import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
+import { 
+  Loader2, AlertTriangle, FileText, ChevronRight, ChevronDown, 
+  Layers, Package, Users, Cpu, ShieldCheck, DollarSign, 
+  TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, Layers2, Wrench, Plus
+} from 'lucide-react';
 
 interface NumericInputProps {
   value: number;
