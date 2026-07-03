@@ -1,17 +1,27 @@
 -- ====================================================
 -- ESOL ENERGÍAS - COTIZADOR SQL SETUP
 -- ====================================================
--- Dependencies:
--- This script requires that 'supabase_schema.sql' is executed
--- first, as it relies on the 'public.profiles' table and the
--- RLS helper function 'public.is_admin_or_master(auth.uid())'.
---
 -- Description:
 -- This migration script creates the database schema, enables Row Level Security (RLS),
 -- defines access control policies, configures timestamp triggers, and inserts seed data.
 -- All operations are wrapped in a transaction block to ensure atomic execution.
+--
+-- Self-contained: includes the required helper function definition.
+-- Requires: public.profiles table with a 'role' column ('admin' | 'master').
 
-BEGIN;
+-- ----------------------------------------------------
+-- 0. RLS HELPER FUNCTION (idempotent - safe to re-run)
+-- ----------------------------------------------------
+CREATE OR REPLACE FUNCTION public.is_admin_or_master(user_id uuid)
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.id = user_id AND profiles.role IN ('admin', 'master')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 
 -- ----------------------------------------------------
 -- 1. TABLE CREATION & INDEXES
@@ -215,5 +225,3 @@ VALUES
   )
 ON CONFLICT (matriz_id, insumo_id) DO UPDATE SET
   quantity = EXCLUDED.quantity;
-
-COMMIT;

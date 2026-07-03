@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, Search, Edit, Trash2, X, Loader2, AlertTriangle, Layers, Check
+  Plus, Search, Edit, Trash2, X, Loader2, AlertTriangle, Layers, Check, Eye
 } from 'lucide-react';
 import { 
   getMatrices, getMatrizDetails, saveMatriz, deleteMatriz, getInsumos,
@@ -39,6 +39,26 @@ export default function MatricesTab() {
   // Delete Confirmation states
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmCode, setDeleteConfirmCode] = useState<string>('');
+
+  // Detail view states
+  const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
+  const [detailMatriz, setDetailMatriz] = useState<Matriz | null>(null);
+  const [loadingDetailView, setLoadingDetailView] = useState<boolean>(false);
+
+  const handleOpenDetail = async (matriz: Matriz) => {
+    setLoadingDetailView(true);
+    setIsDetailOpen(true);
+    setDetailMatriz(null);
+    try {
+      const details = await getMatrizDetails(matriz.id);
+      setDetailMatriz(details);
+    } catch (err: any) {
+      console.error('Error loading matrix detail:', err);
+      setIsDetailOpen(false);
+    } finally {
+      setLoadingDetailView(false);
+    }
+  };
 
   // Fetch matrices and insumos on mount
   useEffect(() => {
@@ -346,7 +366,8 @@ export default function MatricesTab() {
                   return (
                     <tr 
                       key={matriz.id}
-                      className="hover:bg-dark-2/30 transition-colors"
+                      className="hover:bg-gold/5 transition-colors cursor-pointer group"
+                      onClick={() => handleOpenDetail(matriz)}
                     >
                       <td className="py-3.5 px-4 font-mono font-bold text-gold tracking-wide select-all">
                         {matriz.code}
@@ -369,10 +390,17 @@ export default function MatricesTab() {
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-gold select-all">
                         {formatCurrencyMXN(totals.sellingPrice)}
                       </td>
-                      <td className="py-3.5 px-4 text-center select-none">
+                      <td className="py-3.5 px-4 text-center select-none" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1.5">
                           <button
-                            onClick={() => handleOpenEditModal(matriz)}
+                            onClick={(e) => { e.stopPropagation(); handleOpenDetail(matriz); }}
+                            className="p-1.5 border border-dark-4 bg-dark-1 hover:border-gold/30 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-gold transition-all cursor-pointer"
+                            title="Ver desglose APU"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleOpenEditModal(matriz); }}
                             disabled={loadingDetails}
                             className="p-1.5 border border-dark-4 bg-dark-1 hover:border-gold/30 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-gold transition-all cursor-pointer disabled:opacity-40"
                             title="Editar matriz"
@@ -380,7 +408,7 @@ export default function MatricesTab() {
                             <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleOpenDeleteConfirm(matriz)}
+                            onClick={(e) => { e.stopPropagation(); handleOpenDeleteConfirm(matriz); }}
                             className="p-1.5 border border-red-500/10 bg-dark-1 hover:border-red-500/30 hover:bg-red-500/5 rounded-lg text-cream-muted hover:text-red-400 transition-all cursor-pointer"
                             title="Eliminar matriz"
                           >
@@ -396,6 +424,176 @@ export default function MatricesTab() {
           </div>
         )}
       </div>
+
+      {/* DETAIL VIEW MODAL — Desglose APU */}
+      {isDetailOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out] font-body">
+          <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-[scaleUp_0.25s_ease-out]">
+
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-dark-4 bg-dark-2 flex-shrink-0">
+              <div>
+                <h4 className="font-display font-black text-base text-cream uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-gold" />
+                  Desglose APU — Análisis de Precio Unitario
+                </h4>
+                {detailMatriz && (
+                  <p className="text-[10px] font-mono text-cream-dim tracking-wider mt-1">
+                    [{detailMatriz.code}] {detailMatriz.description}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setIsDetailOpen(false)}
+                className="p-1.5 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-cream transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
+              {loadingDetailView ? (
+                <div className="flex flex-col items-center justify-center py-16 select-none">
+                  <Loader2 className="w-8 h-8 animate-spin text-gold" />
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-cream-dim mt-3 font-bold">Cargando desglose...</p>
+                </div>
+              ) : detailMatriz ? (() => {
+                const insumos = detailMatriz.insumos || [];
+                const directCost = calculateMatrixDirectCost(insumos);
+                const subtotal = directCost * (1 + (detailMatriz.indirect_percentage / 100));
+                const sellingPrice = calculateMatrixSellingPrice(directCost, detailMatriz.indirect_percentage, detailMatriz.utility_percentage);
+
+                // Group by type with order: material → labor → equipment → tool
+                const typeOrder = ['material', 'labor', 'equipment', 'tool'];
+                const typeLabels: Record<string, string> = {
+                  material: 'Materiales',
+                  labor: 'Mano de Obra',
+                  equipment: 'Equipos y Maquinaria',
+                  tool: 'Herramientas'
+                };
+                const grouped = typeOrder
+                  .map(type => ({
+                    type,
+                    label: typeLabels[type],
+                    items: insumos.filter(i => i.insumo.type === type)
+                  }))
+                  .filter(g => g.items.length > 0);
+
+                return (
+                  <>
+                    {/* Encabezado de la Matriz */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { label: 'Código', value: detailMatriz.code, mono: true, gold: true },
+                        { label: 'Unidad', value: detailMatriz.unit, mono: true },
+                        { label: 'Indirecto', value: `${detailMatriz.indirect_percentage.toFixed(1)}%`, mono: true },
+                        { label: 'Utilidad', value: `${detailMatriz.utility_percentage.toFixed(1)}%`, mono: true }
+                      ].map(item => (
+                        <div key={item.label} className="bg-dark-1/60 border border-dark-4 rounded-xl p-3 space-y-1">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-cream-muted select-none">{item.label}</p>
+                          <p className={`text-sm font-mono font-bold ${item.gold ? 'text-gold' : 'text-cream'}`}>{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desglose por grupo de insumo */}
+                    {grouped.map(group => {
+                      const groupSubtotal = group.items.reduce((s, i) => s + (Number(i.insumo.cost) * Number(i.quantity)), 0);
+                      return (
+                        <div key={group.type} className="space-y-2">
+                          <div className="flex justify-between items-center pl-3 border-l-2 border-gold/70 bg-gold/5 py-1.5 pr-3 select-none">
+                            <h6 className="text-[10px] font-black uppercase tracking-widest text-cream">{group.label}</h6>
+                            <span className="font-mono text-[10px] text-cream-dim">Subtotal: {formatCurrencyMXN(groupSubtotal)}</span>
+                          </div>
+                          <div className="border border-dark-4 rounded-xl overflow-hidden">
+                            <table className="w-full border-collapse text-left text-xs">
+                              <thead>
+                                <tr className="border-b border-dark-4 bg-dark-2/70 select-none">
+                                  <th className="py-2 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider">Código</th>
+                                  <th className="py-2 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider">Descripción</th>
+                                  <th className="py-2 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-center">Unidad</th>
+                                  <th className="py-2 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Rendimiento / Cant.</th>
+                                  <th className="py-2 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Costo Unitario</th>
+                                  <th className="py-2 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Importe</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-dark-4 font-body">
+                                {group.items.map((item, idx) => {
+                                  const importe = Number(item.insumo.cost) * Number(item.quantity);
+                                  return (
+                                    <tr key={idx} className="hover:bg-dark-1/20 transition-colors">
+                                      <td className="py-2.5 px-3 font-mono font-bold text-gold select-all">{item.insumo.code}</td>
+                                      <td className="py-2.5 px-3 text-cream leading-relaxed">{item.insumo.description}</td>
+                                      <td className="py-2.5 px-3 text-cream-muted text-center font-mono">{item.insumo.unit}</td>
+                                      <td className="py-2.5 px-3 text-right font-mono select-all">{Number(item.quantity).toFixed(6)}</td>
+                                      <td className="py-2.5 px-3 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(Number(item.insumo.cost))}</td>
+                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(importe)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Resumen de precios en cascada */}
+                    <div className="bg-dark-1/40 border border-dark-4 rounded-xl overflow-hidden">
+                      <div className="px-4 py-2 border-b border-dark-4 select-none">
+                        <h6 className="text-[9px] font-black uppercase tracking-widest text-gold">Resumen de Precio en Cascada</h6>
+                      </div>
+                      <div className="divide-y divide-dark-4 text-xs font-mono">
+                        <div className="flex justify-between items-center px-4 py-2.5">
+                          <span className="text-cream-dim font-bold uppercase">Costo Directo Unitario</span>
+                          <span className="text-cream font-bold select-all">{formatCurrencyMXN(directCost)}</span>
+                        </div>
+                        <div className="flex justify-between items-center px-4 py-2.5 bg-dark-2/30">
+                          <span className="text-cream-dim font-bold uppercase">+ Indirectos ({detailMatriz.indirect_percentage.toFixed(1)}%)</span>
+                          <span className="text-cream-dim select-all">{formatCurrencyMXN(directCost * (detailMatriz.indirect_percentage / 100))}</span>
+                        </div>
+                        <div className="flex justify-between items-center px-4 py-2.5">
+                          <span className="text-cream-dim font-bold uppercase">= Subtotal con Indirectos</span>
+                          <span className="text-cream select-all">{formatCurrencyMXN(subtotal)}</span>
+                        </div>
+                        <div className="flex justify-between items-center px-4 py-2.5 bg-dark-2/30">
+                          <span className="text-cream-dim font-bold uppercase">+ Utilidad ({detailMatriz.utility_percentage.toFixed(1)}%)</span>
+                          <span className="text-cream-dim select-all">{formatCurrencyMXN(subtotal * (detailMatriz.utility_percentage / 100))}</span>
+                        </div>
+                        <div className="flex justify-between items-center px-4 py-3 bg-gold/5">
+                          <span className="text-gold font-black uppercase tracking-wide">= Precio de Venta Unitario</span>
+                          <span className="text-gold font-black text-base select-all">{formatCurrencyMXN(sellingPrice)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })() : null}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-dark-4 bg-dark-2 flex justify-between items-center flex-shrink-0 select-none">
+              <span className="text-[10px] font-mono text-cream-muted">eSol Energías — APU Engine v2.0</span>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => detailMatriz && handleOpenEditModal(detailMatriz)}
+                  className="px-4 py-2 border border-dark-4 hover:bg-dark-3 text-cream-muted hover:text-cream text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Editar</span>
+                </button>
+                <button
+                  onClick={() => setIsDetailOpen(false)}
+                  className="px-4 py-2 bg-gold hover:bg-gold-light text-dark-1 font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CREATE & EDIT MODAL */}
       {isModalOpen && (

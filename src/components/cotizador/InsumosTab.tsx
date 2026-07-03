@@ -3,7 +3,8 @@ import {
   Plus, Search, Edit, Trash2, X, Loader2, AlertTriangle, Filter 
 } from 'lucide-react';
 import { getInsumos, saveInsumo, deleteInsumo } from '../../lib/cotizadorService';
-import type { Insumo, InsumoType } from '../../types/cotizador';
+import type { Insumo, InsumoType, InsumoSubcategory } from '../../types/cotizador';
+import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
 
 export default function InsumosTab() {
   // State variables
@@ -24,7 +25,11 @@ export default function InsumosTab() {
   const [formDescription, setFormDescription] = useState<string>('');
   const [formUnit, setFormUnit] = useState<string>('');
   const [formCost, setFormCost] = useState<number>(0);
+  const [formSubcategory, setFormSubcategory] = useState<InsumoSubcategory | ''>('');
   const [formValidationError, setFormValidationError] = useState<string | null>(null);
+
+  // Subcategory filter (only applies when activeFilter === 'material')
+  const [subcategoryFilter, setSubcategoryFilter] = useState<InsumoSubcategory | 'all'>('all');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
   // Delete Confirmation states
@@ -58,6 +63,7 @@ export default function InsumosTab() {
     setFormDescription('');
     setFormUnit('');
     setFormCost(0);
+    setFormSubcategory('');
     setFormValidationError(null);
     setIsModalOpen(true);
   };
@@ -70,6 +76,7 @@ export default function InsumosTab() {
     setFormDescription(insumo.description);
     setFormUnit(insumo.unit);
     setFormCost(insumo.cost);
+    setFormSubcategory((insumo.subcategory as InsumoSubcategory) || '');
     setFormValidationError(null);
     setIsModalOpen(true);
   };
@@ -109,6 +116,7 @@ export default function InsumosTab() {
       const insumoData: Partial<Insumo> = {
         code: formCode.trim().toUpperCase(),
         type: formType,
+        subcategory: formType === 'material' && formSubcategory ? formSubcategory : null,
         description: formDescription.trim(),
         unit: formUnit.trim(),
         cost: formCost,
@@ -161,11 +169,15 @@ export default function InsumosTab() {
   // Filtering and Searching
   const filteredInsumos = insumos.filter(insumo => {
     const matchesFilter = activeFilter === 'all' || insumo.type === activeFilter;
-    const matchesSearch = 
+    const matchesSubcategory =
+      activeFilter !== 'material' ||
+      subcategoryFilter === 'all' ||
+      insumo.subcategory === subcategoryFilter;
+    const matchesSearch =
       insumo.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       insumo.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       insumo.unit.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesSubcategory && matchesSearch;
   });
 
   // Helper to format currency exactly as spec: $2,400.00 MXN
@@ -226,82 +238,82 @@ export default function InsumosTab() {
       </div>
 
       {/* Filter and Search Controls */}
-      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
-        {/* Tab filters */}
-        <div className="flex flex-wrap gap-1.5 bg-dark-2 p-1 rounded-xl border border-dark-4 self-start select-none font-sans">
-          <button
-            onClick={() => setActiveFilter('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeFilter === 'all'
-                ? 'bg-gold/10 text-gold border border-gold/30 font-bold'
-                : 'text-cream-muted hover:text-cream hover:bg-dark-3 border border-transparent'
-            }`}
-          >
-            Todos
-          </button>
-          <button
-            onClick={() => setActiveFilter('material')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeFilter === 'material'
-                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 font-bold'
-                : 'text-cream-muted hover:text-cream hover:bg-dark-3 border border-transparent'
-            }`}
-          >
-            Materiales
-          </button>
-          <button
-            onClick={() => setActiveFilter('labor')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeFilter === 'labor'
-                ? 'bg-green-500/10 text-green-400 border border-green-500/30 font-bold'
-                : 'text-cream-muted hover:text-cream hover:bg-dark-3 border border-transparent'
-            }`}
-          >
-            Mano de Obra
-          </button>
-          <button
-            onClick={() => setActiveFilter('equipment')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeFilter === 'equipment'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold'
-                : 'text-cream-muted hover:text-cream hover:bg-dark-3 border border-transparent'
-            }`}
-          >
-            Equipos
-          </button>
-          <button
-            onClick={() => setActiveFilter('tool')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeFilter === 'tool'
-                ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold'
-                : 'text-cream-muted hover:text-cream hover:bg-dark-3 border border-transparent'
-            }`}
-          >
-            Herramientas
-          </button>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col lg:flex-row gap-3 justify-between items-stretch lg:items-center">
+          {/* Tab filters — tipos principales */}
+          <div className="flex flex-wrap gap-1.5 bg-dark-2 p-1 rounded-xl border border-dark-4 self-start select-none font-sans">
+            {([
+              { key: 'all',       label: 'Todos',        active: 'bg-gold/10 text-gold border border-gold/30' },
+              { key: 'material',  label: 'Materiales',   active: 'bg-blue-500/10 text-blue-400 border border-blue-500/30' },
+              { key: 'labor',     label: 'Mano de Obra', active: 'bg-green-500/10 text-green-400 border border-green-500/30' },
+              { key: 'equipment', label: 'Equipos',      active: 'bg-amber-500/10 text-amber-400 border border-amber-500/30' },
+              { key: 'tool',      label: 'Herramientas', active: 'bg-purple-500/10 text-purple-400 border border-purple-500/30' },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => { setActiveFilter(tab.key as typeof activeFilter); setSubcategoryFilter('all'); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  activeFilter === tab.key
+                    ? `${tab.active} font-bold`
+                    : 'text-cream-muted hover:text-cream hover:bg-dark-3 border border-transparent'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Input */}
+          <div className="relative max-w-md w-full lg:w-72 font-sans">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-cream-muted">
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              placeholder="Buscar por código o desc..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-dark-2 border border-dark-4 focus:border-gold/45 text-xs text-cream placeholder-cream-muted rounded-xl focus:outline-none transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-cream-muted hover:text-cream cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Search Input */}
-        <div className="relative max-w-md w-full lg:w-72 font-sans">
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-cream-muted">
-            <Search className="w-4 h-4" />
-          </span>
-          <input
-            type="text"
-            placeholder="Buscar por código o desc..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-dark-2 border border-dark-4 focus:border-gold/45 text-xs text-cream placeholder-cream-muted rounded-xl focus:outline-none transition-colors"
-          />
-          {searchQuery && (
-            <button 
-              onClick={() => setSearchQuery('')}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-cream-muted hover:text-cream cursor-pointer"
+        {/* Subcategory pills — solo visible cuando activeFilter === 'material' */}
+        {activeFilter === 'material' && (
+          <div className="flex flex-wrap gap-1.5 select-none animate-[fadeIn_0.2s_ease-out]">
+            <button
+              onClick={() => setSubcategoryFilter('all')}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                subcategoryFilter === 'all'
+                  ? 'bg-blue-500/15 text-blue-300 border-blue-500/40'
+                  : 'text-cream-muted border-dark-4 hover:border-blue-500/20 hover:text-blue-400'
+              }`}
             >
-              <X className="w-3.5 h-3.5" />
+              Todos los materiales
             </button>
-          )}
-        </div>
+            {MATERIAL_SUBCATEGORIES.map(sub => (
+              <button
+                key={sub}
+                onClick={() => setSubcategoryFilter(sub)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                  subcategoryFilter === sub
+                    ? 'bg-blue-500/15 text-blue-300 border-blue-500/40'
+                    : 'text-cream-muted border-dark-4 hover:border-blue-500/20 hover:text-blue-400'
+                }`}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Main Table Grid */}
@@ -334,7 +346,7 @@ export default function InsumosTab() {
               <thead>
                 <tr className="border-b border-dark-4 bg-dark-2/65 text-cream-dim text-[10px] font-mono uppercase tracking-wider select-none">
                   <th className="py-3 px-4 font-bold">Código</th>
-                  <th className="py-3 px-4 font-bold">Tipo</th>
+                  <th className="py-3 px-4 font-bold">Tipo / Subcategoría</th>
                   <th className="py-3 px-4 font-bold">Descripción</th>
                   <th className="py-3 px-4 font-bold">Unidad</th>
                   <th className="py-3 px-4 font-bold text-right">Costo Unitario</th>
@@ -350,10 +362,15 @@ export default function InsumosTab() {
                     <td className="py-3.5 px-4 font-mono font-bold text-gold tracking-wide select-all">
                       {insumo.code}
                     </td>
-                    <td className="py-3.5 px-4 select-none">
+                    <td className="py-3.5 px-4 select-none space-y-1">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${getTypeBadgeStyles(insumo.type)}`}>
                         {translateType(insumo.type)}
                       </span>
+                      {insumo.subcategory && (
+                        <span className="block px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider bg-blue-500/5 text-blue-400/80 border border-blue-500/15 w-fit">
+                          {insumo.subcategory}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-cream font-body leading-relaxed max-w-xs md:max-w-md lg:max-w-lg truncate" title={insumo.description}>
                       {insumo.description}
@@ -444,13 +461,33 @@ export default function InsumosTab() {
                     onChange={(e) => setFormType(e.target.value as InsumoType)}
                     className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none cursor-pointer"
                   >
-                    <option value="material">Material (Panel, Inversor, etc.)</option>
-                    <option value="labor">Mano de Obra (Instalador, Supervisor)</option>
-                    <option value="equipment">Equipo (Andamios, Grúa)</option>
-                    <option value="tool">Herramienta (Herramientas de mano)</option>
+                    <option value="material">Material</option>
+                    <option value="labor">Mano de Obra</option>
+                    <option value="equipment">Equipo</option>
+                    <option value="tool">Herramienta</option>
                   </select>
                 </div>
               </div>
+
+              {/* Subcategory selector — solo visible cuando tipo es material */}
+              {formType === 'material' && (
+                <div className="space-y-1.5 animate-[fadeIn_0.2s_ease-out]">
+                  <label htmlFor="insumo-subcategory" className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">
+                    Subcategoría de Material
+                  </label>
+                  <select
+                    id="insumo-subcategory"
+                    value={formSubcategory}
+                    onChange={(e) => setFormSubcategory(e.target.value as InsumoSubcategory | '')}
+                    className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none cursor-pointer"
+                  >
+                    <option value="">— Sin subcategoría —</option>
+                    {MATERIAL_SUBCATEGORIES.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Description Field */}
               <div className="space-y-1.5">

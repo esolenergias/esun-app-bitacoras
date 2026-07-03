@@ -1,9 +1,27 @@
 export type InsumoType = 'material' | 'labor' | 'equipment' | 'tool';
 
+export type InsumoSubcategory =
+  | 'Panel solar'
+  | 'Inversor'
+  | 'Estructura de montaje'
+  | 'Estructura PTR'
+  | 'Material electrico DC'
+  | 'Material electrico AC';
+
+export const MATERIAL_SUBCATEGORIES: InsumoSubcategory[] = [
+  'Panel solar',
+  'Inversor',
+  'Estructura de montaje',
+  'Estructura PTR',
+  'Material electrico DC',
+  'Material electrico AC',
+];
+
 export interface Insumo {
   id: string;
   code: string;
   type: InsumoType;
+  subcategory?: InsumoSubcategory | null;
   description: string;
   unit: string;
   cost: number;
