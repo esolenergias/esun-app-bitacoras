@@ -10,10 +10,14 @@ import {
   getMatrices,
   calculateMatrixSellingPrice,
   calculateBudgetTotals,
-  calculateMatrixDirectCost
+  calculateMatrixDirectCost,
+  getInsumos,
+  saveInsumo,
+  saveMatriz
 } from '../../lib/cotizadorService';
 import type { PresupuestoDetalle } from '../../lib/cotizadorService';
-import type { Presupuesto, PresupuestoConcepto, Matriz, Insumo } from '../../types/cotizador';
+import type { Presupuesto, PresupuestoConcepto, Matriz, Insumo, InsumoType, InsumoSubcategory } from '../../types/cotizador';
+import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
 
 interface PresupuestoWithTotals extends Presupuesto {
   conceptos: PresupuestoConcepto[];
@@ -105,6 +109,44 @@ export default function PresupuestosTab() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
 
+  // ----------------------------------------------------
+  // NESTED CONCEPT CREATOR SUB-MODAL STATES
+  // ----------------------------------------------------
+  const [isAddConceptModalOpen, setIsAddConceptModalOpen] = useState<boolean>(false);
+  const [addConceptTab, setAddConceptTab] = useState<'apu' | 'custom' | 'new_matrix' | 'new_insumo'>('apu');
+  
+  // Cache of insumos for matrix builder
+  const [insumosCatalog, setInsumosCatalog] = useState<Insumo[]>([]);
+  
+  // Custom Concept Form
+  const [customDesc, setCustomDesc] = useState<string>('');
+  const [customUnit, setCustomUnit] = useState<string>('');
+  const [customQty, setCustomQty] = useState<number>(1);
+  const [customCost, setCustomCost] = useState<number>(0);
+  const [customIndirect, setCustomIndirect] = useState<number>(10);
+  const [customUtility, setCustomUtility] = useState<number>(8);
+  
+  // New Matrix Form
+  const [newMatrixCode, setNewMatrixCode] = useState<string>('');
+  const [newMatrixDesc, setNewMatrixDesc] = useState<string>('');
+  const [newMatrixUnit, setNewMatrixUnit] = useState<string>('');
+  const [newMatrixIndirect, setNewMatrixIndirect] = useState<number>(10);
+  const [newMatrixUtility, setNewMatrixUtility] = useState<number>(8);
+  const [newMatrixInsumos, setNewMatrixInsumos] = useState<{ insumo: Insumo; quantity: number }[]>([]);
+  const [selectedInsumoIdForNewMatrix, setSelectedInsumoIdForNewMatrix] = useState<string>('');
+  const [insumoQtyForNewMatrix, setInsumoQtyForNewMatrix] = useState<number>(1);
+  
+  // New Insumo Form
+  const [newInsumoCode, setNewInsumoCode] = useState<string>('');
+  const [newInsumoType, setNewInsumoType] = useState<InsumoType>('material');
+  const [newInsumoSubcategory, setNewInsumoSubcategory] = useState<InsumoSubcategory | ''>('');
+  const [newInsumoDesc, setNewInsumoDesc] = useState<string>('');
+  const [newInsumoUnit, setNewInsumoUnit] = useState<string>('');
+  const [newInsumoCost, setNewInsumoCost] = useState<number>(0);
+
+  const [subModalError, setSubModalError] = useState<string | null>(null);
+  const [subModalSubmitting, setSubModalSubmitting] = useState<boolean>(false);
+
   const fetchBudgets = async () => {
     try {
       const { data, error: dbError } = await supabase
@@ -163,10 +205,12 @@ export default function PresupuestosTab() {
     setLoading(true);
     setError(null);
     try {
-      const [matricesData] = await Promise.all([
-        getMatrices()
+      const [matricesData, insumosData] = await Promise.all([
+        getMatrices(),
+        getInsumos()
       ]);
       setMatrices(matricesData);
+      setInsumosCatalog(insumosData);
       await fetchBudgets();
     } catch (err: any) {
       console.error('Error fetching initial data:', err);
@@ -244,6 +288,232 @@ export default function PresupuestosTab() {
     setFormConceptos(prev => [...prev, newConcept]);
     setSelectedMatrixId('');
     setFormValidationError(null);
+  };
+
+  // ----------------------------------------------------
+  // SUB-MODAL ACTION HANDLERS
+  // ----------------------------------------------------
+  const handleOpenAddConceptModal = () => {
+    setAddConceptTab('apu');
+    setSelectedMatrixId('');
+    
+    setCustomDesc('');
+    setCustomUnit('pza');
+    setCustomQty(1);
+    setCustomCost(0);
+    setCustomIndirect(10);
+    setCustomUtility(8);
+    
+    setNewMatrixCode('');
+    setNewMatrixDesc('');
+    setNewMatrixUnit('pza');
+    setNewMatrixIndirect(10);
+    setNewMatrixUtility(8);
+    setNewMatrixInsumos([]);
+    setSelectedInsumoIdForNewMatrix('');
+    setInsumoQtyForNewMatrix(1);
+    
+    setNewInsumoCode('');
+    setNewInsumoType('material');
+    setNewInsumoSubcategory('');
+    setNewInsumoDesc('');
+    setNewInsumoUnit('pza');
+    setNewInsumoCost(0);
+    
+    setSubModalError(null);
+    setSubModalSubmitting(false);
+    setIsAddConceptModalOpen(true);
+  };
+
+  const handleAddExistingAPU = () => {
+    if (!selectedMatrixId) {
+      setSubModalError('Selecciona una matriz de la lista.');
+      return;
+    }
+    const matrix = matrices.find(m => m.id === selectedMatrixId);
+    if (!matrix) return;
+    
+    const costPrice = calculateMatrixDirectCost(matrix.insumos || []);
+    const newConcept: Partial<PresupuestoConcepto> = {
+      id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      presupuesto_id: editingPresupuesto?.id || '',
+      matriz_id: matrix.id,
+      description: matrix.description,
+      unit: matrix.unit,
+      cost_price: costPrice,
+      indirect_percentage: matrix.indirect_percentage,
+      utility_percentage: matrix.utility_percentage,
+      quantity: customQty > 0 ? customQty : 1.00,
+      matriz: matrix
+    };
+    
+    setFormConceptos(prev => [...prev, newConcept]);
+    setIsAddConceptModalOpen(false);
+  };
+
+  const handleAddCustomConcept = () => {
+    if (!customDesc.trim()) {
+      setSubModalError('La descripción es obligatoria.');
+      return;
+    }
+    if (!customUnit.trim()) {
+      setSubModalError('La unidad es obligatoria.');
+      return;
+    }
+    if (customQty <= 0) {
+      setSubModalError('La cantidad debe ser mayor a 0.');
+      return;
+    }
+    if (customCost < 0) {
+      setSubModalError('El costo no puede ser negativo.');
+      return;
+    }
+    
+    const newConcept: Partial<PresupuestoConcepto> = {
+      id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      presupuesto_id: editingPresupuesto?.id || '',
+      matriz_id: null,
+      description: customDesc.trim(),
+      unit: customUnit.trim(),
+      cost_price: customCost,
+      indirect_percentage: customIndirect,
+      utility_percentage: customUtility,
+      quantity: customQty,
+      matriz: undefined
+    };
+    
+    setFormConceptos(prev => [...prev, newConcept]);
+    setIsAddConceptModalOpen(false);
+  };
+
+  const handleAddInsumoToNewMatrix = () => {
+    if (!selectedInsumoIdForNewMatrix) return;
+    const insumo = insumosCatalog.find(i => i.id === selectedInsumoIdForNewMatrix);
+    if (!insumo) return;
+    
+    // Check if already added
+    if (newMatrixInsumos.some(item => item.insumo.id === insumo.id)) {
+      alert('Este insumo ya está añadido al desglose.');
+      return;
+    }
+    
+    setNewMatrixInsumos(prev => [...prev, { insumo, quantity: insumoQtyForNewMatrix }]);
+    setSelectedInsumoIdForNewMatrix('');
+    setInsumoQtyForNewMatrix(1);
+  };
+
+  const handleRemoveInsumoFromNewMatrix = (insumoId: string) => {
+    setNewMatrixInsumos(prev => prev.filter(item => item.insumo.id !== insumoId));
+  };
+
+  const handleCreateAndAddMatrix = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubModalError(null);
+    
+    if (!newMatrixCode.trim()) {
+      setSubModalError('El código de la matriz es obligatorio.');
+      return;
+    }
+    if (!newMatrixDesc.trim()) {
+      setSubModalError('La descripción es obligatoria.');
+      return;
+    }
+    if (!newMatrixUnit.trim()) {
+      setSubModalError('La unidad es obligatoria.');
+      return;
+    }
+    if (newMatrixInsumos.length === 0) {
+      setSubModalError('Debes añadir al menos un insumo al desglose.');
+      return;
+    }
+    
+    setSubModalSubmitting(true);
+    try {
+      const matrixData: Partial<Matriz> = {
+        code: newMatrixCode.trim().toUpperCase(),
+        description: newMatrixDesc.trim(),
+        unit: newMatrixUnit.trim(),
+        indirect_percentage: newMatrixIndirect,
+        utility_percentage: newMatrixUtility,
+        insumos: newMatrixInsumos
+      };
+      
+      const saved = await saveMatriz(matrixData);
+      
+      // Update local matrices list
+      setMatrices(prev => [...prev, saved].sort((a, b) => a.code.localeCompare(b.code)));
+      
+      // Add it directly as a concept
+      const costPrice = calculateMatrixDirectCost(saved.insumos || []);
+      const newConcept: Partial<PresupuestoConcepto> = {
+        id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        presupuesto_id: editingPresupuesto?.id || '',
+        matriz_id: saved.id,
+        description: saved.description,
+        unit: saved.unit,
+        cost_price: costPrice,
+        indirect_percentage: saved.indirect_percentage,
+        utility_percentage: saved.utility_percentage,
+        quantity: customQty > 0 ? customQty : 1.00,
+        matriz: saved
+      };
+      
+      setFormConceptos(prev => [...prev, newConcept]);
+      setIsAddConceptModalOpen(false);
+    } catch (err: any) {
+      console.error('Error creating matrix:', err);
+      setSubModalError(err.message || 'Error al guardar la matriz. Verifica si el código ya existe.');
+    } finally {
+      setSubModalSubmitting(false);
+    }
+  };
+
+  const handleCreateNewInsumo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubModalError(null);
+    
+    if (!newInsumoCode.trim()) {
+      setSubModalError('El código del insumo es obligatorio.');
+      return;
+    }
+    if (!newInsumoDesc.trim()) {
+      setSubModalError('La descripción es obligatoria.');
+      return;
+    }
+    if (!newInsumoUnit.trim()) {
+      setSubModalError('La unidad es obligatoria.');
+      return;
+    }
+    if (newInsumoCost < 0) {
+      setSubModalError('El costo no puede ser negativo.');
+      return;
+    }
+    
+    setSubModalSubmitting(true);
+    try {
+      const insumoData: Partial<Insumo> = {
+        code: newInsumoCode.trim().toUpperCase(),
+        type: newInsumoType,
+        subcategory: newInsumoType === 'material' && newInsumoSubcategory ? newInsumoSubcategory : null,
+        description: newInsumoDesc.trim(),
+        unit: newInsumoUnit.trim(),
+        cost: newInsumoCost
+      };
+      
+      const saved = await saveInsumo(insumoData);
+      
+      // Update cached catalog
+      setInsumosCatalog(prev => [...prev, saved].sort((a, b) => a.code.localeCompare(b.code)));
+      
+      alert('¡Insumo creado con éxito! Ya puedes seleccionarlo en la pestaña de crear matrices.');
+      setAddConceptTab('new_matrix');
+      setSelectedInsumoIdForNewMatrix(saved.id);
+    } catch (err: any) {
+      console.error('Error creating insumo:', err);
+      setSubModalError(err.message || 'Error al guardar el insumo. Verifica si el código ya existe.');
+    } finally {
+      setSubModalSubmitting(false);
+    }
   };
 
   // Remove concept from list
@@ -784,38 +1054,18 @@ export default function PresupuestosTab() {
                     <h5 className="text-[10px] font-black uppercase tracking-widest text-gold">Líneas de Concepto</h5>
                   </div>
                   
-                  {/* Selector of matrices to add */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 bg-dark-1/40 p-4 border border-dark-4 rounded-xl">
-                    <div className="flex-1 space-y-1.5">
-                      <label className="text-[9.5px] text-cream-dim uppercase font-bold tracking-wider block select-none">Seleccionar Plantilla de Matriz (APU)</label>
-                      <select
-                        value={selectedMatrixId}
-                        onChange={(e) => setSelectedMatrixId(e.target.value)}
-                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none transition-colors font-mono cursor-pointer"
-                      >
-                        <option value="">-- Elige una Matriz de Costos --</option>
-                        {matrices.map(m => (
-                          <option key={m.id} value={m.id}>
-                            [{m.code}] {m.description}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAddConcepto}
-                      disabled={!selectedMatrixId}
-                      className="px-4 py-2.5 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-shrink-0"
-                    >
-                      <Plus className="w-4 h-4 stroke-[2.5]" />
-                      <span>Añadir Concepto</span>
-                    </button>
-                  </div>
-
                   {/* Concept line items list */}
                   {formConceptos.length === 0 ? (
-                    <div className="border border-dashed border-dark-4 p-8 text-center rounded-xl select-none text-cream-muted text-xs font-body">
-                      No hay conceptos añadidos. Selecciona una matriz APU en la parte superior para comenzar.
+                    <div className="border border-dashed border-dark-4 p-12 text-center rounded-xl select-none text-cream-muted text-xs font-body flex flex-col items-center justify-center gap-3">
+                      <span>No hay conceptos añadidos en este presupuesto.</span>
+                      <button
+                        type="button"
+                        onClick={handleOpenAddConceptModal}
+                        className="px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-gold/10 hover:scale-[1.02]"
+                      >
+                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                        <span>Nuevo concepto</span>
+                      </button>
                     </div>
                   ) : (
                     <div className="border border-dark-4 rounded-xl overflow-hidden">
@@ -911,7 +1161,19 @@ export default function PresupuestosTab() {
                           </tbody>
                         </table>
                       </div>
-                      
+
+                      {/* Button Nuevo concepto */}
+                      <div className="p-3 bg-dark-2/45 border-t border-dark-4 flex justify-start select-none">
+                        <button
+                          type="button"
+                          onClick={handleOpenAddConceptModal}
+                          className="px-4 py-2 bg-dark-3 border border-dark-4 hover:border-gold/30 text-gold hover:bg-dark-4 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Nuevo concepto</span>
+                        </button>
+                      </div>
+
                       {/* Calculations Footer */}
                       <div className="bg-dark-2/90 border-t border-dark-4 p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono select-none">
                         <div className="flex justify-between items-center py-1.5 border-b sm:border-b-0 sm:border-r border-dark-4 pr-0 sm:pr-4">
@@ -1169,6 +1431,496 @@ export default function PresupuestosTab() {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4.5 NESTED ADD CONCEPT CREATOR SUB-MODAL */}
+      {isAddConceptModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out] font-sans">
+          <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-[scaleUp_0.25s_ease-out]">
+            
+            {/* Sub-modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-dark-4 bg-dark-2 flex-shrink-0 select-none">
+              <h4 className="font-display font-black text-sm text-cream uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-gold stroke-[2.5]" />
+                <span>Nuevo Concepto</span>
+              </h4>
+              <button 
+                onClick={() => setIsAddConceptModalOpen(false)}
+                className="p-1 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-cream transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Sub-modal Navigation Tabs */}
+            <div className="flex bg-dark-1 border-b border-dark-4 p-1.5 gap-1 select-none flex-shrink-0 text-[10px] font-black uppercase tracking-wider">
+              {([
+                { key: 'apu', label: 'Usar Plantilla APU' },
+                { key: 'custom', label: 'Concepto Personalizado' },
+                { key: 'new_matrix', label: 'Crear Nueva Matriz' },
+                { key: 'new_insumo', label: 'Crear Nuevo Insumo' }
+              ] as const).map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => { setAddConceptTab(tab.key); setSubModalError(null); }}
+                  className={`flex-1 py-2 text-center rounded-lg transition-colors cursor-pointer ${
+                    addConceptTab === tab.key
+                      ? 'bg-gold/10 text-gold border border-gold/20 font-bold'
+                      : 'text-cream-muted hover:text-cream hover:bg-dark-2'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sub-modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 min-h-0 space-y-4">
+              {subModalError && (
+                <div className="p-3 bg-red-500/10 text-red-400 border border-red-500/25 rounded-xl text-xs flex items-start gap-2 select-none animate-[shake_0.4s_ease-in-out]">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{subModalError}</span>
+                </div>
+              )}
+
+              {/* Tab 1: APU Template */}
+              {addConceptTab === 'apu' && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Seleccionar de Matriz Existente (Catálogo APU)</label>
+                    <select
+                      value={selectedMatrixId}
+                      onChange={(e) => setSelectedMatrixId(e.target.value)}
+                      className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none cursor-pointer font-mono"
+                    >
+                      <option value="">-- Elige una Matriz APU --</option>
+                      {matrices.map(m => (
+                        <option key={m.id} value={m.id}>
+                          [{m.code}] {m.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Cantidad requerida</label>
+                      <NumericInput
+                        step="0.01"
+                        min="0.01"
+                        value={customQty}
+                        onChange={setCustomQty}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    {selectedMatrixId && (() => {
+                      const matrix = matrices.find(m => m.id === selectedMatrixId);
+                      if (!matrix) return null;
+                      const directCost = calculateMatrixDirectCost(matrix.insumos || []);
+                      const sellingPrice = calculateMatrixSellingPrice(directCost, matrix.indirect_percentage, matrix.utility_percentage);
+                      return (
+                        <div className="space-y-1 bg-dark-1/50 border border-dark-4 p-3 rounded-xl font-mono text-[10px] select-none">
+                          <span className="text-cream-dim block uppercase text-[8px] font-black tracking-widest">Previsualización APU</span>
+                          <span className="text-cream block">Costo Directo U: {formatCurrencyMXN(directCost)}</span>
+                          <span className="text-gold block font-bold">Venta U: {formatCurrencyMXN(sellingPrice)}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleAddExistingAPU}
+                      disabled={!selectedMatrixId}
+                      className="px-5 py-2.5 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5"
+                    >
+                      Añadir al Presupuesto
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Custom Concept (Ad-hoc) */}
+              {addConceptTab === 'custom' && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Descripción del Concepto</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Suministro e instalación de ducto galvanizado..."
+                      value={customDesc}
+                      onChange={(e) => setCustomDesc(e.target.value)}
+                      className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
+                      <input
+                        type="text"
+                        placeholder="pza, m, jor"
+                        value={customUnit}
+                        onChange={(e) => setCustomUnit(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Cantidad</label>
+                      <NumericInput
+                        step="0.01"
+                        min="0.01"
+                        value={customQty}
+                        onChange={setCustomQty}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Costo Directo Unitario (MXN)</label>
+                      <NumericInput
+                        step="0.01"
+                        value={customCost}
+                        onChange={setCustomCost}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Indirecto %</label>
+                      <NumericInput
+                        step="0.1"
+                        value={customIndirect}
+                        onChange={setCustomIndirect}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Utilidad %</label>
+                      <NumericInput
+                        step="0.1"
+                        value={customUtility}
+                        onChange={setCustomUtility}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="bg-dark-1/50 border border-dark-4 p-3 rounded-xl font-mono text-[10px] select-none flex flex-col justify-center">
+                      <span className="text-cream-dim uppercase text-[8px] font-black tracking-widest block">Precio de Venta Unitario</span>
+                      <span className="text-gold font-bold text-sm">
+                        {formatCurrencyMXN(calculateMatrixSellingPrice(customCost, customIndirect, customUtility))}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleAddCustomConcept}
+                      className="px-5 py-2.5 bg-gold hover:bg-gold-light text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5"
+                    >
+                      Añadir al Presupuesto
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 3: Create New Matrix (APU) */}
+              {addConceptTab === 'new_matrix' && (
+                <form onSubmit={handleCreateAndAddMatrix} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Código Matriz</label>
+                      <input
+                        type="text"
+                        placeholder="APU-CONCEPTO-N"
+                        value={newMatrixCode}
+                        onChange={(e) => setNewMatrixCode(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none uppercase font-mono"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Descripción Matriz</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Suministro e instalacion de panel..."
+                        value={newMatrixDesc}
+                        onChange={(e) => setNewMatrixDesc(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
+                      <input
+                        type="text"
+                        placeholder="pza, m"
+                        value={newMatrixUnit}
+                        onChange={(e) => setNewMatrixUnit(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Indirecto %</label>
+                      <NumericInput
+                        step="0.1"
+                        value={newMatrixIndirect}
+                        onChange={setNewMatrixIndirect}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Utilidad %</label>
+                      <NumericInput
+                        step="0.1"
+                        value={newMatrixUtility}
+                        onChange={setNewMatrixUtility}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Matrix breakdown list builder */}
+                  <div className="border border-dark-4 p-4 rounded-xl space-y-3 bg-dark-1/30">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-gold block select-none">Desglose de Insumos de la Matriz</span>
+                    
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5 select-none">
+                      <div className="flex-1 space-y-1">
+                        <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Seleccionar Insumo del Catálogo</label>
+                        <select
+                          value={selectedInsumoIdForNewMatrix}
+                          onChange={(e) => setSelectedInsumoIdForNewMatrix(e.target.value)}
+                          className="w-full p-2 bg-dark-1 border border-dark-4 text-xs text-cream rounded-lg focus:outline-none font-mono cursor-pointer"
+                        >
+                          <option value="">-- Elige un Insumo --</option>
+                          {insumosCatalog.map(ins => (
+                            <option key={ins.id} value={ins.id}>
+                              [{ins.code}] ({ins.type === 'service' ? 'Trámite' : ins.type}) {ins.description}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="w-24 space-y-1">
+                        <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Cantidad / Rend.</label>
+                        <NumericInput
+                          step="0.0001"
+                          min="0.0001"
+                          value={insumoQtyForNewMatrix}
+                          onChange={setInsumoQtyForNewMatrix}
+                          className="w-full p-2 bg-dark-1 border border-dark-4 text-xs text-cream rounded-lg text-right font-mono focus:outline-none"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleAddInsumoToNewMatrix}
+                        disabled={!selectedInsumoIdForNewMatrix}
+                        className="px-3 py-2 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 font-black text-[10px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Añadir</span>
+                      </button>
+                    </div>
+
+                    {/* Breakdown list */}
+                    {newMatrixInsumos.length > 0 ? (
+                      <div className="border border-dark-4 rounded-lg overflow-hidden">
+                        <table className="w-full text-left text-[11px] border-collapse bg-dark-2/40">
+                          <thead>
+                            <tr className="border-b border-dark-4 bg-dark-2 select-none text-[8.5px] uppercase text-cream-dim">
+                              <th className="py-1.5 px-2">Código</th>
+                              <th className="py-1.5 px-2">Insumo</th>
+                              <th className="py-1.5 px-2 text-right">Rend.</th>
+                              <th className="py-1.5 px-2 text-right">Costo U.</th>
+                              <th className="py-1.5 px-2 text-right">Importe</th>
+                              <th className="py-1.5 px-2 text-center w-8"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-dark-4 font-body">
+                            {newMatrixInsumos.map((item, idx) => {
+                              const importe = item.insumo.cost * item.quantity;
+                              return (
+                                <tr key={idx} className="hover:bg-dark-1/25 transition-colors">
+                                  <td className="py-1.5 px-2 font-mono font-bold text-gold/80 select-all">{item.insumo.code}</td>
+                                  <td className="py-1.5 px-2 text-cream truncate max-w-[150px]">{item.insumo.description}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono select-all">{item.quantity.toFixed(4)}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(item.insumo.cost)}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(importe)}</td>
+                                  <td className="py-1.5 px-2 text-center select-none">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveInsumoFromNewMatrix(item.insumo.id)}
+                                      className="p-1 text-cream-muted hover:text-red-400 transition-colors cursor-pointer"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-cream-muted font-body italic text-center py-2">Ningún insumo añadido a la matriz aún.</p>
+                    )}
+                  </div>
+
+                  <div className="pt-4 flex justify-between items-center select-none border-t border-dark-4">
+                    {/* Live preview cost calculations */}
+                    {(() => {
+                      const direct = calculateMatrixDirectCost(newMatrixInsumos);
+                      const sale = calculateMatrixSellingPrice(direct, newMatrixIndirect, newMatrixUtility);
+                      return (
+                        <div className="font-mono text-[9.5px] text-cream-dim">
+                          <span>Directo: {formatCurrencyMXN(direct)} &bull; </span>
+                          <span className="text-gold font-bold">Venta APU: {formatCurrencyMXN(sale)}</span>
+                        </div>
+                      );
+                    })()}
+                    <button
+                      type="submit"
+                      disabled={subModalSubmitting}
+                      className="px-5 py-2.5 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5 flex items-center gap-1.5"
+                    >
+                      {subModalSubmitting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Guardando Matriz...</span>
+                        </>
+                      ) : (
+                        <span>Guardar Matriz y Añadir Concepto</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Tab 4: Create New Insumo */}
+              {addConceptTab === 'new_insumo' && (
+                <form onSubmit={handleCreateNewInsumo} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Código Insumo</label>
+                      <input
+                        type="text"
+                        placeholder="MAT-NUEVO-01"
+                        value={newInsumoCode}
+                        onChange={(e) => setNewInsumoCode(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none uppercase font-mono"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Tipo Insumo</label>
+                      <select
+                        value={newInsumoType}
+                        onChange={(e) => { setNewInsumoType(e.target.value as InsumoType); setNewInsumoSubcategory(''); }}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none cursor-pointer"
+                      >
+                        <option value="material">Material</option>
+                        <option value="labor">Mano de Obra</option>
+                        <option value="equipment">Equipo</option>
+                        <option value="tool">Herramienta</option>
+                        <option value="service">Trámite</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {newInsumoType === 'material' && (
+                    <div className="space-y-1.5 animate-[fadeIn_0.2s_ease-out]">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Subcategoría de Material</label>
+                      <select
+                        value={newInsumoSubcategory}
+                        onChange={(e) => setNewInsumoSubcategory(e.target.value as InsumoSubcategory | '')}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none cursor-pointer"
+                      >
+                        <option value="">— Sin subcategoría —</option>
+                        {MATERIAL_SUBCATEGORIES.map(sub => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Descripción del Insumo</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Inversor Central trifásico Fronius..."
+                      value={newInsumoDesc}
+                      onChange={(e) => setNewInsumoDesc(e.target.value)}
+                      className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
+                      <input
+                        type="text"
+                        placeholder="pza, m, hr"
+                        value={newInsumoUnit}
+                        onChange={(e) => setNewInsumoUnit(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Costo Unitario (MXN)</label>
+                      <NumericInput
+                        step="0.01"
+                        value={newInsumoCost}
+                        onChange={setNewInsumoCost}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end border-t border-dark-4">
+                    <button
+                      type="submit"
+                      disabled={subModalSubmitting}
+                      className="px-5 py-2.5 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5 flex items-center gap-1.5"
+                    >
+                      {subModalSubmitting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Guardando Insumo...</span>
+                        </>
+                      ) : (
+                        <span>Guardar Insumo en Catálogo</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+            </div>
+
+            {/* Sub-modal Footer */}
+            <div className="px-6 py-4 border-t border-dark-4 bg-dark-2 flex justify-between items-center flex-shrink-0 select-none">
+              <span className="text-[10px] font-mono text-cream-muted">Añadiendo concepto al presupuesto</span>
+              <button
+                type="button"
+                onClick={() => setIsAddConceptModalOpen(false)}
+                className="px-4 py-2 border border-dark-4 hover:bg-dark-3 text-cream-muted hover:text-cream text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+
           </div>
         </div>
       )}
