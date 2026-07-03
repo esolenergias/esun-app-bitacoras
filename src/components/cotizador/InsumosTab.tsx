@@ -200,6 +200,8 @@ export default function InsumosTab() {
         return 'bg-amber-500/10 text-amber-400 border border-amber-500/25';
       case 'tool':
         return 'bg-purple-500/10 text-purple-400 border border-purple-500/25';
+      case 'service':
+        return 'bg-rose-500/10 text-rose-400 border border-rose-500/25';
       default:
         return 'bg-cream/10 text-cream-dim border border-cream/20';
     }
@@ -212,6 +214,7 @@ export default function InsumosTab() {
       case 'labor': return 'Mano de Obra';
       case 'equipment': return 'Equipo';
       case 'tool': return 'Herramienta';
+      case 'service': return 'Trámite';
       default: return type;
     }
   };
@@ -248,6 +251,7 @@ export default function InsumosTab() {
               { key: 'labor',     label: 'Mano de Obra', active: 'bg-green-500/10 text-green-400 border border-green-500/30' },
               { key: 'equipment', label: 'Equipos',      active: 'bg-amber-500/10 text-amber-400 border border-amber-500/30' },
               { key: 'tool',      label: 'Herramientas', active: 'bg-purple-500/10 text-purple-400 border border-purple-500/30' },
+              { key: 'service',   label: 'Trámites',     active: 'bg-rose-500/10 text-rose-400 border border-rose-500/30' },
             ] as const).map(tab => (
               <button
                 key={tab.key}
@@ -465,6 +469,7 @@ export default function InsumosTab() {
                     <option value="labor">Mano de Obra</option>
                     <option value="equipment">Equipo</option>
                     <option value="tool">Herramienta</option>
+                    <option value="service">Trámite</option>
                   </select>
                 </div>
               </div>

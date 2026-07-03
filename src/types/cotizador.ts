@@ -1,4 +1,4 @@
-export type InsumoType = 'material' | 'labor' | 'equipment' | 'tool';
+export type InsumoType = 'material' | 'labor' | 'equipment' | 'tool' | 'service';
 
 export type InsumoSubcategory =
   | 'Panel solar'
