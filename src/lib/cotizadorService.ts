@@ -312,8 +312,10 @@ export interface PresupuestoDetalle extends Presupuesto {
   conceptos: PresupuestoConcepto[];
 }
 
-export async function getPresupuestoDetails(id: string): Promise<PresupuestoDetalle> {
-  const { data, error } = await supabase
+export async function getPresupuestoDetails(idOrName: string): Promise<PresupuestoDetalle> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrName);
+
+  let query = supabase
     .from('presupuestos')
     .select(`
       *,
@@ -329,8 +331,15 @@ export async function getPresupuestoDetails(id: string): Promise<PresupuestoDeta
           )
         )
       )
-    `)
-    .eq('id', id)
+    `);
+
+  if (isUuid) {
+    query = query.eq('id', idOrName);
+  } else {
+    query = query.eq('name', idOrName);
+  }
+
+  const { data, error } = await query
     .order('created_at', { foreignTable: 'presupuesto_conceptos', ascending: true })
     .order('id', { foreignTable: 'presupuesto_conceptos', ascending: true })
     .single();

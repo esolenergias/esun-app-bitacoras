@@ -923,7 +923,7 @@ export default function PresupuestosTab() {
                   <tr 
                     key={budget.id} 
                     className="hover:bg-gold/5 transition-colors cursor-pointer group"
-                    onClick={() => window.open(`/?presupuestoId=${budget.id}`, '_blank')}
+                    onClick={() => window.open(`/?presupuestoId=${encodeURIComponent(budget.name)}`, '_blank')}
                     title="Ver Dashboard del Presupuesto (abre en nueva pestaña)"
                   >
                     <td className="py-3.5 px-4 font-display font-bold text-cream select-all">
