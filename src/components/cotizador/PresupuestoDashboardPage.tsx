@@ -1629,8 +1629,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5 sm:col-span-1">
                       <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
                       <input
                         type="text"
@@ -1639,24 +1639,6 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                         onChange={(e) => setNewMatrixUnit(e.target.value)}
                         className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
                         required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Indirecto %</label>
-                      <NumericInput
-                        step="0.1"
-                        value={newMatrixIndirect}
-                        onChange={setNewMatrixIndirect}
-                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Utilidad %</label>
-                      <NumericInput
-                        step="0.1"
-                        value={newMatrixUtility}
-                        onChange={setNewMatrixUtility}
-                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -1759,11 +1741,13 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                     {/* Live preview cost calculations */}
                     {(() => {
                       const direct = calculateMatrixDirectCost(newMatrixInsumos);
-                      const sale = calculateMatrixSellingPrice(direct, newMatrixIndirect, newMatrixUtility);
+                      const indPct = budget?.indirect_percentage ?? 10.00;
+                      const utPct = budget?.utility_percentage ?? 8.00;
+                      const sale = calculateMatrixSellingPrice(direct, indPct, utPct);
                       return (
                         <div className="font-mono text-[9.5px] text-cream-dim">
                           <span>Directo: {formatCurrencyMXN(direct)} &bull; </span>
-                          <span className="text-gold font-bold">Venta APU: {formatCurrencyMXN(sale)}</span>
+                          <span className="text-gold font-bold">Venta Sugerido: {formatCurrencyMXN(sale)}</span>
                         </div>
                       );
                     })()}
@@ -1948,8 +1932,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5 sm:col-span-1">
                   <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
                   <input
                     type="text"
@@ -1958,24 +1942,6 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                     onChange={(e) => setMatrixFormUnit(e.target.value)}
                     className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
                     required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Indirecto %</label>
-                  <NumericInput
-                    step="0.1"
-                    value={matrixFormIndirect}
-                    onChange={setMatrixFormIndirect}
-                    className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Utilidad %</label>
-                  <NumericInput
-                    step="0.1"
-                    value={matrixFormUtility}
-                    onChange={setMatrixFormUtility}
-                    className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
                   />
                 </div>
               </div>
@@ -2088,11 +2054,13 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               <div className="pt-4 flex justify-between items-center select-none border-t border-dark-4">
                 {(() => {
                   const direct = calculateMatrixDirectCost(matrixFormInsumos);
-                  const sale = calculateMatrixSellingPrice(direct, matrixFormIndirect, matrixFormUtility);
+                  const indPct = budget?.indirect_percentage ?? 10.00;
+                  const utPct = budget?.utility_percentage ?? 8.00;
+                  const sale = calculateMatrixSellingPrice(direct, indPct, utPct);
                   return (
                     <div className="font-mono text-[9.5px] text-cream-dim">
                       <span>Costo Directo: {formatCurrencyMXN(direct)} &bull; </span>
-                      <span className="text-gold font-bold">P.V. Venta APU: {formatCurrencyMXN(sale)}</span>
+                      <span className="text-gold font-bold">P.V. Venta Sugerido: {formatCurrencyMXN(sale)}</span>
                     </div>
                   );
                 })()}
