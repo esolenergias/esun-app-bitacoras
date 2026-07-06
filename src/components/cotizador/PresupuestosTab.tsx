@@ -1324,55 +1324,53 @@ export default function PresupuestosTab() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-4 text-xs font-body">
-                              {(() => {
+                              {reportDetails.conceptos.map((c) => {
                                 const indPct = reportDetails.indirect_percentage ?? 10.00;
                                 const utPct = reportDetails.utility_percentage ?? 8.00;
-                                const reportTotals = calculateBudgetTotals(reportDetails.conceptos, indPct, utPct);
-                                const indVal = reportTotals.directCostTotal * (indPct / 100);
-                                const utVal = (reportTotals.directCostTotal + indVal) * (utPct / 100);
-
+                                const unitSelling = calculateMatrixSellingPrice(c.cost_price, indPct, utPct);
+                                const totalSelling = Number(c.quantity) * unitSelling;
                                 return (
-                                  <>
-                                    {reportDetails.conceptos.map((c) => {
-                                      const unitSelling = calculateMatrixSellingPrice(c.cost_price, indPct, utPct);
-                                      const totalSelling = Number(c.quantity) * unitSelling;
-                                      return (
-                                        <tr key={c.id} className="hover:bg-dark-1/10 transition-colors">
-                                          <td className="py-3 px-4 text-cream font-bold">{c.description}</td>
-                                          <td className="py-3 px-4 text-cream-muted text-center font-mono">{c.unit}</td>
-                                          <td className="py-3 px-4 text-right font-mono select-all">{Number(c.quantity).toFixed(2)}</td>
-                                          <td className="py-3 px-4 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(unitSelling)}</td>
-                                          <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">{formatCurrencyMXN(totalSelling)}</td>
-                                        </tr>
-                                      );
-                                    })}
-                                    
-                                    </tbody>
-                                    </table>
-                                    </div>
-
-                                    {/* Summary Totals */}
-                                    <div className="bg-dark-1/30 p-4 border border-dark-4 rounded-xl space-y-2 text-xs font-mono select-none">
-                                      <div className="flex justify-between items-center text-cream-dim">
-                                        <span className="uppercase font-bold">Costo Directo Consolidado:</span>
-                                        <span className="text-cream font-bold">{formatCurrencyMXN(reportTotals.directCostTotal)}</span>
-                                      </div>
-                                      <div className="flex justify-between items-center text-cream-dim">
-                                        <span className="uppercase font-bold">Indirectos ({indPct.toFixed(1)}%):</span>
-                                        <span className="text-cream font-bold">{formatCurrencyMXN(indVal)}</span>
-                                      </div>
-                                      <div className="flex justify-between items-center text-cream-dim">
-                                        <span className="uppercase font-bold">Utilidad ({utPct.toFixed(1)}%):</span>
-                                        <span className="text-cream font-bold">{formatCurrencyMXN(utVal)}</span>
-                                      </div>
-                                      <div className="flex justify-between items-center border-t border-dark-4/50 pt-2 text-gold">
-                                        <span className="uppercase font-black text-sm">Precio Comercial Total (Venta):</span>
-                                        <span className="font-bold text-base">{formatCurrencyMXN(reportTotals.sellingPriceTotal)}</span>
-                                      </div>
-                                    </div>
-                                  </>
+                                  <tr key={c.id} className="hover:bg-dark-1/10 transition-colors">
+                                    <td className="py-3 px-4 text-cream font-bold">{c.description}</td>
+                                    <td className="py-3 px-4 text-cream-muted text-center font-mono">{c.unit}</td>
+                                    <td className="py-3 px-4 text-right font-mono select-all">{Number(c.quantity).toFixed(2)}</td>
+                                    <td className="py-3 px-4 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(unitSelling)}</td>
+                                    <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">{formatCurrencyMXN(totalSelling)}</td>
+                                  </tr>
                                 );
-                              })()}
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Summary Totals */}
+                        {(() => {
+                          const indPct = reportDetails.indirect_percentage ?? 10.00;
+                          const utPct = reportDetails.utility_percentage ?? 8.00;
+                          const reportTotals = calculateBudgetTotals(reportDetails.conceptos, indPct, utPct);
+                          const indVal = reportTotals.directCostTotal * (indPct / 100);
+                          const utVal = (reportTotals.directCostTotal + indVal) * (utPct / 100);
+                          return (
+                            <div className="bg-dark-1/30 p-4 border border-dark-4 rounded-xl space-y-2 text-xs font-mono select-none">
+                              <div className="flex justify-between items-center text-cream-dim">
+                                <span className="uppercase font-bold">Costo Directo Consolidado:</span>
+                                <span className="text-cream font-bold">{formatCurrencyMXN(reportTotals.directCostTotal)}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-cream-dim">
+                                <span className="uppercase font-bold">Indirectos ({indPct.toFixed(1)}%):</span>
+                                <span className="text-cream font-bold">{formatCurrencyMXN(indVal)}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-cream-dim">
+                                <span className="uppercase font-bold">Utilidad ({utPct.toFixed(1)}%):</span>
+                                <span className="text-cream font-bold">{formatCurrencyMXN(utVal)}</span>
+                              </div>
+                              <div className="flex justify-between items-center border-t border-dark-4/50 pt-2 text-gold">
+                                <span className="uppercase font-black text-sm">Precio Comercial Total (Venta):</span>
+                                <span className="font-bold text-base">{formatCurrencyMXN(reportTotals.sellingPriceTotal)}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
