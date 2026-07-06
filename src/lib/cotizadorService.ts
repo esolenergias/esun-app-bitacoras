@@ -46,6 +46,7 @@ interface DbConcepto {
   indirect_percentage: number | string;
   utility_percentage: number | string;
   matrices: DbMatriz | DbMatriz[] | null;
+  order_index?: number | string;
   created_at?: string;
   updated_at?: string;
 }
@@ -120,6 +121,7 @@ export function mapConceptoFromDb(pc: DbConcepto): PresupuestoConcepto {
     indirect_percentage: Number(pc.indirect_percentage),
     utility_percentage: Number(pc.utility_percentage),
     matriz: hydratedMatriz,
+    order_index: pc.order_index !== undefined ? Number(pc.order_index) : 0,
     created_at: pc.created_at,
     updated_at: pc.updated_at
   };
@@ -350,6 +352,7 @@ export async function getPresupuestoDetails(idOrName: string): Promise<Presupues
   }
 
   const { data, error } = await query
+    .order('order_index', { foreignTable: 'presupuesto_conceptos', ascending: true })
     .order('created_at', { foreignTable: 'presupuesto_conceptos', ascending: true })
     .order('id', { foreignTable: 'presupuesto_conceptos', ascending: true })
     .single();
@@ -407,9 +410,15 @@ export async function savePresupuesto(
     const existingConceptos = (existingConceptosData || []) as { id: string }[];
     const existingIds = existingConceptos.map((ec) => ec.id);
 
+    // Ensure all incoming concepts have an order_index corresponding to their position in the list
+    const conceptsWithOrder = conceptos.map((c, index) => ({
+      ...c,
+      order_index: c.order_index !== undefined ? c.order_index : index
+    }));
+
     // Split incoming concepts
-    const incomingWithId = conceptos.filter((c) => !!c.id);
-    const incomingWithoutId = conceptos.filter((c) => !c.id);
+    const incomingWithId = conceptsWithOrder.filter((c) => !!c.id);
+    const incomingWithoutId = conceptsWithOrder.filter((c) => !c.id);
     const incomingIdsSet = new Set(incomingWithId.map((c) => c.id));
 
     // 2. Identify concepts to delete
@@ -435,7 +444,8 @@ export async function savePresupuesto(
         unit: c.unit || '',
         cost_price: c.cost_price || 0,
         indirect_percentage: c.indirect_percentage || 0,
-        utility_percentage: c.utility_percentage || 0
+        utility_percentage: c.utility_percentage || 0,
+        order_index: c.order_index
       }));
 
       const { error: insertError } = await supabase
@@ -456,7 +466,8 @@ export async function savePresupuesto(
         unit: c.unit || '',
         cost_price: c.cost_price || 0,
         indirect_percentage: c.indirect_percentage || 0,
-        utility_percentage: c.utility_percentage || 0
+        utility_percentage: c.utility_percentage || 0,
+        order_index: c.order_index
       }));
 
       const { error: updateError } = await supabase

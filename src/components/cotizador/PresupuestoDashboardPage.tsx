@@ -10,7 +10,8 @@ import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
 import { 
   Loader2, AlertTriangle, FileText, ChevronRight, ChevronDown, 
   Layers, Package, Users, Cpu, ShieldCheck, DollarSign, 
-  TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, Layers2, Wrench, Plus, HelpCircle
+  TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, Layers2, Wrench, Plus, HelpCircle,
+  ArrowUp, ArrowDown
 } from 'lucide-react';
 
 interface NumericInputProps {
@@ -638,6 +639,44 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     } catch (err: any) {
       console.error('Error updating concept quantity:', err);
       alert('No se pudo actualizar la cantidad del concepto.');
+    }
+  };
+
+  const handleMoveConcept = async (currentIndex: number, direction: -1 | 1) => {
+    if (!budget || !budget.conceptos) return;
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= budget.conceptos.length) return;
+
+    // Create a copy of the concepts array
+    const updatedConceptos = [...budget.conceptos];
+    
+    // Swap the elements
+    const temp = updatedConceptos[currentIndex];
+    updatedConceptos[currentIndex] = updatedConceptos[targetIndex];
+    updatedConceptos[targetIndex] = temp;
+
+    // Re-assign order_index to all elements to guarantee clean incremental values
+    const finalConceptos = updatedConceptos.map((c, idx) => ({
+      ...c,
+      order_index: idx
+    }));
+
+    try {
+      // Optimistic local UI update
+      setBudget(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          conceptos: finalConceptos
+        };
+      });
+
+      // Persist the updated concepts with their new order_index
+      await savePresupuesto(budget, finalConceptos);
+    } catch (err) {
+      console.error("Error updating concept order:", err);
+      alert("No se pudo guardar el nuevo orden de los conceptos.");
+      await fetchBudgetDetails();
     }
   };
 
@@ -1280,6 +1319,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                 <table className="w-full border-collapse text-left text-xs font-sans">
                   <thead>
                     <tr className="border-b border-dark-4 bg-dark-2/80 text-cream-dim select-none text-[9px] uppercase tracking-wider font-bold">
+                      <th className="py-3 px-4 text-center w-16 select-none">Orden</th>
                       <th className="py-3 px-4 w-32">Código</th>
                       <th className="py-3 px-4 text-center w-24">Tipo</th>
                       <th className="py-3 px-4">Descripción / Insumo</th>
@@ -1290,7 +1330,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dark-4/50">
-                    {concepts.map((c) => {
+                    {concepts.map((c, index) => {
                       const unitDirect = c.matriz 
                         ? calculateMatrixDirectCost(c.matriz.insumos || [], Number(c.quantity)) 
                         : Number(c.cost_price);
@@ -1301,6 +1341,34 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                           key={c.id}
                           className="hover:bg-dark-3/20 select-none bg-dark-2/20 transition-colors font-bold text-cream"
                         >
+                          <td className="py-3 px-4 text-center select-none">
+                            <div className="flex items-center justify-center gap-0.5">
+                              <button
+                                type="button"
+                                disabled={index === 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveConcept(index, -1);
+                                }}
+                                className="p-1 hover:text-gold text-cream-muted disabled:opacity-20 disabled:hover:text-cream-muted transition-colors cursor-pointer"
+                                title="Mover arriba"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={index === concepts.length - 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveConcept(index, 1);
+                                }}
+                                className="p-1 hover:text-gold text-cream-muted disabled:opacity-20 disabled:hover:text-cream-muted transition-colors cursor-pointer"
+                                title="Mover abajo"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
                           <td className="py-3 px-4 font-mono text-[10px] text-gold/90 font-bold select-all">
                             {c.matriz?.code || 'S/C'}
                           </td>

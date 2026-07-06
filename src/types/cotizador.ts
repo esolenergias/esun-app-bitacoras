@@ -63,6 +63,7 @@ export interface PresupuestoConcepto {
   indirect_percentage: number;
   utility_percentage: number;
   matriz?: Matriz;
+  order_index?: number;
   created_at?: string;
   updated_at?: string;
 }
