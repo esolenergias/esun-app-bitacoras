@@ -416,6 +416,10 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     if (!matrix) return;
     
     const costPrice = calculateMatrixDirectCost(matrix.insumos || []);
+    const isPza = matrix.unit?.trim().toLowerCase() === 'pza';
+    const rawQty = customQty > 0 ? customQty : 1.00;
+    const finalQty = isPza ? Math.round(rawQty) : rawQty;
+
     await handleSaveConceptToDb({
       matriz_id: matrix.id,
       description: matrix.description,
@@ -423,7 +427,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       cost_price: costPrice,
       indirect_percentage: matrix.indirect_percentage,
       utility_percentage: matrix.utility_percentage,
-      quantity: customQty > 0 ? customQty : 1.00
+      quantity: finalQty
     });
   };
 
@@ -445,6 +449,9 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       return;
     }
     
+    const isPza = customUnit.trim().toLowerCase() === 'pza';
+    const finalQty = isPza ? Math.round(customQty) : customQty;
+
     await handleSaveConceptToDb({
       matriz_id: null,
       description: customDesc.trim(),
@@ -452,7 +459,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       cost_price: customCost,
       indirect_percentage: customIndirect,
       utility_percentage: customUtility,
-      quantity: customQty
+      quantity: finalQty
     });
   };
 
@@ -514,6 +521,10 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       
       // Save it directly as a concept
       const costPrice = calculateMatrixDirectCost(saved.insumos || []);
+      const isPza = saved.unit?.trim().toLowerCase() === 'pza';
+      const rawQty = customQty > 0 ? customQty : 1.00;
+      const finalQty = isPza ? Math.round(rawQty) : rawQty;
+
       await handleSaveConceptToDb({
         matriz_id: saved.id,
         description: saved.description,
@@ -521,7 +532,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         cost_price: costPrice,
         indirect_percentage: saved.indirect_percentage,
         utility_percentage: saved.utility_percentage,
-        quantity: customQty > 0 ? customQty : 1.00
+        quantity: finalQty
       });
     } catch (err: any) {
       console.error('Error creating matrix:', err);
@@ -884,6 +895,17 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     return `$${formatted} MXN`;
   };
 
+  /**
+   * Formats a quantity value. If the unit is "pza" (pieza), rounds to the nearest
+   * integer with no decimals. Otherwise displays up to 4 significant decimal places.
+   */
+  const formatQty = (qty: number, unit?: string, decimals = 4): string => {
+    const isPza = unit?.trim().toLowerCase() === 'pza';
+    if (isPza) return Math.round(qty).toString();
+    // Remove trailing zeros but keep up to `decimals` places
+    return parseFloat(qty.toFixed(decimals)).toString();
+  };
+
   const getStatusBadgeStyles = (status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado') => {
     switch (status) {
       case 'borrador': return 'bg-gray-500/15 text-gray-400 border border-gray-500/30';
@@ -1076,7 +1098,9 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         const matrixQty = item.formula 
           ? evaluateFormula(item.formula, qty) 
           : Number(item.quantity) || 0;
-        const totalCost = costVal * matrixQty * qty;
+        const isPza = item.insumo.unit?.trim().toLowerCase() === 'pza';
+        const finalQty = isPza ? Math.round(matrixQty * qty) : (matrixQty * qty);
+        const totalCost = costVal * finalQty;
         
         const type = item.insumo.type;
         if (type in aggregatedInsumos) {
@@ -1292,11 +1316,13 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                           <td className="py-3 px-4 text-center font-mono text-cream-muted select-none">{c.unit}</td>
                           <td className="py-3 px-4 text-right font-mono select-none">
                             <NumericInput
-                              step="0.01"
-                              min="0.00"
+                              step={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
+                              min="0"
                               value={Number(c.quantity)}
                               onChange={async (val) => {
-                                await handleUpdateConceptQuantity(c.id, val);
+                                const isPza = c.unit?.trim().toLowerCase() === 'pza';
+                                const finalVal = isPza ? Math.round(val) : val;
+                                await handleUpdateConceptQuantity(c.id, finalVal);
                               }}
                               className="w-20 px-1 py-0.5 bg-dark-1/80 border border-dark-4 focus:border-gold/40 text-cream rounded font-mono text-right focus:outline-none text-[11px]"
                             />
@@ -1759,7 +1785,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                 <tr key={idx} className="hover:bg-dark-1/25 transition-colors">
                                   <td className="py-1.5 px-2 font-mono font-bold text-gold/80 select-all">{item.insumo.code}</td>
                                   <td className="py-1.5 px-2 text-cream truncate max-w-[150px]">{item.insumo.description}</td>
-                                  <td className="py-1.5 px-2 text-right font-mono select-all">{item.quantity.toFixed(4)}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono select-all">{formatQty(item.quantity, item.insumo.unit)}</td>
                                   <td className="py-1.5 px-2 text-right font-mono select-none">
                                     <CurrencyEditCell
                                       value={item.insumo.cost}
@@ -2111,10 +2137,12 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       </thead>
                       <tbody className="divide-y divide-dark-4 font-body">
                         {matrixFormInsumos.map((item, idx) => {
+                          const isPza = item.insumo.unit?.trim().toLowerCase() === 'pza';
                           const qty = item.formula 
                             ? evaluateFormula(item.formula, activeConceptQty) 
                             : Number(item.quantity) || 0;
-                          const importe = item.insumo.cost * qty;
+                          const finalQty = isPza ? Math.round(qty * activeConceptQty) / activeConceptQty : qty;
+                          const importe = item.insumo.cost * finalQty;
                           return (
                             <tr key={idx} className="hover:bg-dark-1/25 transition-colors">
                               <td className="py-1.5 px-2 font-mono font-bold text-gold/80 select-all">{item.insumo.code}</td>
@@ -2131,7 +2159,10 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                     setMatrixFormInsumos(prev => prev.map((it, i) => {
                                       if (i === idx) {
                                         if (isNumeric) {
-                                          return { ...it, quantity: Number(trimmed), formula: null };
+                                          let finalVal = Number(trimmed);
+                                          const isPza = it.insumo.unit?.trim().toLowerCase() === 'pza';
+                                          if (isPza) finalVal = Math.round(finalVal);
+                                          return { ...it, quantity: finalVal, formula: null };
                                         } else {
                                           const evalQty = evaluateFormula(trimmed, activeConceptQty);
                                           return { ...it, quantity: evalQty, formula: trimmed || null };
@@ -2144,7 +2175,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                 />
                                 {item.formula && (
                                   <span className="block text-[8px] text-cream-dim text-right font-mono mt-0.5">
-                                    Res: {qty.toFixed(4)}
+                                    Res: {formatQty(finalQty, item.insumo.unit)}
                                   </span>
                                 )}
                               </td>
