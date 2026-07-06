@@ -418,7 +418,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     const costPrice = calculateMatrixDirectCost(matrix.insumos || []);
     const isPza = matrix.unit?.trim().toLowerCase() === 'pza';
     const rawQty = customQty > 0 ? customQty : 1.00;
-    const finalQty = isPza ? Math.round(rawQty) : rawQty;
+    const finalQty = isPza ? Math.max(1, Math.round(rawQty)) : rawQty;
 
     await handleSaveConceptToDb({
       matriz_id: matrix.id,
@@ -450,7 +450,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
     
     const isPza = customUnit.trim().toLowerCase() === 'pza';
-    const finalQty = isPza ? Math.round(customQty) : customQty;
+    const finalQty = isPza ? Math.max(1, Math.round(customQty)) : customQty;
 
     await handleSaveConceptToDb({
       matriz_id: null,
@@ -523,7 +523,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       const costPrice = calculateMatrixDirectCost(saved.insumos || []);
       const isPza = saved.unit?.trim().toLowerCase() === 'pza';
       const rawQty = customQty > 0 ? customQty : 1.00;
-      const finalQty = isPza ? Math.round(rawQty) : rawQty;
+      const finalQty = isPza ? Math.max(1, Math.round(rawQty)) : rawQty;
 
       await handleSaveConceptToDb({
         matriz_id: saved.id,
@@ -2161,7 +2161,9 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                         if (isNumeric) {
                                           let finalVal = Number(trimmed);
                                           const isPza = it.insumo.unit?.trim().toLowerCase() === 'pza';
-                                          if (isPza) finalVal = Math.round(finalVal);
+                                          if (isPza && activeConceptQty > 0) {
+                                            finalVal = Math.round(finalVal * activeConceptQty) / activeConceptQty;
+                                          }
                                           return { ...it, quantity: finalVal, formula: null };
                                         } else {
                                           const evalQty = evaluateFormula(trimmed, activeConceptQty);
@@ -2175,7 +2177,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                 />
                                 {item.formula && (
                                   <span className="block text-[8px] text-cream-dim text-right font-mono mt-0.5">
-                                    Res: {formatQty(finalQty, item.insumo.unit)}
+                                    Res: {parseFloat(finalQty.toFixed(4))} {item.insumo.unit} ({Math.round(finalQty * activeConceptQty)} pza tot)
                                   </span>
                                 )}
                               </td>

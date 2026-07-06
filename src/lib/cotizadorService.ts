@@ -246,19 +246,17 @@ export async function saveMatriz(matriz: Partial<Matriz>): Promise<Matriz> {
     const currentInsumos = (currentInsumosData || []) as { insumo_id: string }[];
 
     const incomingInsumoIds = new Set(
-      matriz.insumos.map((item) => item.insumo.id)
+      matriz.insumos.map((item) => item.insumo?.id || '')
     );
     const insumoIdsToDelete = currentInsumos
       .map((item) => item.insumo_id)
       .filter((id) => !incomingInsumoIds.has(id));
 
     const insumosToUpsert = matriz.insumos.map((item) => {
-      const isPza = item.insumo?.unit?.trim().toLowerCase() === 'pza';
-      const qty = isPza && !item.formula ? Math.round(Number(item.quantity)) : Number(item.quantity);
       return {
         matriz_id: savedMatrix.id,
-        insumo_id: item.insumo.id,
-        quantity: qty,
+        insumo_id: item.insumo?.id || '',
+        quantity: Number(item.quantity),
         formula: item.formula || null
       };
     });

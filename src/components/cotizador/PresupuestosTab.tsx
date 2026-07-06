@@ -746,7 +746,7 @@ export default function PresupuestosTab() {
       const totalSelling = Number(c.quantity) * unitSelling;
       const safeDesc = c.description.replace(/\|/g, '\\|');
       const safeUnit = c.unit.replace(/\|/g, '\\|');
-      md += `| ${safeDesc} | ${safeUnit} | ${Number(c.quantity).toFixed(2)} | $${unitSelling.toFixed(2)} | $${totalSelling.toFixed(2)} |\n`;
+      md += `| ${safeDesc} | ${safeUnit} | ${formatQty(Number(c.quantity), c.unit, 2)} | $${unitSelling.toFixed(2)} | $${totalSelling.toFixed(2)} |\n`;
     }
     
     md += `\n**Resumen de Totales:**\n`;
@@ -768,7 +768,7 @@ export default function PresupuestosTab() {
         const safeCode = item.insumo.code.replace(/\|/g, '\\|');
         const safeInsumoDesc = item.insumo.description.replace(/\|/g, '\\|');
         const safeInsumoUnit = item.insumo.unit.replace(/\|/g, '\\|');
-        grp += `| ${safeCode} | ${safeInsumoDesc} | ${safeInsumoUnit} | ${item.totalQuantity.toFixed(4)} | $${item.insumo.cost.toFixed(2)} | $${item.totalCost.toFixed(2)} |\n`;
+        grp += `| ${safeCode} | ${safeInsumoDesc} | ${safeInsumoUnit} | ${formatQty(item.totalQuantity, item.insumo.unit)} | $${item.insumo.cost.toFixed(2)} | $${item.totalCost.toFixed(2)} |\n`;
         subtotal += item.totalCost;
       }
       grp += `\n**Subtotal ${title}:** $${subtotal.toFixed(2)} MXN\n\n`;
@@ -834,6 +834,13 @@ export default function PresupuestosTab() {
       maximumFractionDigits: 2
     }).format(amount);
     return `$${formatted} MXN`;
+  };
+
+  /** Rounds to integer when unit is "pza", otherwise up to 4 decimal places (trailing zeros removed). */
+  const formatQty = (qty: number, unit?: string, decimals = 4): string => {
+    const isPza = unit?.trim().toLowerCase() === 'pza';
+    if (isPza) return Math.round(qty).toString();
+    return parseFloat(qty.toFixed(decimals)).toString();
   };
 
   // Helper translated status colors
@@ -1342,7 +1349,7 @@ export default function PresupuestosTab() {
                                   <tr key={c.id} className="hover:bg-dark-1/10 transition-colors">
                                     <td className="py-3 px-4 text-cream font-bold">{c.description}</td>
                                     <td className="py-3 px-4 text-cream-muted text-center font-mono">{c.unit}</td>
-                                    <td className="py-3 px-4 text-right font-mono select-all">{Number(c.quantity).toFixed(2)}</td>
+                                    <td className="py-3 px-4 text-right font-mono select-all">{formatQty(Number(c.quantity), c.unit, 2)}</td>
                                     <td className="py-3 px-4 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(unitSelling)}</td>
                                     <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">{formatCurrencyMXN(totalSelling)}</td>
                                   </tr>
@@ -1422,7 +1429,7 @@ export default function PresupuestosTab() {
                                           <td className="py-2 px-3 font-mono font-bold text-gold select-all">{item.insumo.code}</td>
                                           <td className="py-2 px-3 text-cream">{item.insumo.description}</td>
                                           <td className="py-2 px-3 text-cream-muted text-center font-mono">{item.insumo.unit}</td>
-                                          <td className="py-2 px-3 text-right font-mono select-all">{item.totalQuantity.toFixed(4)}</td>
+                                          <td className="py-2 px-3 text-right font-mono select-all">{formatQty(item.totalQuantity, item.insumo.unit)}</td>
                                           <td className="py-2 px-3 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(item.insumo.cost)}</td>
                                           <td className="py-2 px-3 text-right font-mono text-cream font-bold select-all">{formatCurrencyMXN(item.totalCost)}</td>
                                         </tr>
