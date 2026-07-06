@@ -93,6 +93,8 @@ export default function PresupuestosTab() {
   const [formClientName, setFormClientName] = useState<string>('');
   const [formStatus, setFormStatus] = useState<'borrador' | 'enviado' | 'aprobado' | 'rechazado'>('borrador');
   const [formConceptos, setFormConceptos] = useState<Partial<PresupuestoConcepto>[]>([]);
+  const [formIndirect, setFormIndirect] = useState<number>(10.00);
+  const [formUtility, setFormUtility] = useState<number>(8.00);
   
   // Concept selector inside editor
   const [selectedMatrixId, setSelectedMatrixId] = useState<string>('');
@@ -178,13 +180,17 @@ export default function PresupuestosTab() {
           updated_at: pc.updated_at
         }));
 
-        const totals = calculateBudgetTotals(conceptos);
+        const indPct = row.indirect_percentage !== undefined ? Number(row.indirect_percentage) : 10.00;
+        const utPct = row.utility_percentage !== undefined ? Number(row.utility_percentage) : 8.00;
+        const totals = calculateBudgetTotals(conceptos, indPct, utPct);
 
         return {
           id: row.id,
           name: row.name,
           client_name: row.client_name,
           status: row.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
+          indirect_percentage: indPct,
+          utility_percentage: utPct,
           created_at: row.created_at,
           updated_at: row.updated_at,
           conceptos,
@@ -230,6 +236,8 @@ export default function PresupuestosTab() {
     setFormClientName('');
     setFormStatus('borrador');
     setFormConceptos([]);
+    setFormIndirect(10.00);
+    setFormUtility(8.00);
     setSelectedMatrixId('');
     setFormValidationError(null);
     setIsEditorOpen(true);
@@ -245,6 +253,8 @@ export default function PresupuestosTab() {
       setFormClientName(details.client_name);
       setFormStatus(details.status);
       setFormConceptos(details.conceptos || []);
+      setFormIndirect(details.indirect_percentage ?? 10.00);
+      setFormUtility(details.utility_percentage ?? 8.00);
       setSelectedMatrixId('');
       setFormValidationError(null);
       setIsEditorOpen(true);
@@ -711,7 +721,9 @@ export default function PresupuestosTab() {
 
   // Generate clean formatted markdown copy-paste report
   const generateMarkdownReport = (details: PresupuestoDetalle, aggregated: any) => {
-    const totals = calculateBudgetTotals(details.conceptos);
+    const indPct = details.indirect_percentage ?? 10.00;
+    const utPct = details.utility_percentage ?? 8.00;
+    const totals = calculateBudgetTotals(details.conceptos, indPct, utPct);
     
     let md = `# REPORTE TÉCNICO Y COMERCIAL - ESOL ENERGÍAS\n\n`;
     md += `**Presupuesto:** ${details.name}\n`;
@@ -724,7 +736,7 @@ export default function PresupuestosTab() {
     md += `| :--- | :---: | :---: | :---: | :---: |\n`;
     
     for (const c of details.conceptos) {
-      const unitSelling = calculateMatrixSellingPrice(c.cost_price, c.indirect_percentage, c.utility_percentage);
+      const unitSelling = calculateMatrixSellingPrice(c.cost_price, indPct, utPct);
       const totalSelling = Number(c.quantity) * unitSelling;
       const safeDesc = c.description.replace(/\|/g, '\\|');
       const safeUnit = c.unit.replace(/\|/g, '\\|');
@@ -733,6 +745,8 @@ export default function PresupuestosTab() {
     
     md += `\n**Resumen de Totales:**\n`;
     md += `- **Costo Directo Consolidado:** $${totals.directCostTotal.toFixed(2)} MXN\n`;
+    md += `- **Indirectos (${indPct.toFixed(1)}%):** $${(totals.directCostTotal * (indPct / 100)).toFixed(2)} MXN\n`;
+    md += `- **Utilidad (${utPct.toFixed(1)}%):** $${((totals.directCostTotal + (totals.directCostTotal * (indPct / 100))) * (utPct / 100)).toFixed(2)} MXN\n`;
     md += `- **Precio de Venta Sugerido (con Indirectos y Utilidad):** $${totals.sellingPriceTotal.toFixed(2)} MXN\n\n`;
     
     md += `## 2. EXPLOSIÓN DE INSUMOS GENERAL\n\n`;
@@ -849,7 +863,9 @@ export default function PresupuestosTab() {
     utility_percentage: Number(c.utility_percentage) || 0
   })) as PresupuestoConcepto[];
 
-  const totals = safeConceptos.length > 0 ? calculateBudgetTotals(safeConceptos) : { directCostTotal: 0, sellingPriceTotal: 0 };
+  const totals = safeConceptos.length > 0 
+    ? calculateBudgetTotals(safeConceptos, formIndirect, formUtility) 
+    : { directCostTotal: 0, sellingPriceTotal: 0 };
   const aggregatedReport = getAggregatedInsumos();
 
   return (
@@ -1308,34 +1324,55 @@ export default function PresupuestosTab() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-4 text-xs font-body">
-                              {reportDetails.conceptos.map((c) => {
-                                const unitSelling = calculateMatrixSellingPrice(c.cost_price, c.indirect_percentage, c.utility_percentage);
-                                const totalSelling = Number(c.quantity) * unitSelling;
-                                return (
-                                  <tr key={c.id} className="hover:bg-dark-1/10 transition-colors">
-                                    <td className="py-3 px-4 text-cream font-bold">{c.description}</td>
-                                    <td className="py-3 px-4 text-cream-muted text-center font-mono">{c.unit}</td>
-                                    <td className="py-3 px-4 text-right font-mono select-all">{Number(c.quantity).toFixed(2)}</td>
-                                    <td className="py-3 px-4 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(unitSelling)}</td>
-                                    <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">{formatCurrencyMXN(totalSelling)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                              {(() => {
+                                const indPct = reportDetails.indirect_percentage ?? 10.00;
+                                const utPct = reportDetails.utility_percentage ?? 8.00;
+                                const reportTotals = calculateBudgetTotals(reportDetails.conceptos, indPct, utPct);
+                                const indVal = reportTotals.directCostTotal * (indPct / 100);
+                                const utVal = (reportTotals.directCostTotal + indVal) * (utPct / 100);
 
-                        {/* Summary Totals */}
-                        <div className="bg-dark-1/30 p-4 border border-dark-4 rounded-xl flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 text-xs font-mono select-none">
-                          <div className="flex justify-between items-center md:border-r border-dark-4 md:pr-8 flex-1">
-                            <span className="text-cream-dim uppercase font-bold">Costo Directo Consolidado:</span>
-                            <span className="text-cream font-bold text-sm">{formatCurrencyMXN(calculateBudgetTotals(reportDetails.conceptos).directCostTotal)}</span>
-                          </div>
-                          <div className="flex justify-between items-center md:pl-8 flex-1">
-                            <span className="text-cream-dim uppercase font-bold">Precio Comercial Total (Venta):</span>
-                            <span className="text-gold font-bold text-base">{formatCurrencyMXN(calculateBudgetTotals(reportDetails.conceptos).sellingPriceTotal)}</span>
-                          </div>
-                        </div>
+                                return (
+                                  <>
+                                    {reportDetails.conceptos.map((c) => {
+                                      const unitSelling = calculateMatrixSellingPrice(c.cost_price, indPct, utPct);
+                                      const totalSelling = Number(c.quantity) * unitSelling;
+                                      return (
+                                        <tr key={c.id} className="hover:bg-dark-1/10 transition-colors">
+                                          <td className="py-3 px-4 text-cream font-bold">{c.description}</td>
+                                          <td className="py-3 px-4 text-cream-muted text-center font-mono">{c.unit}</td>
+                                          <td className="py-3 px-4 text-right font-mono select-all">{Number(c.quantity).toFixed(2)}</td>
+                                          <td className="py-3 px-4 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(unitSelling)}</td>
+                                          <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">{formatCurrencyMXN(totalSelling)}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                    
+                                    </tbody>
+                                    </table>
+                                    </div>
+
+                                    {/* Summary Totals */}
+                                    <div className="bg-dark-1/30 p-4 border border-dark-4 rounded-xl space-y-2 text-xs font-mono select-none">
+                                      <div className="flex justify-between items-center text-cream-dim">
+                                        <span className="uppercase font-bold">Costo Directo Consolidado:</span>
+                                        <span className="text-cream font-bold">{formatCurrencyMXN(reportTotals.directCostTotal)}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center text-cream-dim">
+                                        <span className="uppercase font-bold">Indirectos ({indPct.toFixed(1)}%):</span>
+                                        <span className="text-cream font-bold">{formatCurrencyMXN(indVal)}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center text-cream-dim">
+                                        <span className="uppercase font-bold">Utilidad ({utPct.toFixed(1)}%):</span>
+                                        <span className="text-cream font-bold">{formatCurrencyMXN(utVal)}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center border-t border-dark-4/50 pt-2 text-gold">
+                                        <span className="uppercase font-black text-sm">Precio Comercial Total (Venta):</span>
+                                        <span className="font-bold text-base">{formatCurrencyMXN(reportTotals.sellingPriceTotal)}</span>
+                                      </div>
+                                    </div>
+                                  </>
+                                );
+                              })()}
                       </div>
                     )}
 

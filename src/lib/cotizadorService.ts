@@ -303,6 +303,8 @@ export async function getPresupuestos(): Promise<Presupuesto[]> {
     name: row.name,
     client_name: row.client_name,
     status: row.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
+    indirect_percentage: Number(row.indirect_percentage ?? 10.00),
+    utility_percentage: Number(row.utility_percentage ?? 8.00),
     created_at: row.created_at,
     updated_at: row.updated_at
   }));
@@ -355,6 +357,8 @@ export async function getPresupuestoDetails(idOrName: string): Promise<Presupues
     name: dbPresupuesto.name,
     client_name: dbPresupuesto.client_name,
     status: dbPresupuesto.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
+    indirect_percentage: Number(dbPresupuesto.indirect_percentage ?? 10.00),
+    utility_percentage: Number(dbPresupuesto.utility_percentage ?? 8.00),
     conceptos,
     created_at: dbPresupuesto.created_at,
     updated_at: dbPresupuesto.updated_at
@@ -369,6 +373,8 @@ export async function savePresupuesto(
     name: presupuesto.name,
     client_name: presupuesto.client_name,
     status: presupuesto.status,
+    indirect_percentage: presupuesto.indirect_percentage ?? 10.00,
+    utility_percentage: presupuesto.utility_percentage ?? 8.00,
     ...(presupuesto.id ? { id: presupuesto.id } : {})
   };
 

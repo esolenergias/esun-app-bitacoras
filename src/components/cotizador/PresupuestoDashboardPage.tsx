@@ -297,6 +297,35 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
+  const [updatingMargins, setUpdatingMargins] = useState<boolean>(false);
+
+  const handleUpdateBudgetMargins = async (indirectPct: number, utilityPct: number) => {
+    if (!budget) return;
+    setUpdatingMargins(true);
+    try {
+      const { error: dbError } = await supabase
+        .from('presupuestos')
+        .update({
+          indirect_percentage: indirectPct,
+          utility_percentage: utilityPct
+        })
+        .eq('id', budget.id);
+
+      if (dbError) throw dbError;
+      
+      setBudget(prev => prev ? {
+        ...prev,
+        indirect_percentage: indirectPct,
+        utility_percentage: utilityPct
+      } : null);
+    } catch (err: any) {
+      console.error('Error updating budget margins:', err);
+      alert('No se pudo actualizar los porcentajes generales. Asegúrate de aplicar la migración DDL en Supabase.');
+    } finally {
+      setUpdatingMargins(false);
+    }
+  };
+
   // ----------------------------------------------------
   // SUB-MODAL ACTION HANDLERS & DB PERSISTENCE
   // ----------------------------------------------------
@@ -982,11 +1011,15 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
 
   // --- Calculations ---
   const concepts = budget.conceptos || [];
-  const totals = calculateBudgetTotals(concepts);
-  const directCost = totals.directCostTotal;
-  const sellingPrice = totals.sellingPriceTotal;
+  const directCost = concepts.reduce((sum, c) => sum + (Number(c.quantity) * Number(c.cost_price)), 0);
+  const indirectPct = budget.indirect_percentage ?? 10.00;
+  const utilityPct = budget.utility_percentage ?? 8.00;
+  const indirectCost = directCost * (indirectPct / 100);
+  const subtotalWithIndirect = directCost + indirectCost;
+  const utilityCost = subtotalWithIndirect * (utilityPct / 100);
+  const sellingPrice = subtotalWithIndirect + utilityCost;
   const marginVal = sellingPrice - directCost;
-  const marginPct = sellingPrice > 0 ? (marginVal / sellingPrice) * 100 : 0;
+  const marginPct = utilityPct;
 
   // Insumos Aggregation for sharing analytics
   const aggregatedInsumos = {
@@ -1064,23 +1097,95 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       </div>
 
       {/* 2. KPI Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Costo Directo Consolidado', value: formatCurrencyMXN(directCost), icon: DollarSign, color: 'text-cream' },
-          { label: 'Precio de Venta Sugerido', value: formatCurrencyMXN(sellingPrice), icon: TrendingUp, color: 'text-gold' },
-          { label: 'Margen Estimado (Utilidad)', value: formatCurrencyMXN(marginVal), icon: DollarSign, color: 'text-green-400' },
-          { label: 'Porcentaje de Margen', value: `${marginPct.toFixed(2)}%`, icon: Layers, color: marginPct > 15 ? 'text-green-400' : 'text-amber-400' }
-        ].map((kpi, idx) => (
-          <div key={idx} className="bg-dark-2/60 border border-dark-4 rounded-2xl p-5 space-y-2 shadow-sm relative overflow-hidden group hover:border-gold/20 transition-all select-none">
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">{kpi.label}</span>
-              <span className={`p-2 bg-dark-1/80 border border-dark-4 rounded-xl ${kpi.color} group-hover:scale-105 transition-transform`}>
-                <kpi.icon className="w-4 h-4" />
-              </span>
-            </div>
-            <p className={`text-xl font-mono font-bold tracking-wide select-all ${kpi.color}`}>{kpi.value}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        
+        {/* Card 1: Costo Directo Consolidado */}
+        <div className="bg-dark-2/60 border border-dark-4 rounded-2xl p-5 space-y-2 shadow-sm relative overflow-hidden group hover:border-gold/20 transition-all select-none">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">Costo Directo Consolidado</span>
+            <span className="p-2 bg-dark-1/80 border border-dark-4 rounded-xl text-cream group-hover:scale-105 transition-transform">
+              <DollarSign className="w-4 h-4" />
+            </span>
           </div>
-        ))}
+          <p className="text-xl font-mono font-bold tracking-wide select-all text-cream">{formatCurrencyMXN(directCost)}</p>
+        </div>
+
+        {/* Card 2: INDIRECTOS (Editable) */}
+        <div className="bg-dark-2/60 border border-dark-4 rounded-2xl p-5 space-y-2 shadow-sm relative overflow-hidden group hover:border-gold/20 transition-all select-none">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">INDIRECTOS (%)</span>
+            <span className="p-2 bg-dark-1/80 border border-dark-4 rounded-xl text-cream group-hover:scale-105 transition-transform">
+              <Layers className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5">
+              <NumericInput
+                step="0.1"
+                min="0.0"
+                value={indirectPct}
+                onChange={async (val) => {
+                  await handleUpdateBudgetMargins(val, utilityPct);
+                }}
+                className="w-20 px-2 py-1 bg-dark-1 border border-dark-4 text-cream font-mono font-bold rounded focus:outline-none focus:border-gold/50 text-sm text-right"
+              />
+              <span className="text-xs text-cream-muted font-bold font-mono">%</span>
+            </div>
+            <span className="text-[10px] font-mono text-cream-dim">
+              Valor: {formatCurrencyMXN(indirectCost)}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: UTILIDAD % (Editable) */}
+        <div className="bg-dark-2/60 border border-dark-4 rounded-2xl p-5 space-y-2 shadow-sm relative overflow-hidden group hover:border-gold/20 transition-all select-none">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">UTILIDAD %</span>
+            <span className="p-2 bg-dark-1/80 border border-dark-4 rounded-xl text-cream group-hover:scale-105 transition-transform">
+              <TrendingUp className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5">
+              <NumericInput
+                step="0.1"
+                min="0.0"
+                value={utilityPct}
+                onChange={async (val) => {
+                  await handleUpdateBudgetMargins(indirectPct, val);
+                }}
+                className="w-20 px-2 py-1 bg-dark-1 border border-dark-4 text-cream font-mono font-bold rounded focus:outline-none focus:border-gold/50 text-sm text-right"
+              />
+              <span className="text-xs text-cream-muted font-bold font-mono">%</span>
+            </div>
+            <span className="text-[10px] font-mono text-cream-dim">
+              Valor: {formatCurrencyMXN(utilityCost)}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Precio de Venta Sugerido */}
+        <div className="bg-dark-2/60 border border-dark-4 rounded-2xl p-5 space-y-2 shadow-sm relative overflow-hidden group hover:border-gold/20 transition-all select-none">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">Precio de Venta Sugerido</span>
+            <span className="p-2 bg-dark-1/80 border border-dark-4 rounded-xl text-gold group-hover:scale-105 transition-transform">
+              <TrendingUp className="w-4 h-4" />
+            </span>
+          </div>
+          <p className="text-xl font-mono font-bold tracking-wide select-all text-gold">{formatCurrencyMXN(sellingPrice)}</p>
+        </div>
+
+        {/* Card 5: Margen Estimado */}
+        <div className="bg-dark-2/60 border border-dark-4 rounded-2xl p-5 space-y-2 shadow-sm relative overflow-hidden group hover:border-gold/20 transition-all select-none">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">Margen Estimado</span>
+            <span className="p-2 bg-dark-1/80 border border-dark-4 rounded-xl text-green-400 group-hover:scale-105 transition-transform">
+              <DollarSign className="w-4 h-4" />
+            </span>
+          </div>
+          <p className="text-xl font-mono font-bold tracking-wide select-all text-green-400">{formatCurrencyMXN(marginVal)}</p>
+        </div>
+
       </div>
 
       {/* 3. Main Dashboard Layout (2 Columns) */}
@@ -1125,8 +1230,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                   </thead>
                   <tbody className="divide-y divide-dark-4/50">
                     {concepts.map((c) => {
-                      const unitSelling = calculateMatrixSellingPrice(Number(c.cost_price), Number(c.indirect_percentage), Number(c.utility_percentage));
-                      const totalSelling = Number(c.quantity) * unitSelling;
+                      const unitDirect = Number(c.cost_price);
+                      const totalDirect = Number(c.quantity) * unitDirect;
 
                       return (
                         <tr 
@@ -1143,15 +1248,6 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                           </td>
                           <td className="py-3 px-4 leading-relaxed font-sans text-xs">
                             <div>{c.description}</div>
-                            {/* Small badges for margins */}
-                            <div className="flex gap-2 mt-1 select-none">
-                              <span className="text-[8px] font-mono text-cream-muted uppercase bg-dark-3 px-1.5 py-0.5 rounded border border-dark-4">
-                                Indirecto: {c.indirect_percentage.toFixed(1)}%
-                              </span>
-                              <span className="text-[8px] font-mono text-cream-muted uppercase bg-dark-3 px-1.5 py-0.5 rounded border border-dark-4">
-                                Utilidad: {c.utility_percentage.toFixed(1)}%
-                              </span>
-                            </div>
                           </td>
                           <td className="py-3 px-4 text-center font-mono text-cream-muted select-none">{c.unit}</td>
                           <td className="py-3 px-4 text-right font-mono select-none">
@@ -1173,10 +1269,10 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                             }}
                             title="Haga clic para editar la matriz de costos completa"
                           >
-                            {formatCurrencyMXN(unitSelling)}
+                            {formatCurrencyMXN(unitDirect)}
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">
-                            {formatCurrencyMXN(totalSelling)}
+                            {formatCurrencyMXN(totalDirect)}
                           </td>
                         </tr>
                       );
@@ -1243,9 +1339,23 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               })}
             </div>
             
-            <div className="border-t border-dark-4 pt-3 mt-4 flex justify-between items-center font-mono text-[10px] text-cream font-bold">
-              <span>Costo Directo Total:</span>
-              <span className="text-gold">{formatCurrencyMXN(directCost)}</span>
+            <div className="border-t border-dark-4 pt-3 mt-4 space-y-2 font-mono text-[10px] text-cream font-bold">
+              <div className="flex justify-between items-center text-cream-dim font-medium">
+                <span>Costo Directo Total:</span>
+                <span>{formatCurrencyMXN(directCost)}</span>
+              </div>
+              <div className="flex justify-between items-center text-cream-dim font-medium">
+                <span>Indirectos ({indirectPct.toFixed(1)}%):</span>
+                <span>{formatCurrencyMXN(indirectCost)}</span>
+              </div>
+              <div className="flex justify-between items-center text-cream-dim font-medium">
+                <span>Utilidad ({utilityPct.toFixed(1)}%):</span>
+                <span>{formatCurrencyMXN(utilityCost)}</span>
+              </div>
+              <div className="flex justify-between items-center text-gold font-black border-t border-dark-4/50 pt-2 text-xs">
+                <span>Precio de Venta Sugerido:</span>
+                <span>{formatCurrencyMXN(sellingPrice)}</span>
+              </div>
             </div>
           </div>
 
