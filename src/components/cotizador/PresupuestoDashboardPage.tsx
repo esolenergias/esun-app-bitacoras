@@ -226,13 +226,17 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     indirect_percentage: number;
     utility_percentage: number;
   }) => {
+    if (!budget) {
+      setSubModalError('El presupuesto no está cargado.');
+      return;
+    }
     setSubModalSubmitting(true);
     setSubModalError(null);
     try {
       const { error: insertError } = await supabase
         .from('presupuesto_conceptos')
         .insert({
-          presupuesto_id: id,
+          presupuesto_id: budget.id,
           matriz_id: conceptData.matriz_id,
           description: conceptData.description,
           unit: conceptData.unit,
@@ -532,6 +536,10 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     e.preventDefault();
     setMatrixFormError(null);
 
+    if (!budget) {
+      setMatrixFormError('El presupuesto no está cargado.');
+      return;
+    }
     if (!matrixFormCode.trim()) {
       setMatrixFormError('El código de la matriz es obligatorio.');
       return;
@@ -569,7 +577,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       const { data: budgetConcepts, error: fetchError } = await supabase
         .from('presupuesto_conceptos')
         .select('*')
-        .eq('presupuesto_id', id)
+        .eq('presupuesto_id', budget.id)
         .eq('matriz_id', saved.id);
 
       if (fetchError) throw fetchError;
