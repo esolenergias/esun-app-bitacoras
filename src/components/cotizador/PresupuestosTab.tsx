@@ -283,6 +283,9 @@ export default function PresupuestosTab() {
     // Calculate unit direct cost (sum of insumos)
     const costPrice = calculateMatrixDirectCost(matrix.insumos || []);
 
+    const isPza = matrix.unit.trim().toLowerCase() === 'pza';
+    const finalQty = isPza ? Math.max(1, Math.round(1.00)) : 1.00;
+
     const newConcept: Partial<PresupuestoConcepto> = {
       id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       presupuesto_id: editingPresupuesto?.id || '',
@@ -292,7 +295,7 @@ export default function PresupuestosTab() {
       cost_price: costPrice,
       indirect_percentage: matrix.indirect_percentage,
       utility_percentage: matrix.utility_percentage,
-      quantity: 1.00,
+      quantity: finalQty,
       matriz: matrix
     };
 
@@ -345,6 +348,10 @@ export default function PresupuestosTab() {
     if (!matrix) return;
     
     const costPrice = calculateMatrixDirectCost(matrix.insumos || []);
+    const qtyVal = customQty > 0 ? customQty : 1.00;
+    const isPza = matrix.unit.trim().toLowerCase() === 'pza';
+    const finalQty = isPza ? Math.max(1, Math.round(qtyVal)) : qtyVal;
+
     const newConcept: Partial<PresupuestoConcepto> = {
       id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       presupuesto_id: editingPresupuesto?.id || '',
@@ -354,7 +361,7 @@ export default function PresupuestosTab() {
       cost_price: costPrice,
       indirect_percentage: matrix.indirect_percentage,
       utility_percentage: matrix.utility_percentage,
-      quantity: customQty > 0 ? customQty : 1.00,
+      quantity: finalQty,
       matriz: matrix
     };
     
@@ -380,6 +387,9 @@ export default function PresupuestosTab() {
       return;
     }
     
+    const isPza = customUnit.trim().toLowerCase() === 'pza';
+    const finalQty = isPza ? Math.max(1, Math.round(customQty)) : customQty;
+
     const newConcept: Partial<PresupuestoConcepto> = {
       id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       presupuesto_id: editingPresupuesto?.id || '',
@@ -389,7 +399,7 @@ export default function PresupuestosTab() {
       cost_price: customCost,
       indirect_percentage: customIndirect,
       utility_percentage: customUtility,
-      quantity: customQty,
+      quantity: finalQty,
       matriz: undefined
     };
     
@@ -456,6 +466,10 @@ export default function PresupuestosTab() {
       
       // Add it directly as a concept
       const costPrice = calculateMatrixDirectCost(saved.insumos || []);
+      const qtyVal = customQty > 0 ? customQty : 1.00;
+      const isPza = saved.unit.trim().toLowerCase() === 'pza';
+      const finalQty = isPza ? Math.max(1, Math.round(qtyVal)) : qtyVal;
+
       const newConcept: Partial<PresupuestoConcepto> = {
         id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         presupuesto_id: editingPresupuesto?.id || '',
@@ -465,7 +479,7 @@ export default function PresupuestosTab() {
         cost_price: costPrice,
         indirect_percentage: saved.indirect_percentage,
         utility_percentage: saved.utility_percentage,
-        quantity: customQty > 0 ? customQty : 1.00,
+        quantity: finalQty,
         matriz: saved
       };
       
@@ -536,7 +550,12 @@ export default function PresupuestosTab() {
   const handleUpdateConceptField = (conceptId: string, field: 'quantity' | 'cost_price' | 'indirect_percentage' | 'utility_percentage', value: number) => {
     setFormConceptos(prev => prev.map(c => {
       if (c.id === conceptId) {
-        return { ...c, [field]: value };
+        let finalVal = value;
+        if (field === 'quantity') {
+          const isPza = c.unit?.trim().toLowerCase() === 'pza';
+          if (isPza) finalVal = Math.max(1, Math.round(value));
+        }
+        return { ...c, [field]: finalVal };
       }
       return c;
     }));
@@ -661,7 +680,8 @@ export default function PresupuestosTab() {
         const quantityPerUnit = mi.formula 
           ? evaluateFormula(mi.formula, conceptQty) 
           : Number(mi.quantity);
-        const neededQty = conceptQty * quantityPerUnit;
+        const isPza = insumo.unit?.trim().toLowerCase() === 'pza';
+        const neededQty = isPza ? Math.round(conceptQty * quantityPerUnit) : (conceptQty * quantityPerUnit);
 
         if (insumosAggregation[insumo.code]) {
           insumosAggregation[insumo.code].totalQuantity += neededQty;
