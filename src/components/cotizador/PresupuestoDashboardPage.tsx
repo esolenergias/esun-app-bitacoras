@@ -536,6 +536,61 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
+  const handleUpdateInsumoCatalogCost = async (insumoId: string, newCost: number) => {
+    try {
+      const { error: dbError } = await supabase
+        .from('insumos')
+        .update({ cost: newCost })
+        .eq('id', insumoId);
+         
+      if (dbError) throw dbError;
+      
+      setInsumosCatalog(prev => prev.map(ins => ins.id === insumoId ? { ...ins, cost: newCost } : ins));
+      
+      setMatrixFormInsumos(prev => prev.map(item => {
+        if (item.insumo.id === insumoId) {
+          return {
+            ...item,
+            insumo: { ...item.insumo, cost: newCost }
+          };
+        }
+        return item;
+      }));
+
+      setNewMatrixInsumos(prev => prev.map(item => {
+        if (item.insumo.id === insumoId) {
+          return {
+            ...item,
+            insumo: { ...item.insumo, cost: newCost }
+          };
+        }
+        return item;
+      }));
+      
+      setMatrices(prev => prev.map(mat => {
+        if (mat.insumos) {
+          return {
+            ...mat,
+            insumos: mat.insumos.map(item => {
+              if (item.insumo.id === insumoId) {
+                return {
+                  ...item,
+                  insumo: { ...item.insumo, cost: newCost }
+                };
+              }
+              return item;
+            })
+          };
+        }
+        return mat;
+      }));
+      
+    } catch (err: any) {
+      console.error('Error updating insumo catalog cost:', err);
+      alert('No se pudo actualizar el costo del insumo en el catálogo general.');
+    }
+  };
+
   const handleOpenMatrixEditor = (matrix: Matriz) => {
     setEditingMatrix(matrix);
     setMatrixFormCode(matrix.code);
@@ -608,10 +663,9 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       };
 
       const saved = await saveMatriz(matrixData);
-
-      // Now, update the snapshot cost_price, indirect_percentage, and utility_percentage of all concepts that use this matrix!
       const newDirectCost = calculateMatrixDirectCost(saved.insumos || []);
-      
+
+      // First, update metadata & margins for concepts that use this specific matrix
       const { data: budgetConcepts, error: fetchError } = await supabase
         .from('presupuesto_conceptos')
         .select('*')
@@ -632,6 +686,41 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               utility_percentage: saved.utility_percentage
             })
             .eq('id', concept.id);
+        }
+      }
+
+      // Second, perform global recalculation of snapshot cost_price for all matrix-backed concepts in the budget
+      const { data: allConcepts, error: fetchAllErr } = await supabase
+        .from('presupuesto_conceptos')
+        .select(`
+          id,
+          matriz_id,
+          matrices (
+            id,
+            matriz_insumos (
+              quantity,
+              insumos (
+                cost
+              )
+            )
+          )
+        `)
+        .eq('presupuesto_id', budget.id);
+
+      if (!fetchAllErr && allConcepts) {
+        for (const c of allConcepts) {
+          if (c.matrices) {
+            const insList = (c.matrices.matriz_insumos || []).map((mi: any) => ({
+              quantity: Number(mi.quantity),
+              insumo: { cost: Number(mi.insumos?.cost || 0) }
+            }));
+            const newDirect = calculateMatrixDirectCost(insList as any);
+            
+            await supabase
+              .from('presupuesto_conceptos')
+              .update({ cost_price: newDirect })
+              .eq('id', c.id);
+          }
         }
       }
 
@@ -1466,7 +1555,17 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                   <td className="py-1.5 px-2 font-mono font-bold text-gold/80 select-all">{item.insumo.code}</td>
                                   <td className="py-1.5 px-2 text-cream truncate max-w-[150px]">{item.insumo.description}</td>
                                   <td className="py-1.5 px-2 text-right font-mono select-all">{item.quantity.toFixed(4)}</td>
-                                  <td className="py-1.5 px-2 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(item.insumo.cost)}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono select-none">
+                                    <NumericInput
+                                      step="0.01"
+                                      min="0.00"
+                                      value={item.insumo.cost}
+                                      onChange={async (val) => {
+                                        await handleUpdateInsumoCatalogCost(item.insumo.id, val);
+                                      }}
+                                      className="w-20 px-1 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded"
+                                    />
+                                  </td>
                                   <td className="py-1.5 px-2 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(importe)}</td>
                                   <td className="py-1.5 px-2 text-center select-none">
                                     <button
@@ -1788,7 +1887,17 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                   className="w-16 px-1 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded"
                                 />
                               </td>
-                              <td className="py-1.5 px-2 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(item.insumo.cost)}</td>
+                              <td className="py-1.5 px-2 text-right font-mono select-none">
+                                <NumericInput
+                                  step="0.01"
+                                  min="0.00"
+                                  value={item.insumo.cost}
+                                  onChange={async (val) => {
+                                    await handleUpdateInsumoCatalogCost(item.insumo.id, val);
+                                  }}
+                                  className="w-20 px-1 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded"
+                                />
+                              </td>
                               <td className="py-1.5 px-2 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(importe)}</td>
                               <td className="py-1.5 px-2 text-center select-none">
                                 <button
