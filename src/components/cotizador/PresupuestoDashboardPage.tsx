@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../context/supabase';
 import { 
-  getPresupuestoDetails, calculateMatrixSellingPrice, 
+  getPresupuestos, getPresupuestoDetails, calculateMatrixSellingPrice, 
   calculateMatrixDirectCost, calculateBudgetTotals,
   getInsumos, getMatrices, saveInsumo, saveMatriz
 } from '../../lib/cotizadorService';
@@ -56,12 +56,23 @@ const NumericInput = ({ value, onChange, className, step = "1", min, required }:
   );
 };
 
+const getInitials = (name: string): string => {
+  if (!name) return '';
+  return name
+    .split(/\s+/)
+    .filter(word => word.length > 0)
+    .map(word => word[0].toUpperCase())
+    .join('')
+    .replace(/[^A-Z0-9]/g, '');
+};
+
 interface PresupuestoDashboardPageProps {
   id: string;
 }
 
 export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPageProps) {
   const [budget, setBudget] = useState<(Presupuesto & { conceptos: PresupuestoConcepto[] }) | null>(null);
+  const [budgetNumber, setBudgetNumber] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
@@ -178,7 +189,18 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         getMatrices(),
         getInsumos()
       ]);
+
+      const allBudgets = await getPresupuestos();
+      const sorted = [...allBudgets].sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateA - dateB;
+      });
+      const idx = sorted.findIndex(b => b.id === data.id);
+      const seqNum = idx !== -1 ? idx + 1 : 1;
+
       setBudget(data);
+      setBudgetNumber(seqNum);
       setMatrices(matricesData);
       setInsumosCatalog(insumosData);
     } catch (err: any) {
@@ -1087,7 +1109,9 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
             <div className="divide-y divide-dark-4 space-y-2.5">
               <div className="flex justify-between items-center pt-2.5">
                 <span className="text-cream-dim">ID del Presupuesto</span>
-                <span className="text-cream truncate max-w-[140px] select-all" title={budget.id}>{budget.id}</span>
+                <span className="text-gold font-bold select-all" title={`UUID: ${budget.id}`}>
+                  {`PS${String(budgetNumber).padStart(4, '0')}${getInitials(budget.name)}`}
+                </span>
               </div>
               <div className="flex justify-between items-center pt-2.5">
                 <span className="text-cream-dim">Fecha de Creación</span>
