@@ -204,6 +204,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [insumoQtyForMatrixForm, setInsumoQtyForMatrixForm] = useState<number>(1);
   const [matrixFormError, setMatrixFormError] = useState<string | null>(null);
   const [matrixFormSubmitting, setMatrixFormSubmitting] = useState<boolean>(false);
+  const [matrixFormInsumoSearch, setMatrixFormInsumoSearch] = useState<string>('');
+  const [matrixFormInsumoTypeFilter, setMatrixFormInsumoTypeFilter] = useState<'all' | 'material' | 'labor' | 'equipment' | 'tool' | 'service'>('all');
 
   // Fetch user session on mount
   useEffect(() => {
@@ -691,6 +693,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     setMatrixFormInsumos(matrix.insumos || []);
     setSelectedInsumoIdForMatrixForm('');
     setInsumoQtyForMatrixForm(1);
+    setMatrixFormInsumoSearch('');
+    setMatrixFormInsumoTypeFilter('all');
     setMatrixFormError(null);
     setMatrixFormSubmitting(false);
     setIsMatrixEditorOpen(true);
@@ -1020,6 +1024,17 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const sellingPrice = subtotalWithIndirect + utilityCost;
   const marginVal = sellingPrice - directCost;
   const marginPct = utilityPct;
+
+  const filteredCatalogForForm = insumosCatalog.filter(ins => {
+    if (matrixFormInsumoTypeFilter !== 'all' && ins.type !== matrixFormInsumoTypeFilter) {
+      return false;
+    }
+    if (matrixFormInsumoSearch) {
+      const q = matrixFormInsumoSearch.toLowerCase();
+      return ins.code.toLowerCase().includes(q) || ins.description.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   // Insumos Aggregation for sharing analytics
   const aggregatedInsumos = {
@@ -1950,16 +1965,58 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               <div className="border border-dark-4 p-4 rounded-xl space-y-3 bg-dark-1/30">
                 <span className="text-[9px] font-black uppercase tracking-widest text-gold block select-none">Desglose de Insumos</span>
                 
+                {/* Category Filter tabs inside the matrix form */}
+                <div className="flex flex-wrap gap-1 border-b border-dark-4 pb-2 select-none">
+                  {([
+                    { value: 'all',      label: 'Todos' },
+                    { value: 'material',  label: 'Materiales' },
+                    { value: 'labor',     label: 'Mano de Obra' },
+                    { value: 'equipment', label: 'Equipos' },
+                    { value: 'tool',      label: 'Herramientas' },
+                    { value: 'service',   label: 'Trámites' }
+                  ] as const).map(tab => (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => {
+                        setMatrixFormInsumoTypeFilter(tab.value);
+                        setSelectedInsumoIdForMatrixForm('');
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                        matrixFormInsumoTypeFilter === tab.value
+                          ? 'bg-gold/10 text-gold border-gold/30 shadow-md'
+                          : 'bg-dark-1 border-dark-4 hover:border-cream/20 text-cream-muted hover:text-cream'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5 select-none">
                   <div className="flex-1 space-y-1">
-                    <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Seleccionar Insumo del Catálogo</label>
+                    <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Buscar Insumo</label>
+                    <input
+                      type="text"
+                      placeholder="Filtrar por código o descripción..."
+                      value={matrixFormInsumoSearch}
+                      onChange={(e) => {
+                        setMatrixFormInsumoSearch(e.target.value);
+                        setSelectedInsumoIdForMatrixForm('');
+                      }}
+                      className="w-full p-2 bg-dark-1 border border-dark-4 text-xs text-cream rounded-lg focus:outline-none focus:border-gold/50"
+                    />
+                  </div>
+
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Seleccionar Insumo ({filteredCatalogForForm.length})</label>
                     <select
                       value={selectedInsumoIdForMatrixForm}
                       onChange={(e) => setSelectedInsumoIdForMatrixForm(e.target.value)}
                       className="w-full p-2 bg-dark-1 border border-dark-4 text-xs text-cream rounded-lg focus:outline-none font-mono cursor-pointer"
                     >
                       <option value="">-- Elige un Insumo --</option>
-                      {insumosCatalog.map(ins => (
+                      {filteredCatalogForForm.map(ins => (
                         <option key={ins.id} value={ins.id}>
                           [{ins.code}] ({ins.type === 'service' ? 'Trámite' : ins.type}) {ins.description}
                         </option>
