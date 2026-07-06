@@ -913,164 +913,148 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               </button>
             </div>
           ) : (
-            <>
-              <div className="space-y-3">
-                {concepts.map((c) => {
-                  const unitSelling = calculateMatrixSellingPrice(Number(c.cost_price), Number(c.indirect_percentage), Number(c.utility_percentage));
-                  const totalDirect = Number(c.quantity) * Number(c.cost_price);
-                  const totalSelling = Number(c.quantity) * unitSelling;
-                  const isExpanded = !!expandedConcepts[c.id];
+            <div className="bg-dark-2/40 border border-dark-4 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs font-sans">
+                  <thead>
+                    <tr className="border-b border-dark-4 bg-dark-2/80 text-cream-dim select-none text-[9px] uppercase tracking-wider font-bold">
+                      <th className="py-3 px-4 w-32">Código</th>
+                      <th className="py-3 px-4 text-center w-24">Tipo</th>
+                      <th className="py-3 px-4">Descripción / Insumo</th>
+                      <th className="py-3 px-4 text-center w-16">Unidad</th>
+                      <th className="py-3 px-4 text-right w-28">Rend. Unit.</th>
+                      <th className="py-3 px-4 text-right w-36">Costo Unit.</th>
+                      <th className="py-3 px-4 text-right w-36">Importe Tot.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-dark-4/50">
+                    {concepts.map((c) => {
+                      const unitSelling = calculateMatrixSellingPrice(Number(c.cost_price), Number(c.indirect_percentage), Number(c.utility_percentage));
+                      const totalSelling = Number(c.quantity) * unitSelling;
+                      const isExpanded = !!expandedConcepts[c.id];
 
-                  return (
-                    <div key={c.id} className="bg-dark-2/65 border border-dark-4 rounded-2xl overflow-hidden shadow-sm transition-all hover:border-gold/15">
-                      
-                      {/* Concept Summary Row (Header) */}
-                      <div 
-                        onClick={() => toggleConcept(c.id)}
-                        className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:bg-dark-3/20 select-none"
-                      >
-                        <div className="space-y-1.5 flex-1 pr-4">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {c.matriz?.code && (
-                              <span className="font-mono text-[9px] font-bold text-gold px-2 py-0.5 bg-gold/10 border border-gold/25 rounded-md">
-                                {c.matriz.code}
+                      return (
+                        <React.Fragment key={c.id}>
+                          {/* Concept/Matrix Row */}
+                          <tr 
+                            onClick={() => toggleConcept(c.id)}
+                            className="hover:bg-dark-3/20 cursor-pointer select-none bg-dark-2/20 transition-colors font-bold text-cream"
+                          >
+                            <td className="py-3 px-4 font-mono text-[10px] text-gold/90 font-bold select-all flex items-center gap-2">
+                              {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-cream-muted" /> : <ChevronRight className="w-3.5 h-3.5 text-cream-muted" />}
+                              {c.matriz?.code || 'S/C'}
+                            </td>
+                            <td className="py-3 px-4 text-center select-none">
+                              <span className="inline-flex px-2 py-0.5 rounded-md text-[8.5px] font-black uppercase tracking-wider bg-gold/10 text-gold border border-gold/20">
+                                MATRIZ
                               </span>
-                            )}
-                            <span className="text-[10px] text-cream-muted font-mono uppercase">Unidad: {c.unit} &bull; Cant: {Number(c.quantity).toFixed(2)}</span>
-                          </div>
-                          <p className="text-xs font-bold text-cream leading-relaxed">{c.description}</p>
-                        </div>
-
-                        <div className="flex items-center gap-6 justify-between w-full md:w-auto">
-                          <div className="text-right space-y-0.5">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-cream-muted">Importe Venta</p>
-                            <p className="text-sm font-mono font-bold text-gold">{formatCurrencyMXN(totalSelling)}</p>
-                            <p className="text-[8px] font-mono text-cream-dim">Directo: {formatCurrencyMXN(totalDirect)}</p>
-                          </div>
-                          <div className="text-cream-muted">
-                            {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Concept Detail APU Breakdown (Expanded) */}
-                      {isExpanded && (
-                        <div className="border-t border-dark-4 bg-dark-1/30 p-5 space-y-4 animate-[fadeIn_0.2s_ease-out]">
-                          <h4 className="text-[9px] font-black uppercase tracking-widest text-gold select-none border-b border-dark-4/70 pb-2">
-                            Desglose Interno del concepto (Análisis de Precios Unitarios)
-                          </h4>
-
-                          {c.matriz && c.matriz.insumos && c.matriz.insumos.length > 0 ? (
-                            <div className="border border-dark-4/70 rounded-xl overflow-hidden">
-                              <table className="w-full border-collapse text-left text-xs">
-                                <thead>
-                                  <tr className="border-b border-dark-4 bg-dark-2/80 text-cream-muted select-none text-[9px] uppercase tracking-wider">
-                                    <th className="py-2.5 px-3 font-bold">Código</th>
-                                    <th className="py-2.5 px-3 font-bold">Tipo</th>
-                                    <th className="py-2.5 px-3 font-bold">Insumo</th>
-                                    <th className="py-2.5 px-3 font-bold text-center">Unidad</th>
-                                    <th className="py-2.5 px-3 font-bold text-right">Rend. Unit.</th>
-                                    <th className="py-2.5 px-3 font-bold text-right">Costo Unit.</th>
-                                    <th className="py-2.5 px-3 font-bold text-right">Cantidad Tot.</th>
-                                    <th className="py-2.5 px-3 font-bold text-right">Importe Tot.</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-dark-4/60">
-                                  {c.matriz.insumos.map((item, idx) => {
-                                    const rend = Number(item.quantity) || 0;
-                                    const costVal = Number(item.insumo.cost) || 0;
-                                    const totalQty = rend * Number(c.quantity);
-                                    const totalCost = costVal * totalQty;
-
-                                    return (
-                                      <tr key={idx} className="hover:bg-dark-2/15 transition-colors">
-                                        <td className="py-2 px-3 font-mono font-bold text-gold/90 select-all">{item.insumo.code}</td>
-                                        <td className="py-2 px-3 select-none text-[9px]">
-                                          <span className={`inline-flex px-2 py-0.5 rounded-full font-black uppercase tracking-wider scale-95 border ${
-                                            item.insumo.type === 'material' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                            item.insumo.type === 'labor' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                            item.insumo.type === 'equipment' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                            item.insumo.type === 'tool' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                                            'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                                          }`}>
-                                            {item.insumo.type === 'material' ? 'Mat' :
-                                             item.insumo.type === 'labor' ? 'MO' :
-                                             item.insumo.type === 'equipment' ? 'Eq' :
-                                             item.insumo.type === 'tool' ? 'Herr' : 'Trám'}
-                                          </span>
-                                        </td>
-                                        <td className="py-2 px-3 text-cream leading-relaxed">{item.insumo.description}</td>
-                                        <td className="py-2 px-3 text-cream-muted text-center font-mono">{item.insumo.unit}</td>
-                                        <td className="py-2 px-3 text-right font-mono select-none">
-                                          <NumericInput
-                                            step="0.0001"
-                                            min="0.0000"
-                                            value={rend}
-                                            onChange={async (val) => {
-                                              await handleUpdateInsumoQuantity(c.matriz!.id, item.insumo.id, val);
-                                            }}
-                                            className="w-20 px-1 py-0.5 bg-dark-1/80 border border-dark-4 focus:border-gold/40 text-cream rounded font-mono text-right focus:outline-none text-[11px]"
-                                          />
-                                        </td>
-                                        <td 
-                                          className="py-2 px-3 text-right font-mono text-cream-dim select-all cursor-pointer hover:text-gold hover:underline transition-colors"
-                                          onClick={() => c.matriz && handleOpenMatrixEditor(c.matriz)}
-                                          title="Haga clic para visualizar y editar la matriz completa"
-                                        >
-                                          {formatCurrencyMXN(costVal)}
-                                        </td>
-                                        <td className="py-2 px-3 text-right font-mono text-cream-dim select-all">{totalQty.toFixed(2)}</td>
-                                        <td className="py-2 px-3 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(totalCost)}</td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : (
-                            <p className="text-[10px] text-cream-muted font-body">Esta matriz no tiene insumos asignados.</p>
-                          )}
-
-                          {/* Cascaded concept subtotal math card */}
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 bg-dark-1/80 border border-dark-4/70 p-3 rounded-xl font-mono text-[10px]">
-                            <div 
-                              className="cursor-pointer hover:text-gold hover:underline transition-colors"
-                              onClick={() => c.matriz && handleOpenMatrixEditor(c.matriz)}
-                              title="Haga clic para visualizar y editar la matriz completa"
+                            </td>
+                            <td className="py-3 px-4 leading-relaxed font-sans text-xs">
+                              <div>{c.description}</div>
+                              {/* Small badges for margins */}
+                              <div className="flex gap-2 mt-1 select-none">
+                                <span className="text-[8px] font-mono text-cream-muted uppercase bg-dark-3 px-1.5 py-0.5 rounded border border-dark-4">
+                                  Indirecto: {c.indirect_percentage.toFixed(1)}%
+                                </span>
+                                <span className="text-[8px] font-mono text-cream-muted uppercase bg-dark-3 px-1.5 py-0.5 rounded border border-dark-4">
+                                  Utilidad: {c.utility_percentage.toFixed(1)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-center font-mono text-cream-muted select-none">{c.unit}</td>
+                            <td className="py-3 px-4 text-right font-mono select-all">
+                              {Number(c.quantity).toFixed(2)}
+                            </td>
+                            <td 
+                              className="py-3 px-4 text-right font-mono text-cream select-all cursor-pointer hover:text-gold hover:underline transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (c.matriz) handleOpenMatrixEditor(c.matriz);
+                              }}
+                              title="Haga clic para editar la matriz de costos completa"
                             >
-                              <span className="text-cream-dim block uppercase text-[8px] font-black tracking-widest select-none">P.U. Costo Directo</span>
-                              <span className="text-cream font-bold">{formatCurrencyMXN(Number(c.cost_price))}</span>
-                            </div>
-                            <div>
-                              <span className="text-cream-dim block uppercase text-[8px] font-black tracking-widest select-none">Margen Indirecto</span>
-                              <span className="text-cream-dim">{c.indirect_percentage.toFixed(1)}% &bull; Utilidad: {c.utility_percentage.toFixed(1)}%</span>
-                            </div>
-                            <div className="col-span-2 md:col-span-1 text-right">
-                              <span className="text-gold block uppercase text-[8px] font-black tracking-widest select-none">P.U. Precio de Venta</span>
-                              <span className="text-gold font-bold">{formatCurrencyMXN(unitSelling)}</span>
-                            </div>
-                          </div>
+                              {formatCurrencyMXN(unitSelling)}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">
+                              {formatCurrencyMXN(totalSelling)}
+                            </td>
+                          </tr>
 
-                        </div>
-                      )}
+                          {/* Nested Insumo Rows */}
+                          {isExpanded && c.matriz && c.matriz.insumos && c.matriz.insumos.map((item, idx) => {
+                            const rend = Number(item.quantity) || 0;
+                            const costVal = Number(item.insumo.cost) || 0;
+                            const totalCost = costVal * rend * Number(c.quantity);
 
-                    </div>
-                  );
-                })}
+                            return (
+                              <tr key={`${c.id}_ins_${idx}`} className="bg-dark-1/10 hover:bg-dark-1/25 transition-colors border-l-2 border-dark-4 text-[11px] text-cream-dim font-body">
+                                <td className="py-2.5 px-4 pl-8 font-mono text-cream-muted font-semibold select-all">
+                                  {item.insumo.code}
+                                </td>
+                                <td className="py-2.5 px-4 text-center select-none text-[8.5px]">
+                                  <span className={`inline-flex px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider border scale-95 ${
+                                    item.insumo.type === 'material' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                    item.insumo.type === 'labor' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                    item.insumo.type === 'equipment' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                    item.insumo.type === 'tool' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                    'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                  }`}>
+                                    {item.insumo.type === 'material' ? 'Mat' :
+                                     item.insumo.type === 'labor' ? 'MO' :
+                                     item.insumo.type === 'equipment' ? 'Eq' :
+                                     item.insumo.type === 'tool' ? 'Herr' : 'Trám'}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-4 pl-6 text-cream leading-relaxed font-sans select-all">
+                                  {item.insumo.description}
+                                </td>
+                                <td className="py-2.5 px-4 text-center font-mono text-cream-muted select-none">{item.insumo.unit}</td>
+                                <td className="py-2.5 px-4 text-right font-mono select-none">
+                                  <NumericInput
+                                    step="0.0001"
+                                    min="0.0000"
+                                    value={rend}
+                                    onChange={async (val) => {
+                                      await handleUpdateInsumoQuantity(c.matriz!.id, item.insumo.id, val);
+                                    }}
+                                    className="w-20 px-1 py-0.5 bg-dark-1/90 border border-dark-4 focus:border-gold/40 text-cream rounded font-mono text-right focus:outline-none text-[11px]"
+                                  />
+                                </td>
+                                <td 
+                                  className="py-2.5 px-4 text-right font-mono text-cream-dim select-all cursor-pointer hover:text-gold hover:underline transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (c.matriz) handleOpenMatrixEditor(c.matriz);
+                                  }}
+                                  title="Haga clic para editar la matriz de costos completa"
+                                >
+                                  {formatCurrencyMXN(costVal)}
+                                </td>
+                                <td className="py-2.5 px-4 text-right font-mono text-cream-dim select-all">
+                                  {formatCurrencyMXN(totalCost)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
-              {/* Button Nuevo concepto */}
-              <div className="flex justify-start pt-3 select-none">
+              {/* Master Table Button Nuevo concepto */}
+              <div className="p-4 bg-dark-2/40 border-t border-dark-4 flex justify-start select-none">
                 <button
                   type="button"
                   onClick={handleOpenAddConceptModal}
-                  className="px-4 py-2.5 bg-dark-2 border border-dark-4 hover:border-gold/30 text-gold hover:bg-dark-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-gold/5 hover:scale-[1.02]"
+                  className="px-4 py-2.5 bg-dark-3 border border-dark-4 hover:border-gold/30 text-gold hover:bg-dark-4 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-gold/5 hover:scale-[1.02]"
                 >
                   <Plus className="w-4 h-4 text-gold stroke-[2.5]" />
                   <span>Nuevo concepto</span>
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
 
