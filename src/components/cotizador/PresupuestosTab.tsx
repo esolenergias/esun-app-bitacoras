@@ -11,6 +11,7 @@ import {
   calculateMatrixSellingPrice,
   calculateBudgetTotals,
   calculateMatrixDirectCost,
+  evaluateFormula,
   getInsumos,
   saveInsumo,
   saveMatriz
@@ -657,7 +658,9 @@ export default function PresupuestosTab() {
 
       for (const mi of matrix.insumos) {
         const insumo = mi.insumo;
-        const quantityPerUnit = Number(mi.quantity);
+        const quantityPerUnit = mi.formula 
+          ? evaluateFormula(mi.formula, conceptQty) 
+          : Number(mi.quantity);
         const neededQty = conceptQty * quantityPerUnit;
 
         if (insumosAggregation[insumo.code]) {
@@ -736,7 +739,10 @@ export default function PresupuestosTab() {
     md += `| :--- | :---: | :---: | :---: | :---: |\n`;
     
     for (const c of details.conceptos) {
-      const unitSelling = calculateMatrixSellingPrice(c.cost_price, indPct, utPct);
+      const unitDirect = c.matriz 
+        ? calculateMatrixDirectCost(c.matriz.insumos || [], Number(c.quantity)) 
+        : Number(c.cost_price);
+      const unitSelling = calculateMatrixSellingPrice(unitDirect, indPct, utPct);
       const totalSelling = Number(c.quantity) * unitSelling;
       const safeDesc = c.description.replace(/\|/g, '\\|');
       const safeUnit = c.unit.replace(/\|/g, '\\|');
@@ -1327,7 +1333,10 @@ export default function PresupuestosTab() {
                               {reportDetails.conceptos.map((c) => {
                                 const indPct = reportDetails.indirect_percentage ?? 10.00;
                                 const utPct = reportDetails.utility_percentage ?? 8.00;
-                                const unitSelling = calculateMatrixSellingPrice(c.cost_price, indPct, utPct);
+                                const unitDirect = c.matriz 
+                                  ? calculateMatrixDirectCost(c.matriz.insumos || [], Number(c.quantity)) 
+                                  : Number(c.cost_price);
+                                const unitSelling = calculateMatrixSellingPrice(unitDirect, indPct, utPct);
                                 const totalSelling = Number(c.quantity) * unitSelling;
                                 return (
                                   <tr key={c.id} className="hover:bg-dark-1/10 transition-colors">

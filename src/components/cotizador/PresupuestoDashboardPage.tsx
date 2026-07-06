@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../context/supabase';
 import { 
   getPresupuestos, getPresupuestoDetails, calculateMatrixSellingPrice, 
-  calculateMatrixDirectCost, calculateBudgetTotals,
+  calculateMatrixDirectCost, calculateBudgetTotals, evaluateFormula,
   getInsumos, getMatrices, saveInsumo, saveMatriz
 } from '../../lib/cotizadorService';
 import type { Presupuesto, PresupuestoConcepto, Insumo, Matriz, InsumoType, InsumoSubcategory } from '../../types/cotizador';
@@ -201,7 +201,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [matrixFormUtility, setMatrixFormUtility] = useState<number>(8);
   const [matrixFormInsumos, setMatrixFormInsumos] = useState<{ insumo: Insumo; quantity: number }[]>([]);
   const [selectedInsumoIdForMatrixForm, setSelectedInsumoIdForMatrixForm] = useState<string>('');
-  const [insumoQtyForMatrixForm, setInsumoQtyForMatrixForm] = useState<number>(1);
+  const [insumoQtyForMatrixForm, setInsumoQtyForMatrixForm] = useState<string>('1');
+  const [activeConceptQty, setActiveConceptQty] = useState<number>(1);
   const [matrixFormError, setMatrixFormError] = useState<string | null>(null);
   const [matrixFormSubmitting, setMatrixFormSubmitting] = useState<boolean>(false);
   const [matrixFormInsumoSearch, setMatrixFormInsumoSearch] = useState<string>('');
@@ -683,7 +684,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
-  const handleOpenMatrixEditor = (matrix: Matriz) => {
+  const handleOpenMatrixEditor = (matrix: Matriz, conceptQty: number = 1) => {
     setEditingMatrix(matrix);
     setMatrixFormCode(matrix.code);
     setMatrixFormDesc(matrix.description);
@@ -692,7 +693,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     setMatrixFormUtility(matrix.utility_percentage);
     setMatrixFormInsumos(matrix.insumos || []);
     setSelectedInsumoIdForMatrixForm('');
-    setInsumoQtyForMatrixForm(1);
+    setInsumoQtyForMatrixForm('1');
+    setActiveConceptQty(conceptQty);
     setMatrixFormInsumoSearch('');
     setMatrixFormInsumoTypeFilter('all');
     setMatrixFormError(null);
@@ -710,9 +712,21 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       return;
     }
 
-    setMatrixFormInsumos(prev => [...prev, { insumo, quantity: insumoQtyForMatrixForm }]);
+    const inputVal = String(insumoQtyForMatrixForm).trim();
+    const isNumeric = /^[0-9]+(\.[0-9]+)?$/.test(inputVal);
+    let qty = 0;
+    let formula: string | null = null;
+
+    if (isNumeric) {
+      qty = Number(inputVal);
+    } else {
+      formula = inputVal;
+      qty = evaluateFormula(formula, activeConceptQty);
+    }
+
+    setMatrixFormInsumos(prev => [...prev, { insumo, quantity: qty, formula }]);
     setSelectedInsumoIdForMatrixForm('');
-    setInsumoQtyForMatrixForm(1);
+    setInsumoQtyForMatrixForm('1');
   };
 
   const handleRemoveInsumoFromMatrixForm = (insumoId: string) => {
@@ -1015,7 +1029,13 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
 
   // --- Calculations ---
   const concepts = budget.conceptos || [];
-  const directCost = concepts.reduce((sum, c) => sum + (Number(c.quantity) * Number(c.cost_price)), 0);
+  const directCost = concepts.reduce((sum, c) => {
+    const qty = Number(c.quantity) || 0;
+    const unitDirect = c.matriz 
+      ? calculateMatrixDirectCost(c.matriz.insumos || [], qty) 
+      : Number(c.cost_price);
+    return sum + (qty * unitDirect);
+  }, 0);
   const indirectPct = budget.indirect_percentage ?? 10.00;
   const utilityPct = budget.utility_percentage ?? 8.00;
   const indirectCost = directCost * (indirectPct / 100);
@@ -1052,7 +1072,9 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     if (matrix && matrix.insumos) {
       matrix.insumos.forEach(item => {
         const costVal = Number(item.insumo.cost) || 0;
-        const matrixQty = Number(item.quantity) || 0;
+        const matrixQty = item.formula 
+          ? evaluateFormula(item.formula, qty) 
+          : Number(item.quantity) || 0;
         const totalCost = costVal * matrixQty * qty;
         
         const type = item.insumo.type;
@@ -1245,7 +1267,9 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                   </thead>
                   <tbody className="divide-y divide-dark-4/50">
                     {concepts.map((c) => {
-                      const unitDirect = Number(c.cost_price);
+                      const unitDirect = c.matriz 
+                        ? calculateMatrixDirectCost(c.matriz.insumos || [], Number(c.quantity)) 
+                        : Number(c.cost_price);
                       const totalDirect = Number(c.quantity) * unitDirect;
 
                       return (
@@ -1280,7 +1304,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                             className="py-3 px-4 text-right font-mono text-cream select-all cursor-pointer hover:text-gold hover:underline transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (c.matriz) handleOpenMatrixEditor(c.matriz);
+                              if (c.matriz) handleOpenMatrixEditor(c.matriz, Number(c.quantity) || 1);
                             }}
                             title="Haga clic para editar la matriz de costos completa"
                           >
@@ -2024,13 +2048,13 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                     </select>
                   </div>
 
-                  <div className="w-24 space-y-1">
-                    <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Cantidad / Rend.</label>
-                    <NumericInput
-                      step="0.0001"
-                      min="0.0001"
+                  <div className="w-28 space-y-1">
+                    <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Cant. / Rend. / Fórmula</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 0.25 o Q * 0.1"
                       value={insumoQtyForMatrixForm}
-                      onChange={setInsumoQtyForMatrixForm}
+                      onChange={(e) => setInsumoQtyForMatrixForm(e.target.value)}
                       className="w-full p-2 bg-dark-1 border border-dark-4 text-xs text-cream rounded-lg text-right font-mono focus:outline-none"
                     />
                   </div>
@@ -2062,21 +2086,42 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       </thead>
                       <tbody className="divide-y divide-dark-4 font-body">
                         {matrixFormInsumos.map((item, idx) => {
-                          const importe = item.insumo.cost * item.quantity;
+                          const qty = item.formula 
+                            ? evaluateFormula(item.formula, activeConceptQty) 
+                            : Number(item.quantity) || 0;
+                          const importe = item.insumo.cost * qty;
                           return (
                             <tr key={idx} className="hover:bg-dark-1/25 transition-colors">
                               <td className="py-1.5 px-2 font-mono font-bold text-gold/80 select-all">{item.insumo.code}</td>
                               <td className="py-1.5 px-2 text-cream truncate max-w-[180px]">{item.insumo.description}</td>
                               <td className="py-1.5 px-2 text-right font-mono select-none">
-                                <NumericInput
-                                  step="0.0001"
-                                  min="0.0000"
-                                  value={item.quantity}
-                                  onChange={(val) => {
-                                    setMatrixFormInsumos(prev => prev.map((it, i) => i === idx ? { ...it, quantity: val } : it));
+                                <input
+                                  type="text"
+                                  placeholder="0.00"
+                                  value={item.formula || String(item.quantity)}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const trimmed = val.trim();
+                                    const isNumeric = /^[0-9]+(\.[0-9]+)?$/.test(trimmed);
+                                    setMatrixFormInsumos(prev => prev.map((it, i) => {
+                                      if (i === idx) {
+                                        if (isNumeric) {
+                                          return { ...it, quantity: Number(trimmed), formula: null };
+                                        } else {
+                                          const evalQty = evaluateFormula(trimmed, activeConceptQty);
+                                          return { ...it, quantity: evalQty, formula: trimmed || null };
+                                        }
+                                      }
+                                      return it;
+                                    }));
                                   }}
-                                  className="w-16 px-1 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded"
+                                  className="w-24 px-1 py-0.5 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded text-[10px] focus:outline-none focus:border-gold/40"
                                 />
+                                {item.formula && (
+                                  <span className="block text-[8px] text-cream-dim text-right font-mono mt-0.5">
+                                    Res: {qty.toFixed(4)}
+                                  </span>
+                                )}
                               </td>
                               <td className="py-1.5 px-2 text-right font-mono select-none">
                                 <CurrencyEditCell
@@ -2110,14 +2155,14 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               {/* Calculations preview and submit */}
               <div className="pt-4 flex justify-between items-center select-none border-t border-dark-4">
                 {(() => {
-                  const direct = calculateMatrixDirectCost(matrixFormInsumos);
+                  const direct = calculateMatrixDirectCost(matrixFormInsumos, activeConceptQty);
                   const indPct = budget?.indirect_percentage ?? 10.00;
                   const utPct = budget?.utility_percentage ?? 8.00;
                   const sale = calculateMatrixSellingPrice(direct, indPct, utPct);
                   return (
-                    <div className="font-mono text-[9.5px] text-cream-dim">
-                      <span>Costo Directo: {formatCurrencyMXN(direct)} &bull; </span>
-                      <span className="text-gold font-bold">P.V. Venta Sugerido: {formatCurrencyMXN(sale)}</span>
+                    <div className="font-mono text-[9.5px] text-cream-dim flex flex-col gap-0.5">
+                      <div>Costo Directo Unitario (evaluado a Cant: {activeConceptQty}): <span className="text-cream font-bold">{formatCurrencyMXN(direct)}</span></div>
+                      <div>P.V. Venta Sugerido Unitario: <span className="text-gold font-bold">{formatCurrencyMXN(sale)}</span></div>
                     </div>
                   );
                 })()}

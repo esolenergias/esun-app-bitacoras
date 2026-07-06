@@ -65,20 +65,39 @@ function runTests() {
     }
   ];
   
-  const totals = calculateBudgetTotals(mockConceptos);
-  // Concepto 1: qty = 2, cost = 100, indirect = 10%, utility = 8%
-  // unit direct = 100, unit selling = 100 * 1.1 * 1.08 = 118.8
-  // total direct = 2 * 100 = 200, total selling = 2 * 118.8 = 237.6
-  //
-  // Concepto 2: qty = 5, cost = 50, indirect = 15%, utility = 10%
-  // unit direct = 50, unit selling = 50 * 1.15 * 1.10 = 63.25
-  // total direct = 5 * 50 = 250, total selling = 5 * 63.25 = 316.25
-  //
-  // Totals:
-  // direct = 200 + 250 = 450
-  // selling = 237.6 + 316.25 = 553.85
+  const globalIndirect = 12;
+  const globalUtility = 10;
+  const totals = calculateBudgetTotals(mockConceptos, globalIndirect, globalUtility);
+  // Concepto 1: qty = 2, cost = 100 -> direct = 200
+  // Concepto 2: qty = 5, cost = 50  -> direct = 250
+  // Total Direct = 450
+  // Global Indirect = 12% -> 450 * 1.12 = 504.00
+  // Global Utility = 10%  -> 504 * 1.10 = 554.40
   assertEquals(totals.directCostTotal, 450, 'Budget Total Direct Cost');
-  assertEquals(totals.sellingPriceTotal, 553.85, 'Budget Total Selling Price');
+  assertEquals(totals.sellingPriceTotal, 554.4, 'Budget Total Selling Price');
+
+  // Test 4: Revit-like Formula Evaluation
+  console.log('\nRunning Test 4: Revit-like Formula Evaluation...');
+  const mockInsumosWithFormulas = [
+    {
+      insumo: { id: '3', code: 'INS-3', type: 'material', description: 'Insumo 3', unit: 'pza', cost: 10 } as Insumo,
+      quantity: 1,
+      formula: 'Q * 0.5 + 2' // At Q=10, evaluated qty is 10 * 0.5 + 2 = 7. cost = 10 * 7 = 70.
+    },
+    {
+      insumo: { id: '4', code: 'INS-4', type: 'labor', description: 'Insumo 4', unit: 'jor', cost: 20 } as Insumo,
+      quantity: 5,
+      formula: null
+    }
+  ];
+  
+  // At Q = 10:
+  const costAt10 = calculateMatrixDirectCost(mockInsumosWithFormulas, 10);
+  assertEquals(costAt10, 170, 'Matrix Cost at Q=10');
+
+  // At Q = 4:
+  const costAt4 = calculateMatrixDirectCost(mockInsumosWithFormulas, 4);
+  assertEquals(costAt4, 140, 'Matrix Cost at Q=4');
 
   console.log('\nAll calculations tests passed successfully!');
 }

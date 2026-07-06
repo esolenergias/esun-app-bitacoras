@@ -19,6 +19,7 @@ interface DbInsumo {
 
 interface DbMatrizInsumo {
   quantity: number | string;
+  formula?: string | null;
   insumos: DbInsumo | DbInsumo[] | null;
 }
 
@@ -83,9 +84,10 @@ export function mapMatrizFromDb(data: DbMatriz): Matriz {
     if (!ins) return null;
     return {
       insumo: mapInsumoFromDb(ins),
-      quantity: Number(mi.quantity)
+      quantity: Number(mi.quantity),
+      formula: mi.formula
     };
-  }).filter((item): item is { insumo: Insumo; quantity: number } => item !== null) || [];
+  }).filter((item): item is { insumo: Insumo; quantity: number; formula?: string | null } => item !== null) || [];
 
   return {
     id: data.id,
@@ -179,6 +181,7 @@ export async function getMatrices(): Promise<Matriz[]> {
       *,
       matriz_insumos (
         quantity,
+        formula,
         insumos (
           *
         )
@@ -198,6 +201,7 @@ export async function getMatrizDetails(id: string): Promise<Matriz> {
       *,
       matriz_insumos (
         quantity,
+        formula,
         insumos (
           *
         )
@@ -251,7 +255,8 @@ export async function saveMatriz(matriz: Partial<Matriz>): Promise<Matriz> {
     const insumosToUpsert = matriz.insumos.map((item) => ({
       matriz_id: savedMatrix.id,
       insumo_id: item.insumo.id,
-      quantity: item.quantity
+      quantity: item.quantity,
+      formula: item.formula || null
     }));
 
     if (insumoIdsToDelete.length > 0) {
@@ -327,6 +332,7 @@ export async function getPresupuestoDetails(idOrName: string): Promise<Presupues
           *,
           matriz_insumos (
             quantity,
+            formula,
             insumos (
               *
             )
@@ -476,8 +482,16 @@ export async function deletePresupuesto(id: string): Promise<void> {
 // 4. CALCULATION HELPERS
 // ==========================================
 
-export function calculateMatrixDirectCost(insumos: { insumo: { cost: number }; quantity: number }[]): number {
-  return insumos.reduce((sum, item) => sum + (Number(item.insumo.cost) * Number(item.quantity)), 0);
+export function calculateMatrixDirectCost(
+  insumos: { insumo: { cost: number }; quantity: number; formula?: string | null }[],
+  conceptQty: number = 1
+): number {
+  return insumos.reduce((sum, item) => {
+    const qty = item.formula 
+      ? evaluateFormula(item.formula, conceptQty) 
+      : Number(item.quantity);
+    return sum + (Number(item.insumo.cost) * qty);
+  }, 0);
 }
 
 export function calculateMatrixSellingPrice(
@@ -495,25 +509,46 @@ export interface BudgetTotals {
   sellingPriceTotal: number;
 }
 
-export function calculateBudgetTotals(conceptos: PresupuestoConcepto[]): BudgetTotals {
+export function calculateBudgetTotals(
+  conceptos: PresupuestoConcepto[],
+  indirectPercentage?: number,
+  utilityPercentage?: number
+): BudgetTotals {
   let directCostTotal = 0;
-  let sellingPriceTotal = 0;
-
   for (const concepto of conceptos) {
     const qty = Number(concepto.quantity);
-    const unitDirect = Number(concepto.cost_price);
-    const unitSelling = calculateMatrixSellingPrice(
-      unitDirect,
-      Number(concepto.indirect_percentage),
-      Number(concepto.utility_percentage)
-    );
-
+    // Since matrix direct cost can depend on the concept qty (formula), pass it here!
+    const unitDirect = concepto.matriz 
+      ? calculateMatrixDirectCost(concepto.matriz.insumos || [], qty) 
+      : Number(concepto.cost_price);
     directCostTotal += qty * unitDirect;
-    sellingPriceTotal += qty * unitSelling;
   }
+
+  const indPct = indirectPercentage !== undefined ? Number(indirectPercentage) : 10.00;
+  const utPct = utilityPercentage !== undefined ? Number(utilityPercentage) : 8.00;
+
+  const subtotal = directCostTotal * (1 + indPct / 100);
+  const sellingPriceTotal = subtotal * (1 + utPct / 100);
 
   return {
     directCostTotal: Math.round((directCostTotal + Number.EPSILON) * 100) / 100,
     sellingPriceTotal: Math.round((sellingPriceTotal + Number.EPSILON) * 100) / 100
   };
+}
+
+export function evaluateFormula(formula: string, conceptQty: number): number {
+  try {
+    if (!formula) return 0;
+    // Replace variable tokens (Q, C, etc.) with conceptQty
+    let sanitized = formula
+      .replace(/q|c|cantidad/gi, String(conceptQty))
+      .replace(/[^0-9+\-*/().\s]/g, ''); // strip unsafe characters
+    
+    const fn = new Function(`return (${sanitized});`);
+    const val = fn();
+    return typeof val === 'number' && !isNaN(val) && isFinite(val) ? val : 0;
+  } catch (e) {
+    console.error('Error evaluating formula:', formula, e);
+    return 0;
+  }
 }
