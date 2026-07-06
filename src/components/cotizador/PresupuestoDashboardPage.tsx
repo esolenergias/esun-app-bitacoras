@@ -1785,7 +1785,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                 <tr key={idx} className="hover:bg-dark-1/25 transition-colors">
                                   <td className="py-1.5 px-2 font-mono font-bold text-gold/80 select-all">{item.insumo.code}</td>
                                   <td className="py-1.5 px-2 text-cream truncate max-w-[150px]">{item.insumo.description}</td>
-                                  <td className="py-1.5 px-2 text-right font-mono select-all">{formatQty(item.quantity, item.insumo.unit)}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono select-all">{parseFloat(item.quantity.toFixed(4)).toString()}</td>
                                   <td className="py-1.5 px-2 text-right font-mono select-none">
                                     <CurrencyEditCell
                                       value={item.insumo.cost}
@@ -2159,12 +2159,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                     setMatrixFormInsumos(prev => prev.map((it, i) => {
                                       if (i === idx) {
                                         if (isNumeric) {
-                                          let finalVal = Number(trimmed);
-                                          const isPza = it.insumo.unit?.trim().toLowerCase() === 'pza';
-                                          if (isPza && activeConceptQty > 0) {
-                                            finalVal = Math.round(finalVal * activeConceptQty) / activeConceptQty;
-                                          }
-                                          return { ...it, quantity: finalVal, formula: null };
+                                          return { ...it, quantity: Number(trimmed), formula: null };
                                         } else {
                                           const evalQty = evaluateFormula(trimmed, activeConceptQty);
                                           return { ...it, quantity: evalQty, formula: trimmed || null };
@@ -2177,7 +2172,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                 />
                                 {item.formula && (
                                   <span className="block text-[8px] text-cream-dim text-right font-mono mt-0.5">
-                                    Res: {parseFloat(finalQty.toFixed(4))} {item.insumo.unit} ({Math.round(finalQty * activeConceptQty)} pza tot)
+                                    Res: {parseFloat(qty.toFixed(4))} {item.insumo.unit} {isPza && `(Ajustado: ${parseFloat(finalQty.toFixed(4))} | ${Math.round(finalQty * activeConceptQty)} pza tot)`}
                                   </span>
                                 )}
                               </td>
