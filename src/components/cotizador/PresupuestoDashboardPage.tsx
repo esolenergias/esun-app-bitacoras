@@ -56,6 +56,67 @@ const NumericInput = ({ value, onChange, className, step = "1", min, required }:
   );
 };
 
+const CurrencyEditCell = ({ value, onChange }: { value: number; onChange: (val: number) => Promise<void> }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempValue, setTempValue] = useState<string>(value.toFixed(2));
+
+  useEffect(() => {
+    setTempValue(value.toFixed(2));
+  }, [value]);
+
+  if (isEditing) {
+    return (
+      <div className="flex justify-end items-center gap-1 select-none font-mono">
+        <span className="text-cream-dim text-[11px] font-mono">$</span>
+        <input
+          type="number"
+          step="0.01"
+          min="0.00"
+          value={tempValue}
+          onChange={(e) => setTempValue(e.target.value)}
+          onBlur={async () => {
+            setIsEditing(false);
+            const parsed = parseFloat(tempValue);
+            if (!isNaN(parsed) && parsed !== value) {
+              await onChange(parsed);
+            } else {
+              setTempValue(value.toFixed(2));
+            }
+          }}
+          onKeyDown={async (e) => {
+            if (e.key === 'Enter') {
+              setIsEditing(false);
+              const parsed = parseFloat(tempValue);
+              if (!isNaN(parsed) && parsed !== value) {
+                await onChange(parsed);
+              } else {
+                setTempValue(value.toFixed(2));
+              }
+            }
+          }}
+          autoFocus
+          className="w-20 px-1 py-0.5 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded text-[11px] focus:outline-none focus:border-gold/50"
+        />
+      </div>
+    );
+  }
+
+  const formatted = new Intl.NumberFormat('es-MX', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+
+  return (
+    <div 
+      onClick={() => setIsEditing(true)}
+      className="cursor-pointer hover:bg-dark-3/30 px-1.5 py-0.5 rounded text-right font-mono text-cream hover:text-gold transition-colors select-all"
+      title="Haga clic para editar el costo"
+    >
+      ${formatted}
+    </div>
+  );
+};
+
 const getInitials = (name: string): string => {
   if (!name) return '';
   return name
@@ -1556,14 +1617,11 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                   <td className="py-1.5 px-2 text-cream truncate max-w-[150px]">{item.insumo.description}</td>
                                   <td className="py-1.5 px-2 text-right font-mono select-all">{item.quantity.toFixed(4)}</td>
                                   <td className="py-1.5 px-2 text-right font-mono select-none">
-                                    <NumericInput
-                                      step="0.01"
-                                      min="0.00"
+                                    <CurrencyEditCell
                                       value={item.insumo.cost}
                                       onChange={async (val) => {
                                         await handleUpdateInsumoCatalogCost(item.insumo.id, val);
                                       }}
-                                      className="w-20 px-1 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded"
                                     />
                                   </td>
                                   <td className="py-1.5 px-2 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(importe)}</td>
@@ -1888,14 +1946,11 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                 />
                               </td>
                               <td className="py-1.5 px-2 text-right font-mono select-none">
-                                <NumericInput
-                                  step="0.01"
-                                  min="0.00"
+                                <CurrencyEditCell
                                   value={item.insumo.cost}
                                   onChange={async (val) => {
                                     await handleUpdateInsumoCatalogCost(item.insumo.id, val);
                                   }}
-                                  className="w-20 px-1 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded"
                                 />
                               </td>
                               <td className="py-1.5 px-2 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(importe)}</td>
