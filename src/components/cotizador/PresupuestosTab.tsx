@@ -856,11 +856,11 @@ export default function PresupuestosTab() {
     return `$${formatted} MXN`;
   };
 
-  /** Rounds to integer when unit is "pza", otherwise up to 4 decimal places (trailing zeros removed). */
-  const formatQty = (qty: number, unit?: string, decimals = 4): string => {
+  /** Rounds to integer when unit is "pza", otherwise exactly 2 decimal places. */
+  const formatQty = (qty: number, unit?: string, decimals = 2): string => {
     const isPza = unit?.trim().toLowerCase() === 'pza';
     if (isPza) return Math.round(qty).toString();
-    return parseFloat(qty.toFixed(decimals)).toString();
+    return qty.toFixed(decimals);
   };
 
   // Helper translated status colors

@@ -897,13 +897,12 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
 
   /**
    * Formats a quantity value. If the unit is "pza" (pieza), rounds to the nearest
-   * integer with no decimals. Otherwise displays up to 4 significant decimal places.
+   * integer with no decimals. Otherwise displays exactly 2 decimal places.
    */
-  const formatQty = (qty: number, unit?: string, decimals = 4): string => {
+  const formatQty = (qty: number, unit?: string, decimals = 2): string => {
     const isPza = unit?.trim().toLowerCase() === 'pza';
     if (isPza) return Math.round(qty).toString();
-    // Remove trailing zeros but keep up to `decimals` places
-    return parseFloat(qty.toFixed(decimals)).toString();
+    return qty.toFixed(decimals);
   };
 
   const getStatusBadgeStyles = (status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado') => {
