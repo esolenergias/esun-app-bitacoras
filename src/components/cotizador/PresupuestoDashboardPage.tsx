@@ -655,27 +655,33 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     updatedConceptos[currentIndex] = updatedConceptos[targetIndex];
     updatedConceptos[targetIndex] = temp;
 
-    // Re-assign order_index to all elements to guarantee clean incremental values
-    const finalConceptos = updatedConceptos.map((c, idx) => ({
-      ...c,
-      order_index: idx
-    }));
+    // Assign correct order_index for the database payload
+    const conceptA = { id: updatedConceptos[currentIndex].id, order_index: currentIndex };
+    const conceptB = { id: updatedConceptos[targetIndex].id, order_index: targetIndex };
 
     try {
       // Optimistic local UI update
       setBudget(prev => {
         if (!prev) return null;
+        const reordered = [...prev.conceptos];
+        const t = reordered[currentIndex];
+        reordered[currentIndex] = reordered[targetIndex];
+        reordered[targetIndex] = t;
         return {
           ...prev,
-          conceptos: finalConceptos
+          conceptos: reordered.map((c, idx) => ({ ...c, order_index: idx }))
         };
       });
 
-      // Persist the updated concepts with their new order_index
-      await savePresupuesto(budget, finalConceptos);
-    } catch (err) {
+      // Update the order_index of the two swapped concepts in Supabase
+      const { error: dbError } = await supabase
+        .from('presupuesto_conceptos')
+        .upsert([conceptA, conceptB]);
+
+      if (dbError) throw dbError;
+    } catch (err: any) {
       console.error("Error updating concept order:", err);
-      alert("No se pudo guardar el nuevo orden de los conceptos.");
+      alert(`No se pudo guardar el nuevo orden de los conceptos: ${err.message || err}`);
       await fetchBudgetDetails();
     }
   };
