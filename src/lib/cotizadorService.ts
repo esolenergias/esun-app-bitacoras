@@ -536,22 +536,33 @@ export function calculateBudgetTotals(
   };
 }
 
+/**
+ * Evaluates a parametric formula for an insumo's REND. (rendimiento por unidad).
+ *
+ * The result IS the rendimiento per unit of the concept — exactly as written.
+ * `Q` (or `C`, `CANTIDAD`) is the concept's general quantity, available as a
+ * parameter so users can model non-linear / scale-dependent consumption:
+ *
+ *   Examples:
+ *     "0.25"          → static: 0.25 units of insumo per unit of concept
+ *     "2 / Q"         → 2 fixed items distributed over the total quantity
+ *     "1/Q + 0.005"   → fixed overhead + linear rate (economy of scale)
+ *     "Q / 5000"      → grows with project size (e.g., transport rounds)
+ *
+ * The caller (calculateMatrixDirectCost) then does:
+ *     Σ(REND_i × CostoU_i)  →  unit cost of the matrix
+ * And the dashboard does:
+ *     unitCost × conceptQty  →  total cost (ONE multiplication, no double)
+ */
 export function evaluateFormula(formula: string, conceptQty: number): number {
   try {
     if (!formula) return 0;
-    const referencesQty = /q|c|cantidad/i.test(formula);
-    let sanitized = formula
+    const sanitized = formula
       .replace(/q|c|cantidad/gi, String(conceptQty))
-      .replace(/[^0-9+\-*/().\s]/g, ''); // strip unsafe characters
-    
+      .replace(/[^0-9+\-*/().\s]/g, ''); // strip unsafe chars
     const fn = new Function(`return (${sanitized});`);
     const val = fn();
-    const result = typeof val === 'number' && !isNaN(val) && isFinite(val) ? val : 0;
-    
-    if (referencesQty && conceptQty > 0) {
-      return result / conceptQty;
-    }
-    return result;
+    return typeof val === 'number' && !isNaN(val) && isFinite(val) ? val : 0;
   } catch (e) {
     console.error('Error evaluating formula:', formula, e);
     return 0;

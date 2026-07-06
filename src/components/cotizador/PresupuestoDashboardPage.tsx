@@ -2238,35 +2238,53 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               <h4 className="font-display font-black text-xs uppercase tracking-wider">Fórmulas Paramétricas</h4>
             </div>
             <div className="text-[10.5px] text-cream-dim space-y-2.5 font-body leading-relaxed text-left">
-              <p>El campo <span className="text-cream font-semibold font-mono">REND.</span> representa la cantidad de este insumo requerida <span className="text-cream font-semibold">por cada unidad</span> del concepto general. Puedes escribir una fórmula usando <span className="font-mono text-gold font-bold">Q</span> para hacerlo proporcional.</p>
-              
+              <p>
+                El campo <span className="text-cream font-semibold font-mono">REND.</span> es la cantidad del insumo
+                necesaria <span className="text-cream font-semibold">por 1 unidad</span> del concepto.
+                El resultado de la fórmula <span className="text-cream font-semibold">ES ese REND. directamente</span> —
+                la cantidad general se aplica automáticamente después.
+              </p>
+
               <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1">
-                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Variable Admitida</span>
+                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Variable Disponible</span>
                 <p className="font-mono text-cream font-bold">Q (o C, CANTIDAD)</p>
-                <span className="block text-[8px] text-cream-muted">Es la cantidad total del concepto general. La fórmula la usa para calcular el rendimiento por unidad sin duplicar la multiplicación.</span>
+                <span className="block text-[8px] text-cream-muted">
+                  Cantidad total del concepto. Úsala para modelar consumos no-lineales.
+                  La multiplicación final (×Q) la hace la matriz automáticamente.
+                </span>
               </div>
 
               <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1.5">
-                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Cómo funciona (Ejemplo)</span>
-                <div className="text-[9px] space-y-1 text-cream-dim">
-                  <p>Concepto: <span className="text-cream font-mono">Cable eléctrico</span>, <span className="text-cream font-mono font-bold">Cantidad = 100 m</span></p>
-                  <p>Insumo: <span className="text-cream font-mono">Conector tipo A</span>, fórmula <span className="text-cream font-mono font-bold">Q / 10</span></p>
-                  <p className="text-cream-muted">→ Rend. por unidad = 100/10/100 = <span className="text-gold font-bold font-mono">0.1 conector/m</span></p>
-                  <p className="text-cream-muted">→ Total = 100 m × 0.1 = <span className="text-gold font-bold font-mono">10 conectores</span></p>
+                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Ejemplo Práctico — Concepto: 100 m de cable</span>
+                <div className="text-[9px] space-y-0.5 font-mono">
+                  <div className="flex justify-between text-cream-dim">
+                    <span>Fórmula: <span className="text-cream font-bold">2 / Q</span></span>
+                    <span>→ REND = 2/100 = <span className="text-gold font-bold">0.02 /m</span></span>
+                  </div>
+                  <div className="flex justify-between text-cream-dim text-[8px]">
+                    <span className="italic">Total = 100 m × 0.02 = 2 conectores</span>
+                  </div>
+                  <div className="flex justify-between text-cream-dim mt-1">
+                    <span>Fórmula: <span className="text-cream font-bold">1/Q + 0.005</span></span>
+                    <span>→ REND = <span className="text-gold font-bold">0.015 /m</span></span>
+                  </div>
+                  <div className="flex justify-between text-cream-dim text-[8px]">
+                    <span className="italic">Base fija (1 pieza) + 0.5% lineal → economía de escala</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1.5">
-                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Más Ejemplos de Fórmulas</span>
-                <ul className="space-y-1 list-disc list-inside font-mono text-[9.5px]">
-                  <li><span className="text-cream font-bold">0.5</span> — estático: 0.5 unidades por cada unidad del concepto</li>
-                  <li><span className="text-cream font-bold">Q / 50</span> — 1 elemento por cada 50 unidades del concepto</li>
-                  <li><span className="text-cream font-bold">Q * 0.02</span> — 2% de la cantidad total como base proporcional</li>
-                  <li><span className="text-cream font-bold">Q * 1.5 + 10</span> — base de 10 + proporción variable</li>
+              <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1">
+                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Patrones Útiles</span>
+                <ul className="space-y-0.5 list-disc list-inside font-mono text-[9px]">
+                  <li><span className="text-cream font-bold">0.25</span> — estático: 0.25 por unidad de concepto</li>
+                  <li><span className="text-cream font-bold">5 / Q</span> — 5 piezas fijas (independiente de Q)</li>
+                  <li><span className="text-cream font-bold">1/Q + 0.01</span> — overhead fijo + tasa lineal</li>
+                  <li><span className="text-cream font-bold">Q / 5000</span> — crece con el proyecto (viajes, rondas)</li>
                 </ul>
               </div>
 
-              <p className="text-[9px] text-cream-muted italic">Nota: Solo se permiten números, paréntesis y los operadores +, -, *, /. La cantidad general del concepto se aplica automáticamente al final.</p>
+              <p className="text-[9px] text-cream-muted italic">Solo se permiten: números, paréntesis y los operadores <span className="font-mono">+ - * /</span></p>
             </div>
             <div className="pt-2 text-right">
               <button
