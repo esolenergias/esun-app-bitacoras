@@ -1153,8 +1153,8 @@ export default function PresupuestosTab() {
                                   </td>
                                   <td className="py-2.5 px-3">
                                     <NumericInput
-                                      step="0.01"
-                                      min="0.01"
+                                      step={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
+                                      min={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
                                       value={c.quantity || 0}
                                       onChange={(val) => handleUpdateConceptField(c.id!, 'quantity', val)}
                                       className="w-full px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"

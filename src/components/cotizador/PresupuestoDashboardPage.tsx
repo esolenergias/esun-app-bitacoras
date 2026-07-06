@@ -1317,11 +1317,11 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                           <td className="py-3 px-4 text-right font-mono select-none">
                             <NumericInput
                               step={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
-                              min="0"
+                              min={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.00"}
                               value={Number(c.quantity)}
                               onChange={async (val) => {
                                 const isPza = c.unit?.trim().toLowerCase() === 'pza';
-                                const finalVal = isPza ? Math.round(val) : val;
+                                const finalVal = isPza ? Math.max(1, Math.round(val)) : val;
                                 await handleUpdateConceptQuantity(c.id, finalVal);
                               }}
                               className="w-20 px-1 py-0.5 bg-dark-1/80 border border-dark-4 focus:border-gold/40 text-cream rounded font-mono text-right focus:outline-none text-[11px]"
