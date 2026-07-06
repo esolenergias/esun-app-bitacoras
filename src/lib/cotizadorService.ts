@@ -252,12 +252,16 @@ export async function saveMatriz(matriz: Partial<Matriz>): Promise<Matriz> {
       .map((item) => item.insumo_id)
       .filter((id) => !incomingInsumoIds.has(id));
 
-    const insumosToUpsert = matriz.insumos.map((item) => ({
-      matriz_id: savedMatrix.id,
-      insumo_id: item.insumo.id,
-      quantity: item.quantity,
-      formula: item.formula || null
-    }));
+    const insumosToUpsert = matriz.insumos.map((item) => {
+      const isPza = item.insumo?.unit?.trim().toLowerCase() === 'pza';
+      const qty = isPza && !item.formula ? Math.round(Number(item.quantity)) : Number(item.quantity);
+      return {
+        matriz_id: savedMatrix.id,
+        insumo_id: item.insumo.id,
+        quantity: qty,
+        formula: item.formula || null
+      };
+    });
 
     if (insumoIdsToDelete.length > 0) {
       const { error: deleteError } = await supabase
@@ -483,14 +487,18 @@ export async function deletePresupuesto(id: string): Promise<void> {
 // ==========================================
 
 export function calculateMatrixDirectCost(
-  insumos: { insumo: { cost: number }; quantity: number; formula?: string | null }[],
+  insumos: { insumo: { cost: number; unit?: string }; quantity: number; formula?: string | null }[],
   conceptQty: number = 1
 ): number {
   return insumos.reduce((sum, item) => {
     const qty = item.formula 
       ? evaluateFormula(item.formula, conceptQty) 
       : Number(item.quantity);
-    return sum + (Number(item.insumo.cost) * qty);
+    const isPza = item.insumo?.unit?.trim().toLowerCase() === 'pza';
+    const adjustedQty = isPza && conceptQty > 0
+      ? Math.round(qty * conceptQty) / conceptQty
+      : qty;
+    return sum + (Number(item.insumo?.cost || 0) * adjustedQty);
   }, 0);
 }
 

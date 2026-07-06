@@ -116,6 +116,20 @@ function runTests() {
   const costAt100 = calculateMatrixDirectCost(mockInsumosWithFormulas, 100);
   assertEquals(costAt100, 12, 'Matrix unit cost at Q=100 (economy of scale demonstrated)');
 
+  // Test 5: Rounding for "pza" units
+  console.log('\nRunning Test 5: Rounding for pza units...');
+  const mockInsumosPza = [
+    {
+      insumo: { id: 'pza-1', code: 'INS-P1', type: 'material', description: 'Insumo Pza 1', unit: 'pza', cost: 100 } as Insumo,
+      quantity: 1.4
+    }
+  ];
+  const costPzaQ1 = calculateMatrixDirectCost(mockInsumosPza, 1);
+  assertEquals(costPzaQ1, 100, 'Pza unit cost at Q=1 should round 1.4 to 1');
+
+  const costPzaQ5 = calculateMatrixDirectCost(mockInsumosPza, 5);
+  assertEquals(costPzaQ5, 140, 'Pza unit cost at Q=5 should scale and round (1.4*5=7) -> 140');
+
   console.log('\nAll calculations tests passed successfully!');
 }
 
