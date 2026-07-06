@@ -117,6 +117,22 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [subModalError, setSubModalError] = useState<string | null>(null);
   const [subModalSubmitting, setSubModalSubmitting] = useState<boolean>(false);
 
+  // ----------------------------------------------------
+  // STANDALONE MATRIX EDITOR STATES (FOR ACCORDION EDITING)
+  // ----------------------------------------------------
+  const [editingMatrix, setEditingMatrix] = useState<Matriz | null>(null);
+  const [isMatrixEditorOpen, setIsMatrixEditorOpen] = useState<boolean>(false);
+  const [matrixFormCode, setMatrixFormCode] = useState<string>('');
+  const [matrixFormDesc, setMatrixFormDesc] = useState<string>('');
+  const [matrixFormUnit, setMatrixFormUnit] = useState<string>('');
+  const [matrixFormIndirect, setMatrixFormIndirect] = useState<number>(10);
+  const [matrixFormUtility, setMatrixFormUtility] = useState<number>(8);
+  const [matrixFormInsumos, setMatrixFormInsumos] = useState<{ insumo: Insumo; quantity: number }[]>([]);
+  const [selectedInsumoIdForMatrixForm, setSelectedInsumoIdForMatrixForm] = useState<string>('');
+  const [insumoQtyForMatrixForm, setInsumoQtyForMatrixForm] = useState<number>(1);
+  const [matrixFormError, setMatrixFormError] = useState<string | null>(null);
+  const [matrixFormSubmitting, setMatrixFormSubmitting] = useState<boolean>(false);
+
   // Fetch user session on mount
   useEffect(() => {
     const fetchSession = async () => {
@@ -439,6 +455,148 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       setSubModalError(err.message || 'Error al guardar el insumo. Verifica si el código ya existe.');
     } finally {
       setSubModalSubmitting(false);
+    }
+  };
+
+  // ----------------------------------------------------
+  // INLINE YIELD AND MATRIX EDITOR ACTIONS
+  // ----------------------------------------------------
+  const handleUpdateInsumoQuantity = async (matrixId: string, insumoId: string, newQty: number) => {
+    try {
+      const { error: dbError } = await supabase
+        .from('matriz_insumos')
+        .update({ quantity: newQty })
+        .eq('matriz_id', matrixId)
+        .eq('insumo_id', insumoId);
+         
+      if (dbError) throw dbError;
+      
+      // Calculate the new direct cost of the matrix
+      const updatedDetails = await getPresupuestoDetails(id);
+      const matrix = updatedDetails.conceptos.find(c => c.matriz_id === matrixId)?.matriz;
+      if (matrix) {
+        const newDirectCost = calculateMatrixDirectCost(matrix.insumos || []);
+        
+        // Update all concepts using this matrix in the database
+        const conceptsToUpdate = updatedDetails.conceptos.filter(c => c.matriz_id === matrixId);
+        for (const c of conceptsToUpdate) {
+          await supabase
+            .from('presupuesto_conceptos')
+            .update({ cost_price: newDirectCost })
+            .eq('id', c.id);
+        }
+      }
+      
+      await fetchBudgetDetails();
+    } catch (err: any) {
+      console.error('Error updating insumo quantity:', err);
+      alert('No se pudo actualizar el rendimiento en la base de datos.');
+    }
+  };
+
+  const handleOpenMatrixEditor = (matrix: Matriz) => {
+    setEditingMatrix(matrix);
+    setMatrixFormCode(matrix.code);
+    setMatrixFormDesc(matrix.description);
+    setMatrixFormUnit(matrix.unit);
+    setMatrixFormIndirect(matrix.indirect_percentage);
+    setMatrixFormUtility(matrix.utility_percentage);
+    setMatrixFormInsumos(matrix.insumos || []);
+    setSelectedInsumoIdForMatrixForm('');
+    setInsumoQtyForMatrixForm(1);
+    setMatrixFormError(null);
+    setMatrixFormSubmitting(false);
+    setIsMatrixEditorOpen(true);
+  };
+
+  const handleAddInsumoToMatrixForm = () => {
+    if (!selectedInsumoIdForMatrixForm) return;
+    const insumo = insumosCatalog.find(i => i.id === selectedInsumoIdForMatrixForm);
+    if (!insumo) return;
+
+    if (matrixFormInsumos.some(item => item.insumo.id === insumo.id)) {
+      alert('Este insumo ya está añadido al desglose.');
+      return;
+    }
+
+    setMatrixFormInsumos(prev => [...prev, { insumo, quantity: insumoQtyForMatrixForm }]);
+    setSelectedInsumoIdForMatrixForm('');
+    setInsumoQtyForMatrixForm(1);
+  };
+
+  const handleRemoveInsumoFromMatrixForm = (insumoId: string) => {
+    setMatrixFormInsumos(prev => prev.filter(item => item.insumo.id !== insumoId));
+  };
+
+  const handleSaveMatrix = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMatrixFormError(null);
+
+    if (!matrixFormCode.trim()) {
+      setMatrixFormError('El código de la matriz es obligatorio.');
+      return;
+    }
+    if (!matrixFormDesc.trim()) {
+      setMatrixFormError('La descripción es obligatoria.');
+      return;
+    }
+    if (!matrixFormUnit.trim()) {
+      setMatrixFormError('La unidad es obligatoria.');
+      return;
+    }
+    if (matrixFormInsumos.length === 0) {
+      setMatrixFormError('Debes añadir al menos un insumo al desglose.');
+      return;
+    }
+
+    setMatrixFormSubmitting(true);
+    try {
+      const matrixData: Partial<Matriz> = {
+        id: editingMatrix?.id,
+        code: matrixFormCode.trim().toUpperCase(),
+        description: matrixFormDesc.trim(),
+        unit: matrixFormUnit.trim(),
+        indirect_percentage: matrixFormIndirect,
+        utility_percentage: matrixFormUtility,
+        insumos: matrixFormInsumos
+      };
+
+      const saved = await saveMatriz(matrixData);
+
+      // Now, update the snapshot cost_price, indirect_percentage, and utility_percentage of all concepts that use this matrix!
+      const newDirectCost = calculateMatrixDirectCost(saved.insumos || []);
+      
+      const { data: budgetConcepts, error: fetchError } = await supabase
+        .from('presupuesto_conceptos')
+        .select('*')
+        .eq('presupuesto_id', id)
+        .eq('matriz_id', saved.id);
+
+      if (fetchError) throw fetchError;
+
+      if (budgetConcepts && budgetConcepts.length > 0) {
+        for (const concept of budgetConcepts) {
+          await supabase
+            .from('presupuesto_conceptos')
+            .update({
+              description: saved.description,
+              unit: saved.unit,
+              cost_price: newDirectCost,
+              indirect_percentage: saved.indirect_percentage,
+              utility_percentage: saved.utility_percentage
+            })
+            .eq('id', concept.id);
+        }
+      }
+
+      setIsMatrixEditorOpen(false);
+      setEditingMatrix(null);
+      await fetchBudgetDetails();
+    } catch (err: any) {
+      console.error('Error saving matrix:', err);
+      setMatrixFormError(err.message || 'Error al guardar la matriz.');
+    } finally {
+      setMatrixFormSubmitting(false);
     }
   };
 
@@ -843,8 +1001,24 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                         </td>
                                         <td className="py-2 px-3 text-cream leading-relaxed">{item.insumo.description}</td>
                                         <td className="py-2 px-3 text-cream-muted text-center font-mono">{item.insumo.unit}</td>
-                                        <td className="py-2 px-3 text-right font-mono select-all">{rend.toFixed(4)}</td>
-                                        <td className="py-2 px-3 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(costVal)}</td>
+                                        <td className="py-2 px-3 text-right font-mono select-none">
+                                          <NumericInput
+                                            step="0.0001"
+                                            min="0.0000"
+                                            value={rend}
+                                            onChange={async (val) => {
+                                              await handleUpdateInsumoQuantity(c.matriz!.id, item.insumo.id, val);
+                                            }}
+                                            className="w-20 px-1 py-0.5 bg-dark-1/80 border border-dark-4 focus:border-gold/40 text-cream rounded font-mono text-right focus:outline-none text-[11px]"
+                                          />
+                                        </td>
+                                        <td 
+                                          className="py-2 px-3 text-right font-mono text-cream-dim select-all cursor-pointer hover:text-gold hover:underline transition-colors"
+                                          onClick={() => c.matriz && handleOpenMatrixEditor(c.matriz)}
+                                          title="Haga clic para visualizar y editar la matriz completa"
+                                        >
+                                          {formatCurrencyMXN(costVal)}
+                                        </td>
                                         <td className="py-2 px-3 text-right font-mono text-cream-dim select-all">{totalQty.toFixed(2)}</td>
                                         <td className="py-2 px-3 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(totalCost)}</td>
                                       </tr>
@@ -859,7 +1033,11 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
 
                           {/* Cascaded concept subtotal math card */}
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 bg-dark-1/80 border border-dark-4/70 p-3 rounded-xl font-mono text-[10px]">
-                            <div>
+                            <div 
+                              className="cursor-pointer hover:text-gold hover:underline transition-colors"
+                              onClick={() => c.matriz && handleOpenMatrixEditor(c.matriz)}
+                              title="Haga clic para visualizar y editar la matriz completa"
+                            >
                               <span className="text-cream-dim block uppercase text-[8px] font-black tracking-widest select-none">P.U. Costo Directo</span>
                               <span className="text-cream font-bold">{formatCurrencyMXN(Number(c.cost_price))}</span>
                             </div>
@@ -1476,6 +1654,222 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                 Cerrar
               </button>
             </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 4.6 STANDALONE MATRIX DETAILS EDITOR MODAL */}
+      {isMatrixEditorOpen && editingMatrix && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out] font-sans">
+          <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-[scaleUp_0.25s_ease-out]">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-dark-4 bg-dark-2 flex-shrink-0 select-none">
+              <div className="space-y-0.5">
+                <span className="text-[9px] font-mono font-bold text-gold px-2 py-0.5 bg-gold/10 border border-gold/25 rounded-md">
+                  {matrixFormCode}
+                </span>
+                <h4 className="font-display font-black text-sm text-cream uppercase tracking-wider block">
+                  Editar Matriz de Costos (APU)
+                </h4>
+              </div>
+              <button 
+                onClick={() => { setIsMatrixEditorOpen(false); setEditingMatrix(null); }}
+                className="p-1 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-cream transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body Form */}
+            <form onSubmit={handleSaveMatrix} className="flex-1 overflow-y-auto p-6 min-h-0 space-y-4">
+              {matrixFormError && (
+                <div className="p-3 bg-red-500/10 text-red-400 border border-red-500/25 rounded-xl text-xs flex items-start gap-2 select-none animate-[shake_0.4s_ease-in-out]">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{matrixFormError}</span>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Descripción Matriz</label>
+                <input
+                  type="text"
+                  placeholder="Ej. Suministro e instalación..."
+                  value={matrixFormDesc}
+                  onChange={(e) => setMatrixFormDesc(e.target.value)}
+                  className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
+                  <input
+                    type="text"
+                    placeholder="pza, m"
+                    value={matrixFormUnit}
+                    onChange={(e) => setMatrixFormUnit(e.target.value)}
+                    className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Indirecto %</label>
+                  <NumericInput
+                    step="0.1"
+                    value={matrixFormIndirect}
+                    onChange={setMatrixFormIndirect}
+                    className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Utilidad %</label>
+                  <NumericInput
+                    step="0.1"
+                    value={matrixFormUtility}
+                    onChange={setMatrixFormUtility}
+                    className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Insumos list builder */}
+              <div className="border border-dark-4 p-4 rounded-xl space-y-3 bg-dark-1/30">
+                <span className="text-[9px] font-black uppercase tracking-widest text-gold block select-none">Desglose de Insumos</span>
+                
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5 select-none">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Seleccionar Insumo del Catálogo</label>
+                    <select
+                      value={selectedInsumoIdForMatrixForm}
+                      onChange={(e) => setSelectedInsumoIdForMatrixForm(e.target.value)}
+                      className="w-full p-2 bg-dark-1 border border-dark-4 text-xs text-cream rounded-lg focus:outline-none font-mono cursor-pointer"
+                    >
+                      <option value="">-- Elige un Insumo --</option>
+                      {insumosCatalog.map(ins => (
+                        <option key={ins.id} value={ins.id}>
+                          [{ins.code}] ({ins.type === 'service' ? 'Trámite' : ins.type}) {ins.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="w-24 space-y-1">
+                    <label className="text-[8.5px] text-cream-muted uppercase font-bold block">Cantidad / Rend.</label>
+                    <NumericInput
+                      step="0.0001"
+                      min="0.0001"
+                      value={insumoQtyForMatrixForm}
+                      onChange={setInsumoQtyForMatrixForm}
+                      className="w-full p-2 bg-dark-1 border border-dark-4 text-xs text-cream rounded-lg text-right font-mono focus:outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddInsumoToMatrixForm}
+                    disabled={!selectedInsumoIdForMatrixForm}
+                    className="px-3 py-2 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 font-black text-[10px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Añadir</span>
+                  </button>
+                </div>
+
+                {/* Insumos breakdown table */}
+                {matrixFormInsumos.length > 0 ? (
+                  <div className="border border-dark-4 rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-[11px] border-collapse bg-dark-2/40">
+                      <thead>
+                        <tr className="border-b border-dark-4 bg-dark-2 select-none text-[8.5px] uppercase text-cream-dim">
+                          <th className="py-1.5 px-2">Código</th>
+                          <th className="py-1.5 px-2">Insumo</th>
+                          <th className="py-1.5 px-2 text-right">Rend.</th>
+                          <th className="py-1.5 px-2 text-right">Costo U.</th>
+                          <th className="py-1.5 px-2 text-right">Importe</th>
+                          <th className="py-1.5 px-2 text-center w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-dark-4 font-body">
+                        {matrixFormInsumos.map((item, idx) => {
+                          const importe = item.insumo.cost * item.quantity;
+                          return (
+                            <tr key={idx} className="hover:bg-dark-1/25 transition-colors">
+                              <td className="py-1.5 px-2 font-mono font-bold text-gold/80 select-all">{item.insumo.code}</td>
+                              <td className="py-1.5 px-2 text-cream truncate max-w-[180px]">{item.insumo.description}</td>
+                              <td className="py-1.5 px-2 text-right font-mono select-none">
+                                <NumericInput
+                                  step="0.0001"
+                                  min="0.0000"
+                                  value={item.quantity}
+                                  onChange={(val) => {
+                                    setMatrixFormInsumos(prev => prev.map((it, i) => i === idx ? { ...it, quantity: val } : it));
+                                  }}
+                                  className="w-16 px-1 bg-dark-1 border border-dark-4 text-right text-cream font-mono rounded"
+                                />
+                              </td>
+                              <td className="py-1.5 px-2 text-right font-mono text-cream-dim select-all">{formatCurrencyMXN(item.insumo.cost)}</td>
+                              <td className="py-1.5 px-2 text-right font-mono font-bold text-cream select-all">{formatCurrencyMXN(importe)}</td>
+                              <td className="py-1.5 px-2 text-center select-none">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveInsumoFromMatrixForm(item.insumo.id)}
+                                  className="p-1 text-cream-muted hover:text-red-400 transition-colors cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-cream-muted font-body italic text-center py-2">Ningún insumo añadido a la matriz aún.</p>
+                )}
+              </div>
+
+              {/* Calculations preview and submit */}
+              <div className="pt-4 flex justify-between items-center select-none border-t border-dark-4">
+                {(() => {
+                  const direct = calculateMatrixDirectCost(matrixFormInsumos);
+                  const sale = calculateMatrixSellingPrice(direct, matrixFormIndirect, matrixFormUtility);
+                  return (
+                    <div className="font-mono text-[9.5px] text-cream-dim">
+                      <span>Costo Directo: {formatCurrencyMXN(direct)} &bull; </span>
+                      <span className="text-gold font-bold">P.V. Venta APU: {formatCurrencyMXN(sale)}</span>
+                    </div>
+                  );
+                })()}
+                
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setIsMatrixEditorOpen(false); setEditingMatrix(null); }}
+                    className="px-4 py-2 border border-dark-4 hover:bg-dark-3 text-cream-muted hover:text-cream text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={matrixFormSubmitting}
+                    className="px-5 py-2.5 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5 flex items-center gap-1.5"
+                  >
+                    {matrixFormSubmitting ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Guardando Matriz...</span>
+                      </>
+                    ) : (
+                      <span>Guardar Matriz</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
 
           </div>
         </div>
