@@ -655,10 +655,6 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     updatedConceptos[currentIndex] = updatedConceptos[targetIndex];
     updatedConceptos[targetIndex] = temp;
 
-    // Assign correct order_index for the database payload
-    const conceptA = { id: updatedConceptos[currentIndex].id, order_index: currentIndex };
-    const conceptB = { id: updatedConceptos[targetIndex].id, order_index: targetIndex };
-
     try {
       // Optimistic local UI update
       setBudget(prev => {
@@ -673,12 +669,21 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         };
       });
 
-      // Update the order_index of the two swapped concepts in Supabase
-      const { error: dbError } = await supabase
+      // Update the order_index of the two swapped concepts in Supabase using concurrent update queries
+      const updateA = supabase
         .from('presupuesto_conceptos')
-        .upsert([conceptA, conceptB]);
+        .update({ order_index: targetIndex })
+        .eq('id', updatedConceptos[currentIndex].id);
 
-      if (dbError) throw dbError;
+      const updateB = supabase
+        .from('presupuesto_conceptos')
+        .update({ order_index: currentIndex })
+        .eq('id', updatedConceptos[targetIndex].id);
+
+      const [resA, resB] = await Promise.all([updateA, updateB]);
+
+      if (resA.error) throw resA.error;
+      if (resB.error) throw resB.error;
     } catch (err: any) {
       console.error("Error updating concept order:", err);
       alert(`No se pudo guardar el nuevo orden de los conceptos: ${err.message || err}`);
