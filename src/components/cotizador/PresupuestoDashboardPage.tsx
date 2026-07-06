@@ -10,7 +10,7 @@ import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
 import { 
   Loader2, AlertTriangle, FileText, ChevronRight, ChevronDown, 
   Layers, Package, Users, Cpu, ShieldCheck, DollarSign, 
-  TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, Layers2, Wrench, Plus
+  TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, Layers2, Wrench, Plus, HelpCircle
 } from 'lucide-react';
 
 interface NumericInputProps {
@@ -207,6 +207,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [matrixFormSubmitting, setMatrixFormSubmitting] = useState<boolean>(false);
   const [matrixFormInsumoSearch, setMatrixFormInsumoSearch] = useState<string>('');
   const [matrixFormInsumoTypeFilter, setMatrixFormInsumoTypeFilter] = useState<'all' | 'material' | 'labor' | 'equipment' | 'tool' | 'service'>('all');
+  const [isFormulaHelpOpen, setIsFormulaHelpOpen] = useState<boolean>(false);
 
   // Fetch user session on mount
   useEffect(() => {
@@ -1733,7 +1734,19 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                             <tr className="border-b border-dark-4 bg-dark-2 select-none text-[8.5px] uppercase text-cream-dim">
                               <th className="py-1.5 px-2">Código</th>
                               <th className="py-1.5 px-2">Insumo</th>
-                              <th className="py-1.5 px-2 text-right">Rend.</th>
+                              <th className="py-1.5 px-2 text-right">
+                                <span className="inline-flex items-center gap-1 justify-end w-full">
+                                  <span>Rend. / Fórmula</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsFormulaHelpOpen(true)}
+                                    className="text-cream-dim hover:text-gold transition-colors focus:outline-none cursor-pointer"
+                                    title="Ver guía de fórmulas paramétricas"
+                                  >
+                                    <HelpCircle className="w-3.5 h-3.5" />
+                                  </button>
+                                </span>
+                              </th>
                               <th className="py-1.5 px-2 text-right">Costo U.</th>
                               <th className="py-1.5 px-2 text-right">Importe</th>
                               <th className="py-1.5 px-2 text-center w-8"></th>
@@ -2078,7 +2091,19 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                         <tr className="border-b border-dark-4 bg-dark-2 select-none text-[8.5px] uppercase text-cream-dim">
                           <th className="py-1.5 px-2">Código</th>
                           <th className="py-1.5 px-2">Insumo</th>
-                          <th className="py-1.5 px-2 text-right">Rend.</th>
+                          <th className="py-1.5 px-2 text-right">
+                            <span className="inline-flex items-center gap-1 justify-end w-full">
+                              <span>Rend. / Fórmula</span>
+                              <button
+                                type="button"
+                                onClick={() => setIsFormulaHelpOpen(true)}
+                                className="text-cream-dim hover:text-gold transition-colors focus:outline-none cursor-pointer"
+                                title="Ver guía de fórmulas paramétricas"
+                              >
+                                <HelpCircle className="w-3.5 h-3.5" />
+                              </button>
+                            </span>
+                          </th>
                           <th className="py-1.5 px-2 text-right">Costo U.</th>
                           <th className="py-1.5 px-2 text-right">Importe</th>
                           <th className="py-1.5 px-2 text-center w-8"></th>
@@ -2193,6 +2218,54 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Floating formulas guide dialog */}
+      {isFormulaHelpOpen && (
+        <div className="fixed inset-0 bg-dark-1/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-dark-2 border border-dark-4 p-5 rounded-2xl shadow-2xl relative space-y-4">
+            <button
+              type="button"
+              onClick={() => setIsFormulaHelpOpen(false)}
+              className="absolute top-3 right-3 text-cream-muted hover:text-cream cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-2 text-gold">
+              <HelpCircle className="w-5 h-5" />
+              <h4 className="font-display font-black text-xs uppercase tracking-wider">Fórmulas Paramétricas</h4>
+            </div>
+            <div className="text-[10.5px] text-cream-dim space-y-2.5 font-body leading-relaxed text-left">
+              <p>Puedes ingresar fórmulas en los rendimientos de tus insumos para que se recalculen automáticamente según la cantidad del concepto general.</p>
+              
+              <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1">
+                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Variable Admitida</span>
+                <p className="font-mono text-cream font-bold">Q (o C, CANTIDAD)</p>
+                <span className="block text-[8px] text-cream-muted">Representa la cantidad actual del concepto general (ej: metros, piezas, etc.).</span>
+              </div>
+
+              <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1.5">
+                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Ejemplos de Fórmulas</span>
+                <ul className="space-y-1 list-disc list-inside font-mono text-[9.5px]">
+                  <li><span className="text-cream font-bold">Q * 0.1</span> (10% de la cantidad)</li>
+                  <li><span className="text-cream font-bold">Q / 50</span> (1 elemento por cada 50 de cantidad)</li>
+                  <li><span className="text-cream font-bold">Q * 1.5 + 2</span> (1.5 por unidad más 2 base)</li>
+                </ul>
+              </div>
+
+              <p className="text-[9px] text-cream-muted italic">Nota: Solo se permiten números, paréntesis y los operadores +, -, *, /.</p>
+            </div>
+            <div className="pt-2 text-right">
+              <button
+                type="button"
+                onClick={() => setIsFormulaHelpOpen(false)}
+                className="px-4 py-2 bg-gold hover:bg-gold-light text-dark-1 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5"
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         </div>
       )}
