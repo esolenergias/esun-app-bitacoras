@@ -2238,24 +2238,35 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               <h4 className="font-display font-black text-xs uppercase tracking-wider">Fórmulas Paramétricas</h4>
             </div>
             <div className="text-[10.5px] text-cream-dim space-y-2.5 font-body leading-relaxed text-left">
-              <p>Puedes ingresar fórmulas en los rendimientos de tus insumos para que se recalculen automáticamente según la cantidad del concepto general.</p>
+              <p>El campo <span className="text-cream font-semibold font-mono">REND.</span> representa la cantidad de este insumo requerida <span className="text-cream font-semibold">por cada unidad</span> del concepto general. Puedes escribir una fórmula usando <span className="font-mono text-gold font-bold">Q</span> para hacerlo proporcional.</p>
               
               <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1">
                 <span className="font-mono text-gold font-bold block text-[9px] uppercase">Variable Admitida</span>
                 <p className="font-mono text-cream font-bold">Q (o C, CANTIDAD)</p>
-                <span className="block text-[8px] text-cream-muted">Representa la cantidad actual del concepto general (ej: metros, piezas, etc.).</span>
+                <span className="block text-[8px] text-cream-muted">Es la cantidad total del concepto general. La fórmula la usa para calcular el rendimiento por unidad sin duplicar la multiplicación.</span>
               </div>
 
               <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1.5">
-                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Ejemplos de Fórmulas</span>
+                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Cómo funciona (Ejemplo)</span>
+                <div className="text-[9px] space-y-1 text-cream-dim">
+                  <p>Concepto: <span className="text-cream font-mono">Cable eléctrico</span>, <span className="text-cream font-mono font-bold">Cantidad = 100 m</span></p>
+                  <p>Insumo: <span className="text-cream font-mono">Conector tipo A</span>, fórmula <span className="text-cream font-mono font-bold">Q / 10</span></p>
+                  <p className="text-cream-muted">→ Rend. por unidad = 100/10/100 = <span className="text-gold font-bold font-mono">0.1 conector/m</span></p>
+                  <p className="text-cream-muted">→ Total = 100 m × 0.1 = <span className="text-gold font-bold font-mono">10 conectores</span></p>
+                </div>
+              </div>
+
+              <div className="bg-dark-1/50 border border-dark-4 p-2.5 rounded-lg space-y-1.5">
+                <span className="font-mono text-gold font-bold block text-[9px] uppercase">Más Ejemplos de Fórmulas</span>
                 <ul className="space-y-1 list-disc list-inside font-mono text-[9.5px]">
-                  <li><span className="text-cream font-bold">Q * 0.1</span> (10% de la cantidad)</li>
-                  <li><span className="text-cream font-bold">Q / 50</span> (1 elemento por cada 50 de cantidad)</li>
-                  <li><span className="text-cream font-bold">Q * 1.5 + 2</span> (1.5 por unidad más 2 base)</li>
+                  <li><span className="text-cream font-bold">0.5</span> — estático: 0.5 unidades por cada unidad del concepto</li>
+                  <li><span className="text-cream font-bold">Q / 50</span> — 1 elemento por cada 50 unidades del concepto</li>
+                  <li><span className="text-cream font-bold">Q * 0.02</span> — 2% de la cantidad total como base proporcional</li>
+                  <li><span className="text-cream font-bold">Q * 1.5 + 10</span> — base de 10 + proporción variable</li>
                 </ul>
               </div>
 
-              <p className="text-[9px] text-cream-muted italic">Nota: Solo se permiten números, paréntesis y los operadores +, -, *, /.</p>
+              <p className="text-[9px] text-cream-muted italic">Nota: Solo se permiten números, paréntesis y los operadores +, -, *, /. La cantidad general del concepto se aplica automáticamente al final.</p>
             </div>
             <div className="pt-2 text-right">
               <button

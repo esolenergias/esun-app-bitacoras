@@ -539,14 +539,19 @@ export function calculateBudgetTotals(
 export function evaluateFormula(formula: string, conceptQty: number): number {
   try {
     if (!formula) return 0;
-    // Replace variable tokens (Q, C, etc.) with conceptQty
+    const referencesQty = /q|c|cantidad/i.test(formula);
     let sanitized = formula
       .replace(/q|c|cantidad/gi, String(conceptQty))
       .replace(/[^0-9+\-*/().\s]/g, ''); // strip unsafe characters
     
     const fn = new Function(`return (${sanitized});`);
     const val = fn();
-    return typeof val === 'number' && !isNaN(val) && isFinite(val) ? val : 0;
+    const result = typeof val === 'number' && !isNaN(val) && isFinite(val) ? val : 0;
+    
+    if (referencesQty && conceptQty > 0) {
+      return result / conceptQty;
+    }
+    return result;
   } catch (e) {
     console.error('Error evaluating formula:', formula, e);
     return 0;

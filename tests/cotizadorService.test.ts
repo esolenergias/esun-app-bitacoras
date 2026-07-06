@@ -77,27 +77,34 @@ function runTests() {
   assertEquals(totals.sellingPriceTotal, 554.4, 'Budget Total Selling Price');
 
   // Test 4: Revit-like Formula Evaluation
+  // SEMANTIC: formula result = yield per 1 unit of concept (REND. per unit)
+  // evaluateFormula divides by Q so the result is already per-unit.
+  // calculateMatrixDirectCost returns cost per 1 unit of concept.
+  // The dashboard then multiplies by the concept's general quantity once.
   console.log('\nRunning Test 4: Revit-like Formula Evaluation...');
   const mockInsumosWithFormulas = [
     {
       insumo: { id: '3', code: 'INS-3', type: 'material', description: 'Insumo 3', unit: 'pza', cost: 10 } as Insumo,
       quantity: 1,
-      formula: 'Q * 0.5 + 2' // At Q=10, evaluated qty is 10 * 0.5 + 2 = 7. cost = 10 * 7 = 70.
+      // Formula Q * 0.5 + 2:
+      //   At Q=10 → (10*0.5+2)/10 = 7/10 = 0.7 yield/unit  → cost contrib = 0.7 * 10 = 7
+      //   At Q=4  → (4*0.5+2)/4  = 4/4  = 1.0 yield/unit  → cost contrib = 1.0 * 10 = 10
+      formula: 'Q * 0.5 + 2'
     },
     {
       insumo: { id: '4', code: 'INS-4', type: 'labor', description: 'Insumo 4', unit: 'jor', cost: 20 } as Insumo,
       quantity: 5,
-      formula: null
+      formula: null // static yield: 5 per unit → cost contrib = 5 * 20 = 100
     }
   ];
   
-  // At Q = 10:
+  // At Q = 10: 0.7*10 + 5*20 = 7 + 100 = 107
   const costAt10 = calculateMatrixDirectCost(mockInsumosWithFormulas, 10);
-  assertEquals(costAt10, 170, 'Matrix Cost at Q=10');
+  assertEquals(costAt10, 107, 'Matrix Unit Cost at Q=10 (no double-multiply)');
 
-  // At Q = 4:
+  // At Q = 4: 1.0*10 + 5*20 = 10 + 100 = 110
   const costAt4 = calculateMatrixDirectCost(mockInsumosWithFormulas, 4);
-  assertEquals(costAt4, 140, 'Matrix Cost at Q=4');
+  assertEquals(costAt4, 110, 'Matrix Unit Cost at Q=4 (no double-multiply)');
 
   console.log('\nAll calculations tests passed successfully!');
 }
