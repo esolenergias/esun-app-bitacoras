@@ -109,6 +109,11 @@ export default function PresupuestosTab() {
   const [loadingReport, setLoadingReport] = useState<boolean>(false);
   const [reportTab, setReportTab] = useState<'resumen' | 'explosion'>('resumen');
   
+  // PDF download options states
+  const [isPDFDialogOpen, setIsPDFDialogOpen] = useState<boolean>(false);
+  const [selectedPDFSections, setSelectedPDFSections] = useState<{ resumen: boolean; explosion: boolean }>({ resumen: true, explosion: true });
+  const [pdfBudgetDetails, setPdfBudgetDetails] = useState<PresupuestoDetalle | null>(null);
+  
   // Deletion Confirmation states
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
@@ -665,6 +670,445 @@ export default function PresupuestosTab() {
     } finally {
       setLoadingReport(false);
     }
+  };
+
+  // Load details and open PDF selection dialog
+  const handleOpenPDFDownloadDialog = async (id: string) => {
+    setLoadingReport(true);
+    try {
+      const details = await getPresupuestoDetails(id);
+      setPdfBudgetDetails(details);
+      setSelectedPDFSections({ resumen: true, explosion: true });
+      setIsPDFDialogOpen(true);
+    } catch (err: any) {
+      console.error('Error loading budget details for PDF:', err);
+      alert('No se pudieron obtener los detalles del presupuesto para la exportación.');
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  const handleGeneratePDF = () => {
+    if (!pdfBudgetDetails) return;
+    
+    const details = pdfBudgetDetails;
+    const sections = selectedPDFSections;
+    setIsPDFDialogOpen(false);
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Por favor, permita las ventanas emergentes (pop-ups) para descargar el PDF.');
+      return;
+    }
+    
+    const logoUrl = window.location.origin + '/Logo_esol_b.png';
+    const formattedDate = new Date(details.created_at || new Date()).toLocaleDateString('es-MX', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const indPct = details.indirect_percentage ?? 10.00;
+    const utPct = details.utility_percentage ?? 8.00;
+    const totals = calculateBudgetTotals(details.conceptos || [], indPct, utPct);
+    const indVal = totals.directCostTotal * (indPct / 100);
+    const utVal = (totals.directCostTotal + indVal) * (utPct / 100);
+    const sellingSub = totals.sellingPriceTotal;
+    const ivaVal = sellingSub * 0.16;
+    const sellingTotal = sellingSub * 1.16;
+
+    let html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Presupuesto eSol - ${details.name}</title>
+  <style>
+    @page {
+      size: letter portrait;
+      margin: 18mm 15mm 18mm 15mm;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1e293b;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+      font-size: 10pt;
+      line-height: 1.4;
+    }
+    .header-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #b59410;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .logo-container img {
+      height: 48px;
+      width: auto;
+    }
+    .meta-container {
+      text-align: right;
+      font-size: 8.5pt;
+      color: #475569;
+    }
+    .meta-container h1 {
+      margin: 0 0 4px 0;
+      font-size: 13pt;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .meta-row {
+      margin: 2px 0;
+    }
+    .meta-label {
+      font-weight: bold;
+      color: #0f172a;
+    }
+    .section-title {
+      font-size: 11pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #0f172a;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 4px;
+      margin-top: 25px;
+      margin-bottom: 12px;
+      page-break-after: avoid;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+      page-break-inside: auto;
+    }
+    tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    th {
+      background-color: #0f172a;
+      color: #ffffff;
+      font-size: 8pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 8px 10px;
+      border: 1px solid #0f172a;
+    }
+    td {
+      padding: 6px 10px;
+      border: 1px solid #e2e8f0;
+      font-size: 8.5pt;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .font-mono { font-family: monospace; }
+    .font-bold { font-weight: bold; }
+    
+    .totals-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 15px;
+      page-break-inside: avoid;
+    }
+    .totals-table {
+      width: 280px;
+      margin-bottom: 0;
+    }
+    .totals-table td {
+      padding: 4px 10px;
+      border: none;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .totals-table tr:last-child td {
+      border-bottom: 2px solid #b59410;
+      font-size: 10pt;
+      font-weight: bold;
+      color: #b59410;
+    }
+    .insumo-group-title {
+      font-size: 9pt;
+      font-weight: bold;
+      background-color: #f8fafc;
+      color: #334155;
+      padding: 6px 10px;
+      border: 1px solid #e2e8f0;
+      margin-top: 10px;
+      page-break-after: avoid;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE HEADER -->
+  <div class="header-container">
+    <div class="logo-container">
+      <img src="${logoUrl}" alt="eSol Energías" onerror="this.style.display='none';">
+    </div>
+    <div class="meta-container">
+      <h1>Presupuesto de Obra</h1>
+      <div class="meta-row"><span class="meta-label">Presupuesto:</span> ${details.name}</div>
+      <div class="meta-row"><span class="meta-label">Cliente:</span> ${details.client_name}</div>
+      <div class="meta-row"><span class="meta-label">Fecha:</span> ${formattedDate}</div>
+    </div>
+  </div>
+`;
+
+    if (sections.resumen) {
+      html += `
+  <div class="section-title">Resumen de Presupuesto</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 55%; text-align: left;">Descripción / Concepto</th>
+        <th style="width: 10%; text-align: center;">Unidad</th>
+        <th style="width: 10%; text-align: right;">Cantidad</th>
+        <th style="width: 12.5%; text-align: right;">P.U. Venta</th>
+        <th style="width: 12.5%; text-align: right;">Importe Venta</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+      details.conceptos.forEach((c: any) => {
+        const unitDirect = c.matriz 
+          ? calculateMatrixDirectCost(c.matriz.insumos || [], Number(c.quantity)) 
+          : Number(c.cost_price);
+        const unitSelling = calculateMatrixSellingPrice(unitDirect, indPct, utPct);
+        const totalSelling = Number(c.quantity) * unitSelling;
+        html += `
+      <tr>
+        <td style="font-weight: ${c.type === 'group' ? '800' : 'normal'}; padding-left: ${c.parent_id ? '20px' : '10px'};">${c.description}</td>
+        <td class="text-center font-mono">${c.type === 'group' ? 'grp' : c.unit}</td>
+        <td class="text-right font-mono">${formatQty(Number(c.quantity), c.unit, 2)}</td>
+        <td class="text-right font-mono">${c.type === 'group' ? '-' : formatCurrencyMXN(unitSelling)}</td>
+        <td class="text-right font-mono font-bold">${formatCurrencyMXN(totalSelling)}</td>
+      </tr>`;
+      });
+
+      html += `
+    </tbody>
+  </table>
+
+  <!-- Totals Summary Table -->
+  <div class="totals-wrapper">
+    <table class="totals-table">
+      <tr>
+        <td class="meta-label">Costo Directo Subtotal:</td>
+        <td class="text-right font-mono">${formatCurrencyMXN(totals.directCostTotal)}</td>
+      </tr>
+      <tr>
+        <td class="meta-label">Indirecto (${indPct}%):</td>
+        <td class="text-right font-mono">${formatCurrencyMXN(indVal)}</td>
+      </tr>
+      <tr>
+        <td class="meta-label">Utilidad (${utPct}%):</td>
+        <td class="text-right font-mono">${formatCurrencyMXN(utVal)}</td>
+      </tr>
+      <tr>
+        <td class="meta-label">Subtotal Precio de Venta:</td>
+        <td class="text-right font-mono">${formatCurrencyMXN(sellingSub)}</td>
+      </tr>
+      <tr>
+        <td class="meta-label">IVA (16%):</td>
+        <td class="text-right font-mono">${formatCurrencyMXN(ivaVal)}</td>
+      </tr>
+      <tr>
+        <td class="meta-label">TOTAL PRECIO VENTA (IVA Inc.):</td>
+        <td class="text-right font-mono font-bold">${formatCurrencyMXN(sellingTotal)}</td>
+      </tr>
+    </table>
+  </div>`;
+    }
+
+    if (sections.explosion) {
+      const insumosAggregation: { [code: string]: { insumo: Insumo; totalQuantity: number } } = {};
+      details.conceptos.forEach((c: any) => {
+        if (c.type === 'group') return;
+        const conceptQty = Number(c.quantity) || 0;
+        
+        if (c.matriz && c.matriz.insumos) {
+          c.matriz.insumos.forEach((mi: any) => {
+            const insumo = mi.insumo;
+            if (!insumo) return;
+            const isPza = insumo.unit?.trim().toLowerCase() === 'pza';
+            const quantityPerUnit = mi.formula 
+              ? evaluateFormula(mi.formula, conceptQty) 
+              : Number(mi.quantity);
+            const neededQty = isPza 
+              ? Math.round(conceptQty * quantityPerUnit) 
+              : (conceptQty * quantityPerUnit);
+            
+            if (insumosAggregation[insumo.code]) {
+              insumosAggregation[insumo.code].totalQuantity += neededQty;
+            } else {
+              insumosAggregation[insumo.code] = {
+                insumo,
+                totalQuantity: neededQty
+              };
+            }
+          });
+        } else if (c.type === 'insumo_directo') {
+          const insCode = c.code || `DIRECTO-${c.id}`;
+          const insType = c.unit?.trim().toLowerCase() === 'jor' || c.description.toLowerCase().includes('mano de obra') ? 'labor' : 'material';
+          const insumo: Insumo = {
+            id: c.id,
+            code: insCode,
+            type: insType as any,
+            description: c.description,
+            unit: c.unit,
+            cost: Number(c.cost_price)
+          };
+          if (insumosAggregation[insumo.code]) {
+            insumosAggregation[insumo.code].totalQuantity += conceptQty;
+          } else {
+            insumosAggregation[insumo.code] = {
+              insumo,
+              totalQuantity: conceptQty
+            };
+          }
+        }
+      });
+
+      const aggregated = {
+        materials: [] as any[],
+        labor: [] as any[],
+        equipment: [] as any[],
+        tools: [] as any[],
+        overallInsumosCost: 0
+      };
+
+      Object.values(insumosAggregation).forEach(item => {
+        const cost = Number(item.insumo.cost) || 0;
+        const totalCost = cost * item.totalQuantity;
+        aggregated.overallInsumosCost += totalCost;
+        
+        const row = {
+          ...item,
+          totalCost
+        };
+        
+        if (item.insumo.type === 'labor') aggregated.labor.push(row);
+        else if (item.insumo.type === 'equipment') aggregated.equipment.push(row);
+        else if (item.insumo.type === 'tool') aggregated.tools.push(row);
+        else aggregated.materials.push(row);
+      });
+
+      const groupedMaterials: { [subcat: string]: any[] } = {
+        'Panel solar': [],
+        'Inversor': [],
+        'Estructura de montaje': [],
+        'Material electrico DC': [],
+        'Material electrico AC': [],
+        'sin_categoria': []
+      };
+
+      aggregated.materials.forEach(row => {
+        const sub = row.insumo.subcategory;
+        if (sub && groupedMaterials[sub]) {
+          groupedMaterials[sub].push(row);
+        } else {
+          groupedMaterials['sin_categoria'].push(row);
+        }
+      });
+
+      const MATERIAL_SUBCATEGORIES_DISPLAY: { [key: string]: string } = {
+        'Panel solar': 'Paneles Solares',
+        'Inversor': 'Inversores',
+        'Estructura de montaje': 'Estructura de Montaje',
+        'Material electrico DC': 'Material Eléctrico DC',
+        'Material electrico AC': 'Material Eléctrico AC',
+        'sin_categoria': 'Otros Materiales'
+      };
+
+      const renderInsumosTable = (items: any[], title: string) => {
+        if (items.length === 0) return '';
+        let tableHtml = `
+  <div class="insumo-group-title">${title}</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%; text-align: left;">Código</th>
+        <th style="width: 50%; text-align: left;">Descripción</th>
+        <th style="width: 10%; text-align: center;">Unidad</th>
+        <th style="width: 12.5%; text-align: right;">Cantidad</th>
+        <th style="width: 12.5%; text-align: right;">Costo Unit.</th>
+        <th style="width: 12.5%; text-align: right;">Importe</th>
+      </tr>
+    </thead>
+    <tbody>`;
+        
+        items.forEach(row => {
+          tableHtml += `
+      <tr>
+        <td class="font-mono text-gold font-bold">${row.insumo.code}</td>
+        <td>${row.insumo.description}</td>
+        <td class="text-center font-mono">${row.insumo.unit}</td>
+        <td class="text-right font-mono">${formatQty(row.totalQuantity, row.insumo.unit, 2)}</td>
+        <td class="text-right font-mono">${formatCurrencyMXN(row.insumo.cost)}</td>
+        <td class="text-right font-mono font-bold">${formatCurrencyMXN(row.totalCost)}</td>
+      </tr>`;
+        });
+
+        tableHtml += `
+    </tbody>
+  </table>`;
+        return tableHtml;
+      };
+
+      if (sections.resumen) {
+        html += `<div class="page-break"></div>`;
+        html += `
+  <!-- SECOND PAGE HEADER -->
+  <div class="header-container">
+    <div class="logo-container">
+      <img src="${logoUrl}" alt="eSol Energías" onerror="this.style.display='none';">
+    </div>
+    <div class="meta-container">
+      <h1>Explosión de Insumos</h1>
+      <div class="meta-row"><span class="meta-label">Presupuesto:</span> ${details.name}</div>
+      <div class="meta-row"><span class="meta-label">Cliente:</span> ${details.client_name}</div>
+      <div class="meta-row"><span class="meta-label">Fecha:</span> ${formattedDate}</div>
+    </div>
+  </div>`;
+      } else {
+        html += `
+  <div class="section-title">Explosión de Insumos Consolidada</div>`;
+      }
+
+      Object.keys(MATERIAL_SUBCATEGORIES_DISPLAY).forEach(key => {
+        html += renderInsumosTable(groupedMaterials[key], MATERIAL_SUBCATEGORIES_DISPLAY[key]);
+      });
+      html += renderInsumosTable(aggregated.labor, 'Mano de Obra');
+      html += renderInsumosTable(aggregated.equipment, 'Equipos y Maquinaria');
+      html += renderInsumosTable(aggregated.tools, 'Herramientas y Accesorios');
+
+      html += `
+  <!-- Explosion Total -->
+  <div style="margin-top: 20px; font-weight: bold; font-size: 10pt; text-align: right; border-top: 1px solid #cbd5e1; padding-top: 10px;">
+    Costo de Insumos Consolidado: <span style="color: #b59410; margin-left: 10px; font-size: 11pt;">${formatCurrencyMXN(aggregated.overallInsumosCost)}</span>
+  </div>`;
+    }
+
+    html += `
+</body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    };
   };
 
   // Insumos Explosion Calculations
@@ -1557,15 +2001,100 @@ export default function PresupuestosTab() {
                       </button>
                       <button
                         onClick={handleCopyReport}
-                        className="px-4 py-2 bg-gold hover:bg-gold-light text-dark-1 font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-gold/5"
+                        className="px-4 py-2 border border-dark-4 hover:bg-dark-3 text-cream-muted hover:text-cream text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
                       >
                         <Copy className="w-3.5 h-3.5" />
-                        <span>Copiar Reporte</span>
+                        <span>Copiar</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPdfBudgetDetails(reportDetails);
+                          setSelectedPDFSections({ resumen: true, explosion: true });
+                          setIsPDFDialogOpen(true);
+                        }}
+                        className="px-4 py-2 bg-gold hover:bg-gold-light text-dark-1 font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-gold/5"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Descargar PDF</span>
                       </button>
                     </div>
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4.2 PDF SELECTION DIALOG */}
+      {isPDFDialogOpen && pdfBudgetDetails && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out] font-sans">
+          <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-[scaleUp_0.25s_ease-out]">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-dark-4 bg-dark-2 flex-shrink-0 select-none">
+              <h4 className="font-display font-black text-sm text-cream uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-gold" />
+                <span>Opciones de Exportación PDF</span>
+              </h4>
+              <button 
+                onClick={() => setIsPDFDialogOpen(false)}
+                className="p-1 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-cream transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-cream-muted leading-relaxed font-body">
+                Seleccione las secciones que desea incluir en el reporte formal en formato carta vertical para el presupuesto <strong className="text-gold">{pdfBudgetDetails.name}</strong>:
+              </p>
+              
+              <div className="space-y-3 pt-2 select-none">
+                <label className="flex items-center gap-3 p-3 bg-dark-1/60 border border-dark-4 rounded-xl cursor-pointer hover:border-gold/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selectedPDFSections.resumen}
+                    onChange={(e) => setSelectedPDFSections(prev => ({ ...prev, resumen: e.target.checked }))}
+                    className="accent-gold w-4 h-4 rounded cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-cream block">Resumen de Presupuesto</span>
+                    <span className="text-[10px] text-cream-muted block mt-0.5">Muestra la lista de conceptos agrupados, cantidades, precios unitarios y totales.</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 bg-dark-1/60 border border-dark-4 rounded-xl cursor-pointer hover:border-gold/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selectedPDFSections.explosion}
+                    onChange={(e) => setSelectedPDFSections(prev => ({ ...prev, explosion: e.target.checked }))}
+                    className="accent-gold w-4 h-4 rounded cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-cream block">Explosión de Insumos</span>
+                    <span className="text-[10px] text-cream-muted block mt-0.5">Muestra la lista consolidada de materiales, mano de obra, herramientas y equipos.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-dark-4 bg-dark-2 flex justify-end gap-3 flex-shrink-0">
+              <button
+                onClick={() => setIsPDFDialogOpen(false)}
+                className="px-4 py-2 border border-dark-4 hover:bg-dark-3 text-cream-muted hover:text-cream text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGeneratePDF}
+                disabled={!selectedPDFSections.resumen && !selectedPDFSections.explosion}
+                className="px-4 py-2 bg-gold hover:bg-gold-light text-dark-1 font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-gold/5 disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Generar PDF</span>
+              </button>
             </div>
           </div>
         </div>
