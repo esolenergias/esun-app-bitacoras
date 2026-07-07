@@ -505,24 +505,24 @@ export async function deletePresupuesto(id: string): Promise<void> {
 
 export function calculateMatrixDirectCost(
   insumos: { insumo: { cost: number; unit?: string }; quantity: number; formula?: string | null }[],
-  conceptQty: number = 1
+  conceptQty?: number
 ): number {
   const standardInsumos = insumos.filter(item => item.insumo?.unit?.trim() !== '%');
   const percentInsumos = insumos.filter(item => item.insumo?.unit?.trim() === '%');
 
   const sumOthers = standardInsumos.reduce((sum, item) => {
-    const qty = item.formula 
+    const qty = (item.formula && typeof conceptQty === 'number' && conceptQty > 0)
       ? evaluateFormula(item.formula, conceptQty) 
       : Number(item.quantity);
     const isPza = item.insumo?.unit?.trim().toLowerCase() === 'pza';
-    const adjustedQty = isPza && conceptQty > 0
+    const adjustedQty = isPza && typeof conceptQty === 'number' && conceptQty > 0
       ? Math.round(qty * conceptQty) / conceptQty
       : qty;
     return sum + (Number(item.insumo?.cost || 0) * adjustedQty);
   }, 0);
 
   const totalPercent = percentInsumos.reduce((pctSum, item) => {
-    const qty = item.formula 
+    const qty = (item.formula && typeof conceptQty === 'number' && conceptQty > 0)
       ? evaluateFormula(item.formula, conceptQty) 
       : Number(item.quantity);
     return pctSum + qty;
@@ -551,21 +551,24 @@ export function calculateBudgetTotals(
   indirectPercentage?: number,
   utilityPercentage?: number
 ): BudgetTotals {
+  const indPct = indirectPercentage !== undefined ? Number(indirectPercentage) : 10.00;
+  const utPct = utilityPercentage !== undefined ? Number(utilityPercentage) : 8.00;
+
   let directCostTotal = 0;
+  let sellingPriceTotal = 0;
+
   for (const concepto of conceptos) {
     const qty = Number(concepto.quantity);
     // Since matrix direct cost can depend on the concept qty (formula), pass it here!
     const unitDirect = concepto.matriz 
       ? calculateMatrixDirectCost(concepto.matriz.insumos || [], qty) 
       : Number(concepto.cost_price);
+
+    const unitSelling = calculateMatrixSellingPrice(unitDirect, indPct, utPct);
+
     directCostTotal += qty * unitDirect;
+    sellingPriceTotal += qty * unitSelling;
   }
-
-  const indPct = indirectPercentage !== undefined ? Number(indirectPercentage) : 10.00;
-  const utPct = utilityPercentage !== undefined ? Number(utilityPercentage) : 8.00;
-
-  const subtotal = directCostTotal * (1 + indPct / 100);
-  const sellingPriceTotal = subtotal * (1 + utPct / 100);
 
   return {
     directCostTotal: Math.round((directCostTotal + Number.EPSILON) * 100) / 100,
