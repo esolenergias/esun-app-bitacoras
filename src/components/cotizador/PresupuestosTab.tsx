@@ -679,25 +679,44 @@ export default function PresupuestosTab() {
     } = {};
 
     for (const concepto of reportDetails.conceptos) {
+      if (concepto.type === 'group') continue;
       const conceptQty = Number(concepto.quantity);
-      const matrix = concepto.matriz;
-      if (!matrix || !matrix.insumos) continue;
 
-      for (const mi of matrix.insumos) {
-        const insumo = mi.insumo;
-        const quantityPerUnit = mi.formula 
-          ? evaluateFormula(mi.formula, conceptQty) 
-          : Number(mi.quantity);
-        const isPza = insumo.unit?.trim().toLowerCase() === 'pza';
-        const neededQty = isPza ? Math.round(conceptQty * quantityPerUnit) : (conceptQty * quantityPerUnit);
+      if (concepto.type === 'insumo_directo') {
+        const insumo = insumosCatalog.find(i => i.description === concepto.description && i.unit === concepto.unit);
+        if (insumo) {
+          const isPza = insumo.unit?.trim().toLowerCase() === 'pza';
+          const neededQty = isPza ? Math.round(conceptQty) : conceptQty;
+          
+          if (insumosAggregation[insumo.code]) {
+            insumosAggregation[insumo.code].totalQuantity += neededQty;
+          } else {
+            insumosAggregation[insumo.code] = {
+              insumo: { ...insumo, cost: Number(concepto.cost_price) || insumo.cost },
+              totalQuantity: neededQty
+            };
+          }
+        }
+      } else {
+        const matrix = concepto.matriz;
+        if (!matrix || !matrix.insumos) continue;
 
-        if (insumosAggregation[insumo.code]) {
-          insumosAggregation[insumo.code].totalQuantity += neededQty;
-        } else {
-          insumosAggregation[insumo.code] = {
-            insumo: { ...insumo },
-            totalQuantity: neededQty
-          };
+        for (const mi of matrix.insumos) {
+          const insumo = mi.insumo;
+          const quantityPerUnit = mi.formula 
+            ? evaluateFormula(mi.formula, conceptQty) 
+            : Number(mi.quantity);
+          const isPza = insumo.unit?.trim().toLowerCase() === 'pza';
+          const neededQty = isPza ? Math.round(conceptQty * quantityPerUnit) : (conceptQty * quantityPerUnit);
+
+          if (insumosAggregation[insumo.code]) {
+            insumosAggregation[insumo.code].totalQuantity += neededQty;
+          } else {
+            insumosAggregation[insumo.code] = {
+              insumo: { ...insumo },
+              totalQuantity: neededQty
+            };
+          }
         }
       }
     }
