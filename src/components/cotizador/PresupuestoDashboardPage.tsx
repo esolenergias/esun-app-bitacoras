@@ -1162,6 +1162,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const subtotalWithIndirect = directCost + indirectCost;
   const utilityCost = subtotalWithIndirect * (utilityPct / 100);
   const sellingPrice = subtotalWithIndirect + utilityCost;
+  const ivaCost = sellingPrice * 0.16;
+  const totalWithIva = sellingPrice + ivaCost;
   const marginVal = sellingPrice - directCost;
   const marginPct = utilityPct;
 
@@ -1558,9 +1560,17 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                 <span>Utilidad ({utilityPct.toFixed(1)}%):</span>
                 <span>{formatCurrencyMXN(utilityCost)}</span>
               </div>
-              <div className="flex justify-between items-center text-gold font-black border-t border-dark-4/50 pt-2 text-xs">
-                <span>Precio de Venta Sugerido:</span>
+              <div className="flex justify-between items-center text-cream font-black border-t border-dark-4/30 pt-2">
+                <span>Subtotal:</span>
                 <span>{formatCurrencyMXN(sellingPrice)}</span>
+              </div>
+              <div className="flex justify-between items-center text-cream-dim font-medium">
+                <span>IVA (16.0%):</span>
+                <span>{formatCurrencyMXN(ivaCost)}</span>
+              </div>
+              <div className="flex justify-between items-center text-gold font-black border-t border-dark-4/50 pt-2 text-xs">
+                <span>Precio de Venta (con IVA):</span>
+                <span>{formatCurrencyMXN(totalWithIva)}</span>
               </div>
             </div>
           </div>
