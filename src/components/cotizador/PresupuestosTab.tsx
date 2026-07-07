@@ -742,6 +742,38 @@ export default function PresupuestosTab() {
     };
   };
 
+  const getGroupedMaterials = (materialsList: any[]) => {
+    const subcategoryOrder: InsumoSubcategory[] = [
+      'estructura',
+      'modulos',
+      'inversores',
+      'conductores',
+      'canalizacion',
+      'protecciones',
+      'monitoreo',
+      'miscelaneos'
+    ];
+
+    const groups: Record<string, any[]> = {};
+    
+    // Initialize groups
+    subcategoryOrder.forEach(sub => {
+      groups[sub] = [];
+    });
+    groups['sin_categoria'] = [];
+
+    materialsList.forEach(item => {
+      const sub = item.insumo.subcategory;
+      if (sub && subcategoryOrder.includes(sub)) {
+        groups[sub].push(item);
+      } else {
+        groups['sin_categoria'].push(item);
+      }
+    });
+
+    return { groups, subcategoryOrder };
+  };
+
   // Generate clean formatted markdown copy-paste report
   const generateMarkdownReport = (details: PresupuestoDetalle, aggregated: any) => {
     const indPct = details.indirect_percentage ?? 10.00;
@@ -795,7 +827,17 @@ export default function PresupuestosTab() {
       return grp;
     };
 
-    md += groupInsumosToMd(aggregated.materials, 'Materiales');
+    const { groups: groupedMaterials, subcategoryOrder } = getGroupedMaterials(aggregated.materials);
+    
+    // Output groups that have items
+    subcategoryOrder.forEach(sub => {
+      const label = MATERIAL_SUBCATEGORIES.find(s => s.value === sub)?.label || sub;
+      const items = groupedMaterials[sub];
+      md += groupInsumosToMd(items, `Materiales - ${label}`);
+    });
+    const uncategorizedItems = groupedMaterials['sin_categoria'];
+    md += groupInsumosToMd(uncategorizedItems, 'Materiales - Sin Categoría');
+
     md += groupInsumosToMd(aggregated.labor, 'Mano de Obra');
     md += groupInsumosToMd(aggregated.equipment, 'Equipos');
     md += groupInsumosToMd(aggregated.tools, 'Herramientas');
@@ -1463,7 +1505,19 @@ export default function PresupuestosTab() {
 
                           return (
                             <div className="space-y-6">
-                              {renderInsumosGroup(aggregatedReport.materials, 'Materiales')}
+                              {(() => {
+                                const { groups: grouped, subcategoryOrder } = getGroupedMaterials(aggregatedReport.materials);
+                                return (
+                                  <>
+                                    {subcategoryOrder.map(sub => {
+                                      const label = MATERIAL_SUBCATEGORIES.find(s => s.value === sub)?.label || sub;
+                                      const items = grouped[sub];
+                                      return renderInsumosGroup(items, `Materiales - ${label}`);
+                                    })}
+                                    {renderInsumosGroup(grouped['sin_categoria'], 'Materiales - Sin Categoría')}
+                                  </>
+                                );
+                              })()}
                               {renderInsumosGroup(aggregatedReport.labor, 'Mano de Obra')}
                               {renderInsumosGroup(aggregatedReport.equipment, 'Equipos y Maquinaria')}
                               {renderInsumosGroup(aggregatedReport.tools, 'Herramientas y Accesorios')}
