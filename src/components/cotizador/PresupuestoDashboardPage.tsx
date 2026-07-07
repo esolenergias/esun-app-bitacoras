@@ -1411,6 +1411,9 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   };
 
   const flatConceptsList = getFlatNodes(concepts);
+  const indirectCost = directCost * (indirectPct / 100);
+  const subtotalWithIndirect = directCost + indirectCost;
+  const utilityCost = subtotalWithIndirect * (utilityPct / 100);
   const ivaCost = sellingPrice * 0.16;
   const totalWithIva = sellingPrice + ivaCost;
   const marginVal = sellingPrice - directCost;
