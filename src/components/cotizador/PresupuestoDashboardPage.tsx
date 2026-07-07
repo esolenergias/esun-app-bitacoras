@@ -11,7 +11,7 @@ import {
   Loader2, AlertTriangle, FileText, ChevronRight, ChevronDown, 
   Layers, Package, Users, Cpu, ShieldCheck, DollarSign, 
   TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, Layers2, Wrench, Plus, HelpCircle,
-  ArrowUp, ArrowDown
+  ArrowUp, ArrowDown, Trash2
 } from 'lucide-react';
 
 interface NumericInputProps {
@@ -693,6 +693,23 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
+  const handleDeleteConcept = async (conceptId: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este concepto del presupuesto?')) return;
+    try {
+      const { error } = await supabase
+        .from('presupuesto_conceptos')
+        .delete()
+        .eq('id', conceptId);
+
+      if (error) throw error;
+      
+      await fetchBudgetDetails();
+    } catch (err: any) {
+      console.error('Error deleting concept:', err);
+      alert('No se pudo eliminar el concepto del presupuesto.');
+    }
+  };
+
   const handleUpdateInsumoCatalogCost = async (insumoId: string, newCost: number) => {
     try {
       const { error: dbError } = await supabase
@@ -1340,6 +1357,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       <th className="py-3 px-4 text-right w-28">CANTIDAD</th>
                       <th className="py-3 px-4 text-right w-36">Costo Unit.</th>
                       <th className="py-3 px-4 text-right w-36">Importe Tot.</th>
+                      <th className="py-3 px-4 text-center w-24 select-none">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dark-4/50">
@@ -1419,6 +1437,19 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">
                             {formatCurrencyMXN(totalDirect)}
+                          </td>
+                          <td className="py-3 px-4 text-center select-none">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteConcept(c.id);
+                              }}
+                              className="p-1 hover:text-red-400 text-cream-muted hover:bg-red-500/10 rounded transition-colors cursor-pointer animate-pulse-subtle"
+                              title="Eliminar concepto"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </td>
                         </tr>
                       );
