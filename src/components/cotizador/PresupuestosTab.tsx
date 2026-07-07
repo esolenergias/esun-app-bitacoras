@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, Edit, Trash2, X, Loader2, AlertTriangle, FileText, Download, Copy 
 } from 'lucide-react';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 import { supabase } from '../../context/supabase';
 import { 
   getPresupuestoDetails, 
@@ -695,12 +697,6 @@ export default function PresupuestosTab() {
     const sections = selectedPDFSections;
     setIsPDFDialogOpen(false);
     
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Por favor, permita las ventanas emergentes (pop-ups) para descargar el PDF.');
-      return;
-    }
-    
     const logoUrl = window.location.origin + '/Logo_esol_b.png';
     const formattedDate = new Date(details.created_at || new Date()).toLocaleDateString('es-MX', {
       year: 'numeric',
@@ -717,164 +713,189 @@ export default function PresupuestosTab() {
     const ivaVal = sellingSub * 0.16;
     const sellingTotal = sellingSub * 1.16;
 
-    let html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Presupuesto eSol - ${details.name}</title>
-  <style>
-    @page {
-      size: letter portrait;
-      margin: 18mm 15mm 18mm 15mm;
-    }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: #1e293b;
-      background-color: #ffffff;
-      margin: 0;
-      padding: 0;
-      font-size: 10pt;
-      line-height: 1.4;
-    }
-    .header-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      border-bottom: 2px solid #b59410;
-      padding-bottom: 12px;
-      margin-bottom: 20px;
-    }
-    .logo-container img {
-      height: 48px;
-      width: auto;
-    }
-    .meta-container {
-      text-align: right;
-      font-size: 8.5pt;
-      color: #475569;
-    }
-    .meta-container h1 {
-      margin: 0 0 4px 0;
-      font-size: 13pt;
-      font-weight: 800;
-      color: #0f172a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .meta-row {
-      margin: 2px 0;
-    }
-    .meta-label {
-      font-weight: bold;
-      color: #0f172a;
-    }
-    .section-title {
-      font-size: 11pt;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #0f172a;
-      border-bottom: 1px solid #cbd5e1;
-      padding-bottom: 4px;
-      margin-top: 25px;
-      margin-bottom: 12px;
-      page-break-after: avoid;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 15px;
-      page-break-inside: auto;
-    }
-    tr {
-      page-break-inside: avoid;
-      page-break-after: auto;
-    }
-    th {
-      background-color: #0f172a;
-      color: #ffffff;
-      font-size: 8pt;
-      font-weight: 800;
-      text-transform: uppercase;
-      padding: 8px 10px;
-      border: 1px solid #0f172a;
-    }
-    td {
-      padding: 6px 10px;
-      border: 1px solid #e2e8f0;
-      font-size: 8.5pt;
-    }
-    .text-center { text-align: center; }
-    .text-right { text-align: right; }
-    .font-mono { font-family: monospace; }
-    .font-bold { font-weight: bold; }
+    // Create container
+    const container = document.createElement('div');
+    container.style.width = '730px';
+    container.style.backgroundColor = '#ffffff';
+    container.style.color = '#1e293b';
+    container.style.fontFamily = "'Josefin Sans', sans-serif";
+    container.style.padding = '25px';
+    container.style.boxSizing = 'border-box';
     
-    .totals-wrapper {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 15px;
-      page-break-inside: avoid;
-    }
-    .totals-table {
-      width: 280px;
-      margin-bottom: 0;
-    }
-    .totals-table td {
-      padding: 4px 10px;
-      border: none;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .totals-table tr:last-child td {
-      border-bottom: 2px solid #b59410;
-      font-size: 10pt;
-      font-weight: bold;
-      color: #b59410;
-    }
-    .insumo-group-title {
-      font-size: 9pt;
-      font-weight: bold;
-      background-color: #f8fafc;
-      color: #334155;
-      padding: 6px 10px;
-      border: 1px solid #e2e8f0;
-      margin-top: 10px;
-      page-break-after: avoid;
-    }
-    .page-break {
-      page-break-before: always;
-    }
-  </style>
-</head>
-<body>
+    // Add font links to print document head
+    const styleTag = document.createElement('style');
+    styleTag.innerHTML = `
+      @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Josefin+Sans:wght@300;400;600;700&display=swap');
+      
+      .pdf-container {
+        font-family: 'Josefin Sans', sans-serif;
+        background-color: #ffffff;
+        color: #1e293b;
+      }
+      .pdf-title-font {
+        font-family: 'Cinzel', serif;
+      }
+      .pdf-border-gold {
+        border-color: #C49825;
+      }
+      .pdf-text-gold {
+        color: #C49825;
+      }
+      .pdf-bg-light-1 {
+        background-color: #ffffff;
+      }
+      .pdf-bg-light-2 {
+        background-color: #f8fafc;
+      }
+      .pdf-border-light-4 {
+        border-color: #cbd5e1;
+      }
+      .pdf-text-slate-dim {
+        color: #64748b;
+      }
+      
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 25px;
+        table-layout: fixed;
+      }
+      tr {
+        min-height: 25px;
+        height: 25px;
+      }
+      th {
+        font-family: 'Cinzel', serif;
+        background-color: #0f172a;
+        color: #C49825;
+        border: 1px solid #cbd5e1;
+        font-size: 9.5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 6px 10px;
+        vertical-align: middle;
+      }
+      td {
+        border: 1px solid #cbd5e1;
+        padding: 4px 10px;
+        font-size: 10.5px;
+        word-wrap: break-word;
+        vertical-align: middle;
+        line-height: 1.3;
+      }
+      .text-center { text-align: center; }
+      .text-right { text-align: right; }
+      .font-mono { font-family: monospace; }
+      .font-bold { font-weight: bold; }
+      
+      .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #C49825;
+        padding-bottom: 15px;
+        margin-bottom: 15px;
+      }
+      .logo-img {
+        height: 48px;
+        width: auto;
+      }
+      .meta-block {
+        text-align: right;
+        font-size: 10px;
+        color: #64748b;
+      }
+      .meta-block h1 {
+        margin: 0 0 5px 0;
+        font-size: 16px;
+        font-weight: 900;
+        color: #0f172a;
+        letter-spacing: 1px;
+      }
+      .section-header {
+        font-family: 'Cinzel', serif;
+        font-size: 13px;
+        color: #C49825;
+        border-bottom: 1px solid #cbd5e1;
+        padding-bottom: 6px;
+        margin-top: 35px;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+      }
+      .totals-grid {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 20px;
+        page-break-inside: avoid;
+      }
+      .totals-tab {
+        width: 320px;
+      }
+      .totals-tab td {
+        padding: 6px 12px;
+        border: none;
+        border-bottom: 1px solid #cbd5e1;
+      }
+      .totals-tab tr:last-child td {
+        border-bottom: 2px solid #C49825;
+        font-size: 12.5px;
+        font-weight: bold;
+        color: #C49825;
+      }
+      .group-title {
+        font-size: 10px;
+        font-weight: bold;
+        background-color: #f8fafc;
+        border-left: 4px solid #C49825;
+        border-top: 1px solid #cbd5e1;
+        border-right: 1px solid #cbd5e1;
+        border-bottom: 1px solid #cbd5e1;
+        padding: 6px 10px;
+        margin-top: 15px;
+        color: #0f172a;
+        font-family: 'Cinzel', serif;
+        letter-spacing: 0.5px;
+      }
+      .html2pdf__page-break {
+        page-break-before: always;
+      }
+    `;
+    container.appendChild(styleTag);
 
-  <!-- PAGE HEADER -->
-  <div class="header-container">
-    <div class="logo-container">
-      <img src="${logoUrl}" alt="eSol Energías" onerror="this.style.display='none';">
-    </div>
-    <div class="meta-container">
-      <h1>Presupuesto de Obra</h1>
-      <div class="meta-row"><span class="meta-label">Presupuesto:</span> ${details.name}</div>
-      <div class="meta-row"><span class="meta-label">Cliente:</span> ${details.client_name}</div>
-      <div class="meta-row"><span class="meta-label">Fecha:</span> ${formattedDate}</div>
-    </div>
-  </div>
-`;
+    // Inner element
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'pdf-container';
+    
+    let innerHtml = `
+      <!-- PAGE HEADER -->
+      <div class="header-container">
+        <div>
+          <img src="${logoUrl}" class="logo-img" alt="eSol Energías" onerror="this.style.display='none';">
+        </div>
+        <div class="meta-block">
+          <h1 class="pdf-title-font">PRESUPUESTO FORMAL</h1>
+          <div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Presupuesto:</span> <span style="color: #1e293b;">${details.name}</span></div>
+          <div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Cliente:</span> <span style="color: #1e293b;">${details.client_name}</span></div>
+          <div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Fecha:</span> <span style="color: #1e293b;">${formattedDate}</span></div>
+        </div>
+      </div>
+    `;
 
     if (sections.resumen) {
-      html += `
-  <div class="section-title">Resumen de Presupuesto</div>
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 55%; text-align: left;">Descripción / Concepto</th>
-        <th style="width: 10%; text-align: center;">Unidad</th>
-        <th style="width: 10%; text-align: right;">Cantidad</th>
-        <th style="width: 12.5%; text-align: right;">P.U. Venta</th>
-        <th style="width: 12.5%; text-align: right;">Importe Venta</th>
-      </tr>
-    </thead>
-    <tbody>`;
+      innerHtml += `
+      <div class="section-header">Resumen de Presupuesto</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 50%; text-align: left;">Descripción / Concepto</th>
+            <th style="width: 10%; text-align: center;">Unidad</th>
+            <th style="width: 10%; text-align: right;">Cantidad</th>
+            <th style="width: 15%; text-align: right;">P.U. Venta</th>
+            <th style="width: 15%; text-align: right;">Importe Venta</th>
+          </tr>
+        </thead>
+        <tbody>`;
 
       details.conceptos.forEach((c: any) => {
         const unitDirect = c.matriz 
@@ -882,49 +903,53 @@ export default function PresupuestosTab() {
           : Number(c.cost_price);
         const unitSelling = calculateMatrixSellingPrice(unitDirect, indPct, utPct);
         const totalSelling = Number(c.quantity) * unitSelling;
-        html += `
-      <tr>
-        <td style="font-weight: ${c.type === 'group' ? '800' : 'normal'}; padding-left: ${c.parent_id ? '20px' : '10px'};">${c.description}</td>
-        <td class="text-center font-mono">${c.type === 'group' ? 'grp' : c.unit}</td>
-        <td class="text-right font-mono">${formatQty(Number(c.quantity), c.unit, 2)}</td>
-        <td class="text-right font-mono">${c.type === 'group' ? '-' : formatCurrencyMXN(unitSelling)}</td>
-        <td class="text-right font-mono font-bold">${formatCurrencyMXN(totalSelling)}</td>
-      </tr>`;
+        
+        innerHtml += `
+          <tr style="background-color: ${c.type === 'group' ? '#f8fafc' : 'transparent'};">
+            <td style="font-weight: ${c.type === 'group' ? 'bold' : 'normal'}; padding-left: ${c.parent_id ? '20px' : '12px'}; color: ${c.type === 'group' ? '#C49825' : '#1e293b'};">
+              ${c.description}
+            </td>
+            <td class="text-center font-mono" style="color: #64748b;">${c.type === 'group' ? 'grupo' : c.unit}</td>
+            <td class="text-right font-mono">${formatQty(Number(c.quantity), c.unit, 2)}</td>
+            <td class="text-right font-mono" style="color: #64748b;">${c.type === 'group' ? '-' : formatCurrencyMXN(unitSelling)}</td>
+            <td class="text-right font-mono font-bold" style="color: ${c.type === 'group' ? '#C49825' : '#1e293b'};">${formatCurrencyMXN(totalSelling)}</td>
+          </tr>`;
       });
 
-      html += `
-    </tbody>
-  </table>
+      innerHtml += `
+        </tbody>
+      </table>
 
-  <!-- Totals Summary Table -->
-  <div class="totals-wrapper">
-    <table class="totals-table">
-      <tr>
-        <td class="meta-label">Costo Directo Subtotal:</td>
-        <td class="text-right font-mono">${formatCurrencyMXN(totals.directCostTotal)}</td>
-      </tr>
-      <tr>
-        <td class="meta-label">Indirecto (${indPct}%):</td>
-        <td class="text-right font-mono">${formatCurrencyMXN(indVal)}</td>
-      </tr>
-      <tr>
-        <td class="meta-label">Utilidad (${utPct}%):</td>
-        <td class="text-right font-mono">${formatCurrencyMXN(utVal)}</td>
-      </tr>
-      <tr>
-        <td class="meta-label">Subtotal Precio de Venta:</td>
-        <td class="text-right font-mono">${formatCurrencyMXN(sellingSub)}</td>
-      </tr>
-      <tr>
-        <td class="meta-label">IVA (16%):</td>
-        <td class="text-right font-mono">${formatCurrencyMXN(ivaVal)}</td>
-      </tr>
-      <tr>
-        <td class="meta-label">TOTAL PRECIO VENTA (IVA Inc.):</td>
-        <td class="text-right font-mono font-bold">${formatCurrencyMXN(sellingTotal)}</td>
-      </tr>
-    </table>
-  </div>`;
+      <!-- Totals Summary Grid -->
+      <div class="totals-grid">
+        <table class="totals-tab">
+          <tr>
+            <td style="color: #64748b;">Costo Directo Subtotal:</td>
+            <td class="text-right font-mono">${formatCurrencyMXN(totals.directCostTotal)}</td>
+          </tr>
+          <tr>
+            <td style="color: #64748b;">Indirecto (${indPct}%):</td>
+            <td class="text-right font-mono">${formatCurrencyMXN(indVal)}</td>
+          </tr>
+          <tr>
+            <td style="color: #64748b;">Utilidad (${utPct}%):</td>
+            <td class="text-right font-mono">${formatCurrencyMXN(utVal)}</td>
+          </tr>
+          <tr>
+            <td style="color: #64748b;">Subtotal Precio de Venta:</td>
+            <td class="text-right font-mono">${formatCurrencyMXN(sellingSub)}</td>
+          </tr>
+          <tr>
+            <td style="color: #64748b;">IVA (16%):</td>
+            <td class="text-right font-mono">${formatCurrencyMXN(ivaVal)}</td>
+          </tr>
+          <tr>
+            <td class="font-bold" style="color: #C49825;">TOTAL PRECIO VENTA (IVA Inc.):</td>
+            <td class="text-right font-mono font-bold" style="color: #C49825; font-size: 13px;">${formatCurrencyMXN(sellingTotal)}</td>
+          </tr>
+        </table>
+      </div>
+      `;
     }
 
     if (sections.explosion) {
@@ -1027,88 +1052,102 @@ export default function PresupuestosTab() {
         'sin_categoria': 'Otros Materiales'
       };
 
-      const renderInsumosTable = (items: any[], title: string) => {
+      const renderInsumosRows = (items: any[], title: string) => {
         if (items.length === 0) return '';
-        let tableHtml = `
-  <div class="insumo-group-title">${title}</div>
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 15%; text-align: left;">Código</th>
-        <th style="width: 50%; text-align: left;">Descripción</th>
-        <th style="width: 10%; text-align: center;">Unidad</th>
-        <th style="width: 12.5%; text-align: right;">Cantidad</th>
-        <th style="width: 12.5%; text-align: right;">Costo Unit.</th>
-        <th style="width: 12.5%; text-align: right;">Importe</th>
-      </tr>
-    </thead>
-    <tbody>`;
+        let rowsHtml = `
+          <!-- Category Group Header Row -->
+          <tr style="background-color: #f8fafc; font-weight: bold; page-break-inside: avoid; page-break-after: avoid;">
+            <td colspan="6" class="font-bold" style="color: #0f172a; font-family: 'Cinzel', serif; font-size: 11px; padding: 6px 10px; border-left: 4px solid #C49825; border-bottom: 1px solid #cbd5e1;">
+              ${title}
+            </td>
+          </tr>`;
         
         items.forEach(row => {
-          tableHtml += `
-      <tr>
-        <td class="font-mono text-gold font-bold">${row.insumo.code}</td>
-        <td>${row.insumo.description}</td>
-        <td class="text-center font-mono">${row.insumo.unit}</td>
-        <td class="text-right font-mono">${formatQty(row.totalQuantity, row.insumo.unit, 2)}</td>
-        <td class="text-right font-mono">${formatCurrencyMXN(row.insumo.cost)}</td>
-        <td class="text-right font-mono font-bold">${formatCurrencyMXN(row.totalCost)}</td>
-      </tr>`;
+          rowsHtml += `
+            <tr style="page-break-inside: avoid;">
+              <td class="font-mono font-bold" style="color: #C49825; text-align: left; padding: 4px 10px;">${row.insumo.code}</td>
+              <td style="color: #1e293b; text-align: left; padding: 4px 10px;">${row.insumo.description}</td>
+              <td class="text-center font-mono" style="color: #64748b; padding: 4px 10px;">${row.insumo.unit}</td>
+              <td class="text-right font-mono" style="padding: 4px 10px;">${formatQty(row.totalQuantity, row.insumo.unit, 2)}</td>
+              <td class="text-right font-mono" style="color: #64748b; padding: 4px 10px;">${formatCurrencyMXN(row.insumo.cost)}</td>
+              <td class="text-right font-mono font-bold" style="color: #1e293b; padding: 4px 10px;">${formatCurrencyMXN(row.totalCost)}</td>
+            </tr>`;
         });
-
-        tableHtml += `
-    </tbody>
-  </table>`;
-        return tableHtml;
+        
+        return rowsHtml;
       };
 
       if (sections.resumen) {
-        html += `<div class="page-break"></div>`;
-        html += `
-  <!-- SECOND PAGE HEADER -->
-  <div class="header-container">
-    <div class="logo-container">
-      <img src="${logoUrl}" alt="eSol Energías" onerror="this.style.display='none';">
-    </div>
-    <div class="meta-container">
-      <h1>Explosión de Insumos</h1>
-      <div class="meta-row"><span class="meta-label">Presupuesto:</span> ${details.name}</div>
-      <div class="meta-row"><span class="meta-label">Cliente:</span> ${details.client_name}</div>
-      <div class="meta-row"><span class="meta-label">Fecha:</span> ${formattedDate}</div>
-    </div>
-  </div>`;
+        innerHtml += `<!-- SECOND PAGE HEADER --><div class="header-container html2pdf__page-break" style="page-break-before: always; break-before: page; margin-top: 0px; margin-bottom: 0px; padding-bottom: 5px;"><div><img src="${logoUrl}" class="logo-img" alt="eSol Energías" onerror="this.style.display='none';"></div><div class="meta-block"><h1 class="pdf-title-font">EXPLOSIÓN DE INSUMOS</h1><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Presupuesto:</span> <span style="color: #1e293b;">${details.name}</span></div><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Cliente:</span> <span style="color: #1e293b;">${details.client_name}</span></div><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Fecha:</span> <span style="color: #1e293b;">${formattedDate}</span></div></div></div>`;
       } else {
-        html += `
-  <div class="section-title">Explosión de Insumos Consolidada</div>`;
+        innerHtml += `<div class="section-header" style="margin-top: 0px; margin-bottom: 0px;">Explosión de Insumos Consolidada</div>`;
       }
 
-      Object.keys(MATERIAL_SUBCATEGORIES_DISPLAY).forEach(key => {
-        html += renderInsumosTable(groupedMaterials[key], MATERIAL_SUBCATEGORIES_DISPLAY[key]);
-      });
-      html += renderInsumosTable(aggregated.labor, 'Mano de Obra');
-      html += renderInsumosTable(aggregated.equipment, 'Equipos y Maquinaria');
-      html += renderInsumosTable(aggregated.tools, 'Herramientas y Accesorios');
+      // Single Table Wrapper for all supply categories
+      innerHtml += `
+        <table style="width: 100%; border-collapse: collapse; margin-top: 0px; table-layout: fixed;">
+          <thead>
+            <tr>
+              <th style="width: 15%; text-align: center; vertical-align: middle;">Código</th>
+              <th style="width: 45%; text-align: center; vertical-align: middle;">Descripción</th>
+              <th style="width: 10%; text-align: center; vertical-align: middle;">Unidad</th>
+              <th style="width: 10%; text-align: center; vertical-align: middle;">Cantidad</th>
+              <th style="width: 10%; text-align: center; vertical-align: middle;">Costo Unit.</th>
+              <th style="width: 10%; text-align: center; vertical-align: middle;">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${renderInsumosRows(groupedMaterials['Panel solar'], 'Paneles Solares')}
+            ${renderInsumosRows(groupedMaterials['Inversor'], 'Inversores')}
+            ${renderInsumosRows(groupedMaterials['Estructura de montaje'], 'Estructura de Montaje')}
+            ${renderInsumosRows(groupedMaterials['Material electrico DC'], 'Material Eléctrico DC')}
+            ${renderInsumosRows(groupedMaterials['Material electrico AC'], 'Material Eléctrico AC')}
+            ${renderInsumosRows(groupedMaterials['sin_categoria'], 'Otros Materiales')}
+            ${renderInsumosRows(aggregated.labor, 'Mano de Obra')}
+            ${renderInsumosRows(aggregated.equipment, 'Equipos y Maquinaria')}
+            ${renderInsumosRows(aggregated.tools, 'Herramientas y Accesorios')}
+          </tbody>
+        </table>`;
 
-      html += `
-  <!-- Explosion Total -->
-  <div style="margin-top: 20px; font-weight: bold; font-size: 10pt; text-align: right; border-top: 1px solid #cbd5e1; padding-top: 10px;">
-    Costo de Insumos Consolidado: <span style="color: #b59410; margin-left: 10px; font-size: 11pt;">${formatCurrencyMXN(aggregated.overallInsumosCost)}</span>
-  </div>`;
+      innerHtml += `
+        <!-- Explosion Total -->
+        <div style="margin-top: 25px; font-weight: bold; font-size: 11px; text-align: right; border-top: 1px solid #cbd5e1; padding-top: 15px; color: #1e293b;">
+          Costo de Insumos Consolidado (Explosión): <span style="color: #C49825; margin-left: 10px; font-size: 13px;">${formatCurrencyMXN(aggregated.overallInsumosCost)}</span>
+        </div>`;
     }
 
-    html += `
-</body>
-</html>`;
+    contentDiv.innerHTML = innerHtml;
+    container.appendChild(contentDiv);
+    document.body.appendChild(container);
 
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
+    const opt = {
+      margin:       [10, 10, 10, 10],
+      filename:     `Presupuesto_${details.name}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false
+      },
+      jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' },
+      pagebreak:    { mode: ['css', 'legacy'] }
     };
+
+    // Generate PDF and trigger download
+    html2pdf()
+      .from(container)
+      .set(opt)
+      .save()
+      .then(() => {
+        // Cleanup element
+        document.body.removeChild(container);
+      })
+      .catch((err: any) => {
+        console.error('Error generating PDF:', err);
+        document.body.removeChild(container);
+        alert('Error al generar el archivo PDF.');
+      });
   };
 
   // Insumos Explosion Calculations
