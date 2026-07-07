@@ -1079,6 +1079,7 @@ export default function PresupuestosTab() {
 
       if (sections.resumen) {
         innerHtml += `<!-- SECOND PAGE HEADER --><div class="header-container html2pdf__page-break" style="page-break-before: always; break-before: page; margin-top: 0px; margin-bottom: 0px; padding-bottom: 5px;"><div><img src="${logoUrl}" class="logo-img" alt="eSol Energías" onerror="this.style.display='none';"></div><div class="meta-block"><h1 class="pdf-title-font">EXPLOSIÓN DE INSUMOS</h1><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Presupuesto:</span> <span style="color: #1e293b;">${details.name}</span></div><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Cliente:</span> <span style="color: #1e293b;">${details.client_name}</span></div><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Fecha:</span> <span style="color: #1e293b;">${formattedDate}</span></div></div></div>`;
+        innerHtml += `<div style="font-family: 'Cinzel', serif; font-size: 11px; color: #C49825; margin-top: 10px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">Resumen de explosión de insumos</div>`;
       } else {
         innerHtml += `<div class="section-header" style="margin-top: 0px; margin-bottom: 0px;">Explosión de Insumos Consolidada</div>`;
       }
