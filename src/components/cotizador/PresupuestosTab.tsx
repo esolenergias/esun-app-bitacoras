@@ -1190,7 +1190,6 @@ export default function PresupuestosTab() {
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-center">Unidad</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right w-24">Cantidad</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">P.U.</th>
-                              <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">P.U. Venta</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Importe Venta</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-center">Acciones</th>
                             </tr>
@@ -1198,7 +1197,9 @@ export default function PresupuestosTab() {
                           <tbody className="divide-y divide-dark-4 text-xs font-body">
                             {formConceptos.map((c, index) => {
                                const qty = Number(c.quantity) || 0;
-                               const unitDirect = Number(c.cost_price) || 0;
+                               const unitDirect = c.matriz
+                                 ? calculateMatrixDirectCost(c.matriz.insumos || [], qty)
+                                 : Number(c.cost_price) || 0;
 
                                const unitSelling = calculateMatrixSellingPrice(unitDirect, formIndirect, formUtility);
                                const totalSelling = qty * unitSelling;
@@ -1232,9 +1233,6 @@ export default function PresupuestosTab() {
                                          required
                                        />
                                      </div>
-                                   </td>
-                                   <td className="py-2.5 px-3 text-right font-mono text-cream-dim select-all">
-                                     {formatCurrencyMXN(unitSelling)}
                                    </td>
                                    <td className="py-2.5 px-3 text-right font-mono font-bold text-gold select-all">
                                      {formatCurrencyMXN(totalSelling * 1.16)}
