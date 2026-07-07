@@ -10,7 +10,7 @@ import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
 import { 
   Loader2, AlertTriangle, FileText, ChevronRight, ChevronDown, 
   Layers, Package, Users, Cpu, ShieldCheck, DollarSign, 
-  TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, Layers2, Wrench, Plus, HelpCircle,
+  TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, ArrowRight, Layers2, Wrench, Plus, HelpCircle,
   ArrowUp, ArrowDown, Trash2, Folder
 } from 'lucide-react';
 
@@ -139,6 +139,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
   const [expandedConcepts, setExpandedConcepts] = useState<Record<string, boolean>>({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   // Auth check states
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -856,6 +857,71 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
+  const handleIndentConcept = async (conceptId: string) => {
+    if (!budget || !budget.conceptos) return;
+    
+    const flatIndex = flatConceptsList.findIndex(fc => fc.concept.id === conceptId);
+    if (flatIndex <= 0) return;
+
+    const currentItem = flatConceptsList[flatIndex].concept;
+    const prevItem = flatConceptsList[flatIndex - 1].concept;
+
+    try {
+      const updates: Promise<any>[] = [];
+      updates.push(
+        supabase
+          .from('presupuesto_conceptos')
+          .update({ parent_id: prevItem.id })
+          .eq('id', currentItem.id)
+      );
+
+      if (prevItem.type !== 'group') {
+        updates.push(
+          supabase
+            .from('presupuesto_conceptos')
+            .update({ type: 'group', matriz_id: null, cost_price: 0 })
+            .eq('id', prevItem.id)
+        );
+      }
+
+      await Promise.all(updates);
+      await fetchBudgetDetails();
+    } catch (err: any) {
+      console.error('Error indenting concept:', err);
+      alert('No se pudo agrupar el concepto.');
+    }
+  };
+
+  const handleOutdentConcept = async (conceptId: string) => {
+    if (!budget || !budget.conceptos) return;
+    
+    const currentItem = budget.conceptos.find(c => c.id === conceptId);
+    if (!currentItem || !currentItem.parent_id) return;
+
+    const parentItem = budget.conceptos.find(c => c.id === currentItem.parent_id);
+    const newParentId = parentItem ? parentItem.parent_id : null;
+
+    try {
+      const { error } = await supabase
+        .from('presupuesto_conceptos')
+        .update({ parent_id: newParentId })
+        .eq('id', currentItem.id);
+
+      if (error) throw error;
+      await fetchBudgetDetails();
+    } catch (err: any) {
+      console.error('Error outdenting concept:', err);
+      alert('No se pudo desagrupar el concepto.');
+    }
+  };
+
+  const toggleGroupCollapse = (groupId: string) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
   const handleDeleteConcept = async (conceptId: string) => {
     if (!window.confirm('¿Estás seguro de que deseas eliminar este concepto del presupuesto?')) return;
     try {
@@ -1401,7 +1467,10 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       nodes.sort((a, b) => (a.concept.order_index ?? 0) - (b.concept.order_index ?? 0));
       nodes.forEach(n => {
         accumulator.push({ concept: n.concept, level: currentLevel });
-        sortAndFlatten(n.children, currentLevel + 1, accumulator);
+        const isCollapsed = collapsedGroups[n.concept.id];
+        if (!isCollapsed) {
+          sortAndFlatten(n.children, currentLevel + 1, accumulator);
+        }
       });
     };
 
@@ -1647,7 +1716,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                 <table className="w-full border-collapse text-left text-xs font-sans">
                   <thead>
                     <tr className="border-b border-dark-4 bg-dark-2/80 text-cream-dim select-none text-[9px] uppercase tracking-wider font-bold">
-                      <th className="py-3 px-4 text-center w-16 select-none">Orden</th>
+                      <th className="py-3 px-4 text-center w-28 select-none">Orden / Nivel</th>
                       <th className="py-3 px-4 w-32">Código</th>
                       <th className="py-3 px-4 text-center w-24">Tipo</th>
                       <th className="py-3 px-4">Descripción / Insumo</th>
@@ -1655,7 +1724,6 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       <th className="py-3 px-4 text-right w-28">CANTIDAD</th>
                       <th className="py-3 px-4 text-right w-36">Costo Unit.</th>
                       <th className="py-3 px-4 text-right w-36">Importe Tot.</th>
-                      <th className="py-3 px-4 text-center w-32 select-none">Agrupador</th>
                       <th className="py-3 px-4 text-center w-24 select-none">Acciones</th>
                     </tr>
                   </thead>
@@ -1665,7 +1733,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       const unitDirect = costs.directUnit;
                       const totalDirect = costs.totalDirect;
 
-                      // Find siblings of the current concept to enable up/down sorting bounds
+                      // Sibling indices for moving up/down
                       const siblings = concepts.filter(sib => sib.parent_id === c.parent_id);
                       siblings.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
                       const sibIndex = siblings.findIndex(sib => sib.id === c.id);
@@ -1673,6 +1741,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       const isLastSibling = sibIndex === siblings.length - 1;
 
                       const isGroup = c.type === 'group';
+                      const flatIndex = flatConceptsList.findIndex(fc => fc.concept.id === c.id);
 
                       return (
                         <tr 
@@ -1683,8 +1752,24 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                               : 'bg-dark-2/20 hover:bg-dark-3/20 text-cream'
                           }`}
                         >
-                          <td className="py-3 px-4 text-center select-none">
+                          {/* Sibling movement and level adjustment arrows */}
+                          <td className="py-3 px-4 text-center select-none w-28">
                             <div className="flex items-center justify-center gap-0.5">
+                              {/* Left Arrow (Desagrupar) */}
+                              <button
+                                type="button"
+                                disabled={!c.parent_id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOutdentConcept(c.id);
+                                }}
+                                className="p-1 hover:text-gold text-cream-muted disabled:opacity-20 disabled:hover:text-cream-muted transition-colors cursor-pointer"
+                                title="Desagrupar (Mover a la izquierda)"
+                              >
+                                <ArrowLeft className="w-3 h-3" />
+                              </button>
+
+                              {/* Up Arrow */}
                               <button
                                 type="button"
                                 disabled={isFirstSibling}
@@ -1695,8 +1780,10 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                 className="p-1 hover:text-gold text-cream-muted disabled:opacity-20 disabled:hover:text-cream-muted transition-colors cursor-pointer"
                                 title="Mover arriba"
                               >
-                                <ArrowUp className="w-3.5 h-3.5" />
+                                <ArrowUp className="w-3 h-3" />
                               </button>
+
+                              {/* Down Arrow */}
                               <button
                                 type="button"
                                 disabled={isLastSibling}
@@ -1707,10 +1794,25 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                                 className="p-1 hover:text-gold text-cream-muted disabled:opacity-20 disabled:hover:text-cream-muted transition-colors cursor-pointer"
                                 title="Mover abajo"
                               >
-                                <ArrowDown className="w-3.5 h-3.5" />
+                                <ArrowDown className="w-3 h-3" />
+                              </button>
+
+                              {/* Right Arrow (Agrupar) */}
+                              <button
+                                type="button"
+                                disabled={flatIndex === 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleIndentConcept(c.id);
+                                }}
+                                className="p-1 hover:text-gold text-cream-muted disabled:opacity-20 disabled:hover:text-cream-muted transition-colors cursor-pointer"
+                                title="Agrupar (Mover a la derecha)"
+                              >
+                                <ArrowRight className="w-3 h-3" />
                               </button>
                             </div>
                           </td>
+
                           <td className="py-3 px-4 font-mono text-[10px] text-gold/90 font-bold select-all">
                             {isGroup ? 'AGRUPADOR' : (c.matriz?.code || 'INSUMO')}
                           </td>
@@ -1733,10 +1835,26 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                             className="py-3 px-4 leading-relaxed font-sans text-xs"
                             style={{ paddingLeft: `${16 + level * 20}px` }}
                           >
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
                               {level > 0 && <span className="text-gold/40 select-none font-mono">└─</span>}
+                              
+                              {/* Toggle expand/collapse button for groups */}
                               {isGroup ? (
-                                <Folder className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                                <button
+                                  type="button"
+                                  onClick={() => toggleGroupCollapse(c.id)}
+                                  className="p-1 hover:bg-dark-3 rounded text-cream-muted hover:text-cream transition-colors cursor-pointer flex-shrink-0"
+                                >
+                                  {collapsedGroups[c.id] ? (
+                                    <ChevronRight className="w-3.5 h-3.5 text-gold" />
+                                  ) : (
+                                    <ChevronDown className="w-3.5 h-3.5 text-gold" />
+                                  )}
+                                </button>
+                              ) : null}
+
+                              {isGroup ? (
+                                <Folder className="w-3.5 h-3.5 text-gold/90 flex-shrink-0" />
                               ) : null}
                               <span className={isGroup ? 'font-black text-cream' : ''}>{c.description}</span>
                             </div>
@@ -1773,25 +1891,6 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-bold text-gold select-all">
                             {formatCurrencyMXN(totalDirect)}
-                          </td>
-                          <td className="py-3 px-4 text-center select-none">
-                            <select
-                              value={c.parent_id || ''}
-                              onChange={async (e) => {
-                                const newParentId = e.target.value || null;
-                                await handleUpdateConceptParent(c.id, newParentId);
-                              }}
-                              className="text-[10px] bg-dark-1/80 border border-dark-4 focus:border-gold/40 text-cream rounded-md p-1 focus:outline-none w-28 cursor-pointer"
-                            >
-                              <option value="">(Raíz / Sin Grupo)</option>
-                              {concepts
-                                .filter(other => other.type === 'group' && other.id !== c.id)
-                                .map(other => (
-                                  <option key={other.id} value={other.id}>
-                                    {other.description}
-                                  </option>
-                                ))}
-                            </select>
                           </td>
                           <td className="py-3 px-4 text-center select-none">
                             <button
