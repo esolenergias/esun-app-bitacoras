@@ -743,16 +743,7 @@ export default function PresupuestosTab() {
   };
 
   const getGroupedMaterials = (materialsList: any[]) => {
-    const subcategoryOrder: InsumoSubcategory[] = [
-      'estructura',
-      'modulos',
-      'inversores',
-      'conductores',
-      'canalizacion',
-      'protecciones',
-      'monitoreo',
-      'miscelaneos'
-    ];
+    const subcategoryOrder: InsumoSubcategory[] = MATERIAL_SUBCATEGORIES;
 
     const groups: Record<string, any[]> = {};
     
@@ -831,9 +822,8 @@ export default function PresupuestosTab() {
     
     // Output groups that have items
     subcategoryOrder.forEach(sub => {
-      const label = MATERIAL_SUBCATEGORIES.find(s => s.value === sub)?.label || sub;
       const items = groupedMaterials[sub];
-      md += groupInsumosToMd(items, `Materiales - ${label}`);
+      md += groupInsumosToMd(items, `Materiales - ${sub}`);
     });
     const uncategorizedItems = groupedMaterials['sin_categoria'];
     md += groupInsumosToMd(uncategorizedItems, 'Materiales - Sin Categoría');
@@ -1510,9 +1500,8 @@ export default function PresupuestosTab() {
                                 return (
                                   <>
                                     {subcategoryOrder.map(sub => {
-                                      const label = MATERIAL_SUBCATEGORIES.find(s => s.value === sub)?.label || sub;
                                       const items = grouped[sub];
-                                      return renderInsumosGroup(items, `Materiales - ${label}`);
+                                      return renderInsumosGroup(items, `Materiales - ${sub}`);
                                     })}
                                     {renderInsumosGroup(grouped['sin_categoria'], 'Materiales - Sin Categoría')}
                                   </>
