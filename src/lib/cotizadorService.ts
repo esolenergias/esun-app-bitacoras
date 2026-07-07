@@ -28,6 +28,7 @@ interface DbMatriz {
   code: string;
   description: string;
   unit: string;
+  subcategory?: string;
   indirect_percentage: number | string;
   utility_percentage: number | string;
   matriz_insumos?: DbMatrizInsumo[];
@@ -97,6 +98,7 @@ export function mapMatrizFromDb(data: DbMatriz): Matriz {
     code: data.code,
     description: data.description,
     unit: data.unit,
+    subcategory: data.subcategory || undefined,
     indirect_percentage: Number(data.indirect_percentage),
     utility_percentage: Number(data.utility_percentage),
     insumos,
@@ -227,6 +229,7 @@ export async function saveMatriz(matriz: Partial<Matriz>): Promise<Matriz> {
     code: matriz.code,
     description: matriz.description,
     unit: matriz.unit,
+    subcategory: matriz.subcategory,
     indirect_percentage: matriz.indirect_percentage,
     utility_percentage: matriz.utility_percentage,
     ...(matriz.id ? { id: matriz.id } : {})

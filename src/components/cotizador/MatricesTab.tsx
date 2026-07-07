@@ -26,6 +26,7 @@ export default function MatricesTab() {
   const [formCode, setFormCode] = useState<string>('');
   const [formDescription, setFormDescription] = useState<string>('');
   const [formUnit, setFormUnit] = useState<string>('');
+  const [formSubcategory, setFormSubcategory] = useState<string>('Otros');
   const [formIndirectPercentage, setFormIndirectPercentage] = useState<number>(0);
   const [formUtilityPercentage, setFormUtilityPercentage] = useState<number>(0);
   const [formInsumos, setFormInsumos] = useState<{ insumo: Insumo; quantity: number }[]>([]);
@@ -89,6 +90,7 @@ export default function MatricesTab() {
     setFormCode('');
     setFormDescription('');
     setFormUnit('');
+    setFormSubcategory('Otros');
     setFormIndirectPercentage(0);
     setFormUtilityPercentage(0);
     setFormInsumos([]);
@@ -106,6 +108,7 @@ export default function MatricesTab() {
       setFormCode(details.code);
       setFormDescription(details.description);
       setFormUnit(details.unit);
+      setFormSubcategory(details.subcategory || 'Otros');
       setFormIndirectPercentage(details.indirect_percentage);
       setFormUtilityPercentage(details.utility_percentage);
       setFormInsumos(details.insumos || []);
@@ -124,6 +127,7 @@ export default function MatricesTab() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingMatriz(null);
+    setFormSubcategory('Otros');
     setFormValidationError(null);
   };
 
@@ -190,6 +194,7 @@ export default function MatricesTab() {
         code: formCode.trim().toUpperCase(),
         description: formDescription.trim(),
         unit: formUnit.trim(),
+        subcategory: formSubcategory,
         indirect_percentage: 0,
         utility_percentage: 0,
         insumos: formInsumos,
@@ -241,7 +246,88 @@ export default function MatricesTab() {
 
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
+  // Load custom categories from local storage
+  const [customCategories, setCustomCategories] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('esol_matrix_categories');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Default hardcoded categories
+  const defaultCategories = useMemo(() => [
+    'Paneles Solares',
+    'Inversores',
+    'Estructura de Montaje',
+    'Material Eléctrico y Protecciones',
+    'Monitoreo y Comunicación',
+    'Mano de Obra y Servicios',
+    'Otros'
+  ], []);
+
+  // Compute all available categories by merging defaults, custom categories, and unique subcategories from loaded matrices
+  const allAvailableCategories = useMemo(() => {
+    const uniqueFromDB = new Set<string>();
+    matrices.forEach(m => {
+      if (m.subcategory && m.subcategory.trim()) {
+        uniqueFromDB.add(m.subcategory.trim());
+      }
+    });
+    
+    const combined = new Set([
+      ...defaultCategories,
+      ...customCategories,
+      ...Array.from(uniqueFromDB)
+    ]);
+    
+    // Return sorted categories, but keep 'Otros' at the end
+    return Array.from(combined).sort((a, b) => {
+      if (a === 'Otros') return 1;
+      if (b === 'Otros') return -1;
+      return a.localeCompare(b);
+    });
+  }, [matrices, customCategories, defaultCategories]);
+
+  const handleAddNewCategory = () => {
+    const name = prompt('Ingrese el nombre de la nueva categoría/subcategoría:');
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    
+    if (allAvailableCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      alert('Esta categoría ya existe.');
+      return;
+    }
+    
+    setCustomCategories(prev => {
+      const next = [...prev, trimmed];
+      localStorage.setItem('esol_matrix_categories', JSON.stringify(next));
+      return next;
+    });
+    
+    setFormSubcategory(trimmed);
+  };
+
+  const handleDeleteCategory = () => {
+    if (defaultCategories.includes(formSubcategory)) {
+      alert('Las categorías predeterminadas del sistema no se pueden eliminar.');
+      return;
+    }
+    
+    if (confirm(`¿Está seguro de que desea eliminar la categoría "${formSubcategory}"?`)) {
+      setCustomCategories(prev => {
+        const next = prev.filter(c => c !== formSubcategory);
+        localStorage.setItem('esol_matrix_categories', JSON.stringify(next));
+        return next;
+      });
+      setFormSubcategory('Otros');
+    }
+  };
+
   const getMatrixSubcategory = (matriz: Matriz): string => {
+    if (matriz.subcategory) return matriz.subcategory;
     const text = `${matriz.code} ${matriz.description}`.toLowerCase();
     if (text.includes('panel') || text.includes('modulo') || text.includes('módulo') || text.includes('fotovoltaico') || text.includes('fv')) {
       return 'Paneles Solares';
@@ -294,7 +380,7 @@ export default function MatricesTab() {
         acc[key] = groups[key];
         return acc;
       }, {} as Record<string, Matriz[]>);
-  }, [filteredMatrices]);
+  }, [filteredMatrices, allAvailableCategories]);
 
   // Calculation helpers
   const getMatrixTotals = (insumosList: { insumo: Insumo; quantity: number }[], indirect: number, utility: number) => {
@@ -399,14 +485,15 @@ export default function MatricesTab() {
                   <th className="py-3 px-4 font-bold text-right">Costo Directo</th>
                   <th className="py-3 px-4 font-bold text-center w-24">Acciones</th>
                 </tr>
-               <tbody className="divide-y divide-dark-4/45">
+              </thead>
+              <tbody className="divide-y divide-dark-4/45">
                 {Object.entries(groupedMatrices).map(([category, items]) => {
                   const isCollapsed = collapsedCategories[category];
                   return (
                     <React.Fragment key={category}>
                       {/* Subcategory Group Header Row */}
                       <tr 
-                        className="bg-dark-3/30 hover:bg-dark-3/50 transition-colors cursor-pointer select-none border-y border-dark-4/50"
+                        className="bg-dark-1/80 hover:bg-dark-1/95 border-l-4 border-l-gold/60 border-y border-dark-4/85 transition-colors cursor-pointer select-none"
                         onClick={() => setCollapsedCategories(prev => ({ ...prev, [category]: !prev[category] }))}
                       >
                         <td colSpan={5} className="py-2.5 px-4">
@@ -693,7 +780,7 @@ export default function MatricesTab() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Unit */}
                     <div className="space-y-1.5">
                       <label htmlFor="matriz-unit" className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
@@ -706,6 +793,41 @@ export default function MatricesTab() {
                         className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none transition-colors font-mono"
                         required
                       />
+                    </div>
+
+                    {/* Subcategory */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center select-none">
+                        <label htmlFor="matriz-subcat" className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block">Subcategoría</label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleAddNewCategory}
+                            className="text-[9px] font-black uppercase text-gold hover:text-gold-light transition-colors flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <Plus className="w-2.5 h-2.5" /> Agregar
+                          </button>
+                          {!defaultCategories.includes(formSubcategory) && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteCategory}
+                              className="text-[9px] font-black uppercase text-red-400 hover:text-red-300 transition-colors flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Trash2 className="w-2.5 h-2.5" /> Eliminar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <select
+                        id="matriz-subcat"
+                        value={formSubcategory}
+                        onChange={(e) => setFormSubcategory(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none transition-colors"
+                      >
+                        {allAvailableCategories.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>

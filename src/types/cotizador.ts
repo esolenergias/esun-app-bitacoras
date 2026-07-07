@@ -34,6 +34,7 @@ export interface Matriz {
   code: string;
   description: string;
   unit: string;
+  subcategory?: string;
   indirect_percentage: number;
   utility_percentage: number;
   insumos?: { insumo: Insumo; quantity: number; formula?: string | null }[];
