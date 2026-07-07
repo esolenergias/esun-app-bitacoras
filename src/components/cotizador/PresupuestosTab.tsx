@@ -800,17 +800,26 @@ export default function PresupuestosTab() {
         height: 48px;
         width: auto;
       }
+      * {
+        box-sizing: border-box;
+      }
+      h1, h2, h3, h4, h5, h6, p {
+        margin: 0;
+        padding: 0;
+      }
       .meta-block {
         text-align: right;
         font-size: 10px;
         color: #64748b;
       }
       .meta-block h1 {
-        margin: 0 0 5px 0;
+        margin: 0 0 3px 0;
+        padding: 0;
         font-size: 16px;
         font-weight: 900;
         color: #0f172a;
         letter-spacing: 1px;
+        line-height: 1.2;
       }
       .section-header {
         font-family: 'Cinzel', serif;
