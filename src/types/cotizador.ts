@@ -64,6 +64,8 @@ export interface PresupuestoConcepto {
   utility_percentage: number;
   matriz?: Matriz;
   order_index?: number;
+  parent_id?: string | null;
+  type?: 'concept' | 'group' | 'insumo_directo';
   created_at?: string;
   updated_at?: string;
 }

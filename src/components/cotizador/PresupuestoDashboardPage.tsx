@@ -11,7 +11,7 @@ import {
   Loader2, AlertTriangle, FileText, ChevronRight, ChevronDown, 
   Layers, Package, Users, Cpu, ShieldCheck, DollarSign, 
   TrendingUp, Download, Eye, RefreshCw, X, ArrowLeft, Layers2, Wrench, Plus, HelpCircle,
-  ArrowUp, ArrowDown, Trash2
+  ArrowUp, ArrowDown, Trash2, Folder
 } from 'lucide-react';
 
 interface NumericInputProps {
@@ -158,7 +158,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [matrices, setMatrices] = useState<Matriz[]>([]);
   const [insumosCatalog, setInsumosCatalog] = useState<Insumo[]>([]);
   const [isAddConceptModalOpen, setIsAddConceptModalOpen] = useState<boolean>(false);
-  const [addConceptTab, setAddConceptTab] = useState<'apu' | 'use_insumo' | 'custom' | 'new_matrix' | 'new_insumo'>('apu');
+  const [addConceptTab, setAddConceptTab] = useState<'apu' | 'use_insumo' | 'group_insumos' | 'create_group' | 'new_matrix' | 'new_insumo'>('apu');
   
   // Selector / Custom Concept / Insumo Concept
   const [selectedMatrixId, setSelectedMatrixId] = useState<string>('');
@@ -169,6 +169,14 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [customCost, setCustomCost] = useState<number>(0);
   const [customIndirect, setCustomIndirect] = useState<number>(10);
   const [customUtility, setCustomUtility] = useState<number>(8);
+
+  // Grupo de Insumos Form
+  const [groupName, setGroupName] = useState<string>('');
+  const [groupUnit, setGroupUnit] = useState<string>('lote');
+  const [groupQty, setGroupQty] = useState<number>(1);
+  const [selectedInsumoIdForGroup, setSelectedInsumoIdForGroup] = useState<string>('');
+  const [insumoQtyForGroup, setInsumoQtyForGroup] = useState<number>(1);
+  const [groupInsumos, setGroupInsumos] = useState<{ insumo: Insumo; quantity: number }[]>([]);
   
   // New Matrix Form
   const [newMatrixCode, setNewMatrixCode] = useState<string>('');
@@ -390,6 +398,13 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     setCustomCost(0);
     setCustomIndirect(10);
     setCustomUtility(8);
+
+    setGroupName('');
+    setGroupUnit('lote');
+    setGroupQty(1);
+    setSelectedInsumoIdForGroup('');
+    setInsumoQtyForGroup(1);
+    setGroupInsumos([]);
     
     setNewMatrixCode('');
     setNewMatrixDesc('');
@@ -463,36 +478,142 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     });
   };
 
-  const handleAddCustomConcept = async () => {
-    if (!customDesc.trim()) {
-      setSubModalError('La descripción es obligatoria.');
+  const handleCreateAndAddGroupOfInsumos = async () => {
+    if (!groupName.trim()) {
+      setSubModalError('El nombre del grupo es obligatorio.');
       return;
     }
-    if (!customUnit.trim()) {
+    if (!groupUnit.trim()) {
       setSubModalError('La unidad es obligatoria.');
       return;
     }
-    if (customQty <= 0) {
-      setSubModalError('La cantidad debe ser mayor a 0.');
+    if (groupQty <= 0) {
+      setSubModalError('La cantidad del grupo debe ser mayor a 0.');
       return;
     }
-    if (customCost < 0) {
-      setSubModalError('El costo no puede ser negativo.');
+    if (groupInsumos.length === 0) {
+      setSubModalError('Debes añadir al menos un insumo al grupo.');
+      return;
+    }
+
+    setSubModalSubmitting(true);
+    setSubModalError(null);
+
+    try {
+      const nextOrderIndex = budget.conceptos ? budget.conceptos.length : 0;
+      
+      // 1. Save the parent group concept
+      const { data: parentGroupData, error: parentError } = await supabase
+        .from('presupuesto_conceptos')
+        .insert({
+          presupuesto_id: budget.id,
+          matriz_id: null,
+          description: groupName.trim(),
+          unit: groupUnit.trim(),
+          quantity: groupQty,
+          cost_price: 0,
+          indirect_percentage: customIndirect,
+          utility_percentage: customUtility,
+          order_index: nextOrderIndex,
+          type: 'group',
+          parent_id: null
+        })
+        .select()
+        .single();
+
+      if (parentError) throw parentError;
+
+      // 2. Save all insumos as child concepts of type 'insumo_directo'
+      const childConcepts = groupInsumos.map((item, idx) => {
+        const isPza = item.insumo.unit?.trim().toLowerCase() === 'pza';
+        const rawChildQty = item.quantity;
+        const finalChildQty = isPza ? Math.max(1, Math.round(rawChildQty)) : rawChildQty;
+
+        return {
+          presupuesto_id: budget.id,
+          matriz_id: null,
+          description: item.insumo.description,
+          unit: item.insumo.unit,
+          quantity: finalChildQty,
+          cost_price: item.insumo.cost,
+          indirect_percentage: customIndirect,
+          utility_percentage: customUtility,
+          order_index: idx,
+          type: 'insumo_directo',
+          parent_id: parentGroupData.id
+        };
+      });
+
+      const { error: childrenError } = await supabase
+        .from('presupuesto_conceptos')
+        .insert(childConcepts);
+
+      if (childrenError) throw childrenError;
+
+      setIsAddConceptModalOpen(false);
+      await fetchBudgetDetails();
+    } catch (err: any) {
+      console.error('Error saving group of insumos:', err);
+      setSubModalError(err.message || 'Error al guardar el grupo de insumos.');
+    } finally {
+      setSubModalSubmitting(false);
+    }
+  };
+
+  const handleCreateAgrupador = async () => {
+    if (!groupName.trim()) {
+      setSubModalError('El nombre del agrupador es obligatorio.');
       return;
     }
     
-    const isPza = customUnit.trim().toLowerCase() === 'pza';
-    const finalQty = isPza ? Math.max(1, Math.round(customQty)) : customQty;
+    setSubModalSubmitting(true);
+    setSubModalError(null);
+    try {
+      const nextOrderIndex = budget.conceptos ? budget.conceptos.length : 0;
+      const { error } = await supabase
+        .from('presupuesto_conceptos')
+        .insert({
+          presupuesto_id: budget.id,
+          matriz_id: null,
+          description: groupName.trim(),
+          unit: groupUnit || 'grp',
+          quantity: 1,
+          cost_price: 0,
+          indirect_percentage: customIndirect,
+          utility_percentage: customUtility,
+          order_index: nextOrderIndex,
+          type: 'group',
+          parent_id: selectedMatrixId || null // Reused selectedMatrixId as parentId in this tab
+        });
 
-    await handleSaveConceptToDb({
-      matriz_id: null,
-      description: customDesc.trim(),
-      unit: customUnit.trim(),
-      cost_price: customCost,
-      indirect_percentage: customIndirect,
-      utility_percentage: customUtility,
-      quantity: finalQty
-    });
+      if (error) throw error;
+      setIsAddConceptModalOpen(false);
+      await fetchBudgetDetails();
+    } catch (err: any) {
+      console.error('Error creating agrupador:', err);
+      setSubModalError(err.message || 'Error al crear el agrupador.');
+    } finally {
+      setSubModalSubmitting(false);
+    }
+  };
+
+  const handleAddInsumoToGroup = () => {
+    if (!selectedInsumoIdForGroup) return;
+    const insumo = insumosCatalog.find(i => i.id === selectedInsumoIdForGroup);
+    if (!insumo) return;
+    
+    if (groupInsumos.some(item => item.insumo.id === insumo.id)) {
+      alert('Este insumo ya está añadido al grupo.');
+      return;
+    }
+    
+    setGroupInsumos(prev => [...prev, { insumo, quantity: insumoQtyForGroup }]);
+    setSelectedInsumoIdForGroup('');
+    setInsumoQtyForGroup(1);
+  };
+
+  const handleRemoveInsumoFromGroup = (insumoId: string) => {
+    setGroupInsumos(prev => prev.filter(item => item.insumo.id !== insumoId));
   };
 
   const handleAddInsumoToNewMatrix = () => {
@@ -673,52 +794,65 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
-  const handleMoveConcept = async (currentIndex: number, direction: -1 | 1) => {
+  const handleMoveConcept = async (conceptId: string, direction: -1 | 1) => {
     if (!budget || !budget.conceptos) return;
-    const targetIndex = currentIndex + direction;
-    if (targetIndex < 0 || targetIndex >= budget.conceptos.length) return;
-
-    // Create a copy of the concepts array
-    const updatedConceptos = [...budget.conceptos];
     
-    // Swap the elements
-    const temp = updatedConceptos[currentIndex];
-    updatedConceptos[currentIndex] = updatedConceptos[targetIndex];
-    updatedConceptos[targetIndex] = temp;
+    const targetConcept = budget.conceptos.find(c => c.id === conceptId);
+    if (!targetConcept) return;
+
+    // Find siblings (concepts with the same parent_id)
+    const siblings = budget.conceptos
+      .filter(c => c.parent_id === targetConcept.parent_id)
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+    const currentIndex = siblings.findIndex(s => s.id === conceptId);
+    const targetIndex = currentIndex + direction;
+    
+    if (targetIndex < 0 || targetIndex >= siblings.length) return;
+
+    const siblingA = siblings[currentIndex];
+    const siblingB = siblings[targetIndex];
 
     try {
-      // Optimistic local UI update
-      setBudget(prev => {
-        if (!prev) return null;
-        const reordered = [...prev.conceptos];
-        const t = reordered[currentIndex];
-        reordered[currentIndex] = reordered[targetIndex];
-        reordered[targetIndex] = t;
-        return {
-          ...prev,
-          conceptos: reordered.map((c, idx) => ({ ...c, order_index: idx }))
-        };
-      });
+      const orderA = siblingA.order_index ?? 0;
+      const orderB = siblingB.order_index ?? 0;
 
-      // Update the order_index of the two swapped concepts in Supabase using concurrent update queries
+      // Swap order_index values in Supabase
       const updateA = supabase
         .from('presupuesto_conceptos')
-        .update({ order_index: targetIndex })
-        .eq('id', updatedConceptos[currentIndex].id);
+        .update({ order_index: orderB })
+        .eq('id', siblingA.id);
 
       const updateB = supabase
         .from('presupuesto_conceptos')
-        .update({ order_index: currentIndex })
-        .eq('id', updatedConceptos[targetIndex].id);
+        .update({ order_index: orderA })
+        .eq('id', siblingB.id);
 
       const [resA, resB] = await Promise.all([updateA, updateB]);
 
       if (resA.error) throw resA.error;
       if (resB.error) throw resB.error;
+
+      await fetchBudgetDetails();
     } catch (err: any) {
       console.error("Error updating concept order:", err);
       alert(`No se pudo guardar el nuevo orden de los conceptos: ${err.message || err}`);
       await fetchBudgetDetails();
+    }
+  };
+
+  const handleUpdateConceptParent = async (conceptId: string, parentId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('presupuesto_conceptos')
+        .update({ parent_id: parentId })
+        .eq('id', conceptId);
+        
+      if (error) throw error;
+      await fetchBudgetDetails();
+    } catch (err) {
+      console.error('Error updating parent:', err);
+      alert('No se pudo reasignar el agrupador del concepto.');
     }
   };
 
@@ -1149,19 +1283,134 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
 
   // --- Calculations ---
   const concepts = budget.conceptos || [];
-  const directCost = concepts.reduce((sum, c) => {
-    const qty = Number(c.quantity) || 0;
-    const unitDirect = c.matriz 
-      ? calculateMatrixDirectCost(c.matriz.insumos || [], qty) 
-      : Number(c.cost_price);
-    return sum + (qty * unitDirect);
-  }, 0);
   const indirectPct = budget.indirect_percentage ?? 10.00;
   const utilityPct = budget.utility_percentage ?? 8.00;
-  const indirectCost = directCost * (indirectPct / 100);
-  const subtotalWithIndirect = directCost + indirectCost;
-  const utilityCost = subtotalWithIndirect * (utilityPct / 100);
-  const sellingPrice = subtotalWithIndirect + utilityCost;
+
+  // Tree helper maps and recursive calculation methods
+  const conceptMap = new Map<string, PresupuestoConcepto[]>();
+  concepts.forEach(c => {
+    if (c.parent_id) {
+      if (!conceptMap.has(c.parent_id)) {
+        conceptMap.set(c.parent_id, []);
+      }
+      conceptMap.get(c.parent_id)!.push(c);
+    }
+  });
+
+  const getConceptCosts = (
+    c: PresupuestoConcepto
+  ): { directUnit: number; totalDirect: number } => {
+    if (c.type === 'group') {
+      const children = conceptMap.get(c.id) || [];
+      let sumTotalDirect = 0;
+      children.forEach(child => {
+        const childCosts = getConceptCosts(child);
+        sumTotalDirect += childCosts.totalDirect;
+      });
+      const qty = Number(c.quantity) || 1;
+      return {
+        directUnit: sumTotalDirect / qty,
+        totalDirect: sumTotalDirect
+      };
+    } else if (c.type === 'insumo_directo') {
+      const directUnit = Number(c.cost_price) || 0;
+      const qty = Number(c.quantity) || 0;
+      return {
+        directUnit,
+        totalDirect: qty * directUnit
+      };
+    } else {
+      const qty = Number(c.quantity) || 0;
+      const unitDirect = c.matriz 
+        ? calculateMatrixDirectCost(c.matriz.insumos || [], qty) 
+        : Number(c.cost_price);
+      return {
+        directUnit: unitDirect,
+        totalDirect: qty * unitDirect
+      };
+    }
+  };
+
+  const getConceptSellingCosts = (
+    c: PresupuestoConcepto
+  ): { sellingUnit: number; totalSelling: number } => {
+    if (c.type === 'group') {
+      const children = conceptMap.get(c.id) || [];
+      let sumTotalSelling = 0;
+      children.forEach(child => {
+        const childCosts = getConceptSellingCosts(child);
+        sumTotalSelling += childCosts.totalSelling;
+      });
+      const qty = Number(c.quantity) || 1;
+      return {
+        sellingUnit: sumTotalSelling / qty,
+        totalSelling: sumTotalSelling
+      };
+    } else if (c.type === 'insumo_directo') {
+      const directUnit = Number(c.cost_price) || 0;
+      const sellingUnit = calculateMatrixSellingPrice(directUnit, c.indirect_percentage || indirectPct, c.utility_percentage || utilityPct);
+      const qty = Number(c.quantity) || 0;
+      return {
+        sellingUnit,
+        totalSelling: qty * sellingUnit
+      };
+    } else {
+      const qty = Number(c.quantity) || 0;
+      const unitDirect = c.matriz 
+        ? calculateMatrixDirectCost(c.matriz.insumos || [], qty) 
+        : Number(c.cost_price);
+      const sellingUnit = calculateMatrixSellingPrice(unitDirect, c.indirect_percentage || indirectPct, c.utility_percentage || utilityPct);
+      return {
+        sellingUnit,
+        totalSelling: qty * sellingUnit
+      };
+    }
+  };
+
+  const rootConcepts = concepts.filter(c => !c.parent_id);
+
+  const directCost = rootConcepts.reduce((sum, c) => {
+    return sum + getConceptCosts(c).totalDirect;
+  }, 0);
+
+  const sellingPrice = rootConcepts.reduce((sum, c) => {
+    return sum + getConceptSellingCosts(c).totalSelling;
+  }, 0);
+
+  // Flatten the tree for rendering
+  const getFlatNodes = (flatConcepts: PresupuestoConcepto[]) => {
+    const nodeMap = new Map<string, { concept: PresupuestoConcepto; children: any[] }>();
+    
+    flatConcepts.forEach(c => {
+      nodeMap.set(c.id, { concept: c, children: [] });
+    });
+
+    const roots: any[] = [];
+
+    flatConcepts.forEach(c => {
+      const node = nodeMap.get(c.id)!;
+      if (c.parent_id && nodeMap.has(c.parent_id)) {
+        const parent = nodeMap.get(c.parent_id)!;
+        parent.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    const sortAndFlatten = (nodes: any[], currentLevel: number, accumulator: any[]) => {
+      nodes.sort((a, b) => (a.concept.order_index ?? 0) - (b.concept.order_index ?? 0));
+      nodes.forEach(n => {
+        accumulator.push({ concept: n.concept, level: currentLevel });
+        sortAndFlatten(n.children, currentLevel + 1, accumulator);
+      });
+    };
+
+    const accumulator: { concept: PresupuestoConcepto; level: number }[] = [];
+    sortAndFlatten(roots, 0, accumulator);
+    return accumulator;
+  };
+
+  const flatConceptsList = getFlatNodes(concepts);
   const ivaCost = sellingPrice * 0.16;
   const totalWithIva = sellingPrice + ivaCost;
   const marginVal = sellingPrice - directCost;
@@ -1189,24 +1438,39 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   };
 
   concepts.forEach(c => {
+    if (c.type === 'group') return;
     const qty = Number(c.quantity) || 0;
-    const matrix = c.matriz;
-    if (matrix && matrix.insumos) {
-      matrix.insumos.forEach(item => {
-        const costVal = Number(item.insumo.cost) || 0;
-        const matrixQty = item.formula 
-          ? evaluateFormula(item.formula, qty) 
-          : Number(item.quantity) || 0;
-        const isPza = item.insumo.unit?.trim().toLowerCase() === 'pza';
-        const finalQty = isPza ? Math.round(matrixQty * qty) : (matrixQty * qty);
-        const totalCost = costVal * finalQty;
-        
-        const type = item.insumo.type;
+
+    if (c.type === 'insumo_directo') {
+      const insumo = insumosCatalog.find(i => i.description === c.description && i.unit === c.unit);
+      if (insumo) {
+        const costVal = Number(c.cost_price) || insumo.cost || 0;
+        const totalCost = costVal * qty;
+        const type = insumo.type;
         if (type in aggregatedInsumos) {
           aggregatedInsumos[type as keyof typeof aggregatedInsumos] += totalCost;
           aggregatedInsumos.total += totalCost;
         }
-      });
+      }
+    } else {
+      const matrix = c.matriz;
+      if (matrix && matrix.insumos) {
+        matrix.insumos.forEach(item => {
+          const costVal = Number(item.insumo.cost) || 0;
+          const matrixQty = item.formula 
+            ? evaluateFormula(item.formula, qty) 
+            : Number(item.quantity) || 0;
+          const isPza = item.insumo.unit?.trim().toLowerCase() === 'pza';
+          const finalQty = isPza ? Math.round(matrixQty * qty) : (matrixQty * qty);
+          const totalCost = costVal * finalQty;
+          
+          const type = item.insumo.type;
+          if (type in aggregatedInsumos) {
+            aggregatedInsumos[type as keyof typeof aggregatedInsumos] += totalCost;
+            aggregatedInsumos.total += totalCost;
+          }
+        });
+      }
     }
   });
 
@@ -1388,29 +1652,42 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       <th className="py-3 px-4 text-right w-28">CANTIDAD</th>
                       <th className="py-3 px-4 text-right w-36">Costo Unit.</th>
                       <th className="py-3 px-4 text-right w-36">Importe Tot.</th>
+                      <th className="py-3 px-4 text-center w-32 select-none">Agrupador</th>
                       <th className="py-3 px-4 text-center w-24 select-none">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dark-4/50">
-                    {concepts.map((c, index) => {
-                      const unitDirect = c.matriz 
-                        ? calculateMatrixDirectCost(c.matriz.insumos || [], Number(c.quantity)) 
-                        : Number(c.cost_price);
-                      const totalDirect = Number(c.quantity) * unitDirect;
+                    {flatConceptsList.map(({ concept: c, level }) => {
+                      const costs = getConceptCosts(c);
+                      const unitDirect = costs.directUnit;
+                      const totalDirect = costs.totalDirect;
+
+                      // Find siblings of the current concept to enable up/down sorting bounds
+                      const siblings = concepts.filter(sib => sib.parent_id === c.parent_id);
+                      siblings.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+                      const sibIndex = siblings.findIndex(sib => sib.id === c.id);
+                      const isFirstSibling = sibIndex === 0;
+                      const isLastSibling = sibIndex === siblings.length - 1;
+
+                      const isGroup = c.type === 'group';
 
                       return (
                         <tr 
                           key={c.id}
-                          className="hover:bg-dark-3/20 select-none bg-dark-2/20 transition-colors font-bold text-cream"
+                          className={`select-none transition-colors font-bold ${
+                            isGroup 
+                              ? 'bg-dark-3/60 hover:bg-dark-3/80 border-l-4 border-l-gold text-cream-dim' 
+                              : 'bg-dark-2/20 hover:bg-dark-3/20 text-cream'
+                          }`}
                         >
                           <td className="py-3 px-4 text-center select-none">
                             <div className="flex items-center justify-center gap-0.5">
                               <button
                                 type="button"
-                                disabled={index === 0}
+                                disabled={isFirstSibling}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleMoveConcept(index, -1);
+                                  handleMoveConcept(c.id, -1);
                                 }}
                                 className="p-1 hover:text-gold text-cream-muted disabled:opacity-20 disabled:hover:text-cream-muted transition-colors cursor-pointer"
                                 title="Mover arriba"
@@ -1419,10 +1696,10 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                               </button>
                               <button
                                 type="button"
-                                disabled={index === concepts.length - 1}
+                                disabled={isLastSibling}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleMoveConcept(index, 1);
+                                  handleMoveConcept(c.id, 1);
                                 }}
                                 className="p-1 hover:text-gold text-cream-muted disabled:opacity-20 disabled:hover:text-cream-muted transition-colors cursor-pointer"
                                 title="Mover abajo"
@@ -1432,37 +1709,62 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                             </div>
                           </td>
                           <td className="py-3 px-4 font-mono text-[10px] text-gold/90 font-bold select-all">
-                            {c.matriz?.code || 'S/C'}
+                            {isGroup ? 'AGRUPADOR' : (c.matriz?.code || 'INSUMO')}
                           </td>
                           <td className="py-3 px-4 text-center select-none">
-                            <span className="inline-flex px-2 py-0.5 rounded-md text-[8.5px] font-black uppercase tracking-wider bg-gold/10 text-gold border border-gold/20">
-                              MATRIZ
-                            </span>
+                            {isGroup ? (
+                              <span className="inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-gold/25 text-gold border border-gold/45">
+                                GRUPO
+                              </span>
+                            ) : (
+                              <span className={`inline-flex px-2 py-0.5 rounded-md text-[8.5px] font-black uppercase tracking-wider ${
+                                c.type === 'insumo_directo' 
+                                  ? 'bg-cream/10 text-cream-muted border border-cream/20' 
+                                  : 'bg-gold/10 text-gold border border-gold/20'
+                              }`}>
+                                {c.type === 'insumo_directo' ? 'INSUMO' : 'MATRIZ'}
+                              </span>
+                            )}
                           </td>
-                          <td className="py-3 px-4 leading-relaxed font-sans text-xs">
-                            <div>{c.description}</div>
+                          <td 
+                            className="py-3 px-4 leading-relaxed font-sans text-xs"
+                            style={{ paddingLeft: `${16 + level * 20}px` }}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              {level > 0 && <span className="text-gold/40 select-none font-mono">└─</span>}
+                              {isGroup ? (
+                                <Folder className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                              ) : null}
+                              <span className={isGroup ? 'font-black text-cream' : ''}>{c.description}</span>
+                            </div>
                           </td>
-                          <td className="py-3 px-4 text-center font-mono text-cream-muted select-none">{c.unit}</td>
+                          <td className="py-3 px-4 text-center font-mono text-cream-muted select-none">{isGroup ? 'grp' : c.unit}</td>
                           <td className="py-3 px-4 text-right font-mono select-none">
                             <NumericInput
                               step={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
-                              min={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.00"}
+                              min="1"
                               value={Number(c.quantity)}
                               onChange={async (val) => {
                                 const isPza = c.unit?.trim().toLowerCase() === 'pza';
-                                const finalVal = isPza ? Math.max(1, Math.round(val)) : val;
+                                const finalVal = (isPza || isGroup) ? Math.max(1, Math.round(val)) : val;
                                 await handleUpdateConceptQuantity(c.id, finalVal);
                               }}
                               className="w-20 px-1 py-0.5 bg-dark-1/80 border border-dark-4 focus:border-gold/40 text-cream rounded font-mono text-right focus:outline-none text-[11px]"
                             />
                           </td>
                           <td 
-                            className="py-3 px-4 text-right font-mono text-cream select-all cursor-pointer hover:text-gold hover:underline transition-colors"
+                            className={`py-3 px-4 text-right font-mono select-all ${
+                              (!isGroup && c.matriz) 
+                                ? 'text-cream cursor-pointer hover:text-gold hover:underline transition-colors' 
+                                : 'text-cream-dim'
+                            }`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (c.matriz) handleOpenMatrixEditor(c.matriz, Number(c.quantity) || 1);
+                              if (!isGroup && c.matriz) {
+                                handleOpenMatrixEditor(c.matriz, Number(c.quantity) || 1);
+                              }
                             }}
-                            title="Haga clic para editar la matriz de costos completa"
+                            title={(!isGroup && c.matriz) ? "Haga clic para editar la matriz de costos completa" : undefined}
                           >
                             {formatCurrencyMXN(unitDirect)}
                           </td>
@@ -1470,11 +1772,30 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                             {formatCurrencyMXN(totalDirect)}
                           </td>
                           <td className="py-3 px-4 text-center select-none">
+                            <select
+                              value={c.parent_id || ''}
+                              onChange={async (e) => {
+                                const newParentId = e.target.value || null;
+                                await handleUpdateConceptParent(c.id, newParentId);
+                              }}
+                              className="text-[10px] bg-dark-1/80 border border-dark-4 focus:border-gold/40 text-cream rounded-md p-1 focus:outline-none w-28 cursor-pointer"
+                            >
+                              <option value="">(Raíz / Sin Grupo)</option>
+                              {concepts
+                                .filter(other => other.type === 'group' && other.id !== c.id)
+                                .map(other => (
+                                  <option key={other.id} value={other.id}>
+                                    {other.description}
+                                  </option>
+                                ))}
+                            </select>
+                          </td>
+                          <td className="py-3 px-4 text-center select-none">
                             <button
                               type="button"
                               onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteConcept(c.id);
+                                  e.stopPropagation();
+                                  handleDeleteConcept(c.id);
                               }}
                               className="p-1 hover:text-red-400 text-cream-muted hover:bg-red-500/10 rounded transition-colors cursor-pointer animate-pulse-subtle"
                               title="Eliminar concepto"
@@ -1632,7 +1953,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               {([
                 { key: 'apu', label: 'Usar Plantilla APU' },
                 { key: 'use_insumo', label: 'Usar Insumo' },
-                { key: 'custom', label: 'Concepto Personalizado' },
+                { key: 'group_insumos', label: 'Grupo de Insumos' },
+                { key: 'create_group', label: 'Crear Agrupador' },
                 { key: 'new_matrix', label: 'Crear Nueva Matriz' },
                 { key: 'new_insumo', label: 'Crear Nuevo Insumo' }
               ] as const).map(tab => (
@@ -1835,53 +2157,44 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                 </div>
               )}
 
-              {/* Tab 2: Custom Concept (Ad-hoc) */}
-              {addConceptTab === 'custom' && (
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Descripción del Concepto</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. Suministro e instalación de ducto galvanizado..."
-                      value={customDesc}
-                      onChange={(e) => setCustomDesc(e.target.value)}
-                      className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
+              {/* Tab: Grupo de Insumos */}
+              {addConceptTab === 'group_insumos' && (
+                <div className="space-y-4 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Nombre del Grupo</label>
                       <input
                         type="text"
-                        placeholder="pza, m, jor"
-                        value={customUnit}
-                        onChange={(e) => setCustomUnit(e.target.value)}
-                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                        placeholder="Ej. Kit de Fijación Estructura..."
+                        value={groupName}
+                        onChange={(e) => setGroupName(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none"
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Cantidad</label>
-                      <NumericInput
-                        step="0.01"
-                        min="0.01"
-                        value={customQty}
-                        onChange={setCustomQty}
-                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1.5 col-span-2">
-                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Costo Directo Unitario (MXN)</label>
-                      <NumericInput
-                        step="0.01"
-                        value={customCost}
-                        onChange={setCustomCost}
-                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
+                        <input
+                          type="text"
+                          value={groupUnit}
+                          onChange={(e) => setGroupUnit(e.target.value)}
+                          className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Cantidad</label>
+                        <NumericInput
+                          step="1"
+                          min="1"
+                          value={groupQty}
+                          onChange={setGroupQty}
+                          className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Indirecto %</label>
                       <NumericInput
@@ -1900,28 +2213,186 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                         className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
                       />
                     </div>
-                    <div className="bg-dark-1/50 border border-dark-4 p-3 rounded-xl font-mono text-[10px] select-none flex flex-col justify-center">
-                      <span className="text-cream-dim uppercase text-[8px] font-black tracking-widest block">Precio de Venta Unitario</span>
-                      <span className="text-gold font-bold text-sm">
-                        {formatCurrencyMXN(calculateMatrixSellingPrice(customCost, customIndirect, customUtility))}
-                      </span>
-                    </div>
                   </div>
+
+                  {/* Add Insumos to Group Builder */}
+                  <div className="border border-dark-4 p-4 rounded-xl bg-dark-1/30 space-y-3">
+                    <span className="text-[9px] uppercase tracking-wider font-black text-gold block">Añadir Insumos al Grupo</span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <select
+                        value={selectedInsumoIdForGroup}
+                        onChange={(e) => setSelectedInsumoIdForGroup(e.target.value)}
+                        className="p-2.5 bg-dark-1 border border-dark-4 text-xs text-cream rounded-xl focus:outline-none md:col-span-2 cursor-pointer"
+                      >
+                        <option value="">Selecciona un insumo...</option>
+                        {insumosCatalog.map(ins => (
+                          <option key={ins.id} value={ins.id}>
+                            [{ins.code}] {ins.description} ({formatCurrencyMXN(ins.cost)}/{ins.unit})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <NumericInput
+                          step="0.0001"
+                          min="0.0001"
+                          value={insumoQtyForGroup}
+                          onChange={setInsumoQtyForGroup}
+                          className="w-24 p-2.5 bg-dark-1 border border-dark-4 text-xs text-cream rounded-xl focus:outline-none text-right font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddInsumoToGroup}
+                          className="flex-1 bg-dark-3 border border-dark-4 hover:border-gold/30 hover:text-gold text-cream text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                        >
+                          Añadir
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Temporary Insumos List */}
+                    {groupInsumos.length > 0 && (
+                      <div className="border border-dark-4 rounded-xl overflow-hidden bg-dark-2/40 max-h-[150px] overflow-y-auto mt-2">
+                        <table className="w-full text-left text-[11px] font-sans border-collapse">
+                          <thead>
+                            <tr className="bg-dark-1/80 text-cream-muted uppercase font-bold text-[8px] tracking-wider border-b border-dark-4 select-none">
+                              <th className="py-2 px-3">Código</th>
+                              <th className="py-2 px-3">Descripción</th>
+                              <th className="py-2 px-3 text-right">Cantidad</th>
+                              <th className="py-2 px-3 text-right">Costo</th>
+                              <th className="py-2 px-3 text-right">Importe</th>
+                              <th className="py-2 px-3 text-center">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-dark-4/50">
+                            {groupInsumos.map(item => {
+                              const totalCost = item.quantity * item.insumo.cost;
+                              return (
+                                <tr key={item.insumo.id} className="text-cream">
+                                  <td className="py-1.5 px-3 font-mono text-[9px] text-gold/90">{item.insumo.code}</td>
+                                  <td className="py-1.5 px-3 leading-tight">{item.insumo.description}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono">{item.quantity}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono">{formatCurrencyMXN(item.insumo.cost)}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono font-bold text-gold">{formatCurrencyMXN(totalCost)}</td>
+                                  <td className="py-1.5 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveInsumoFromGroup(item.insumo.id)}
+                                      className="p-1 hover:text-red-400 text-cream-muted transition-colors cursor-pointer"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Calculations Preview Summary */}
+                  {groupInsumos.length > 0 && (
+                    <div className="bg-dark-1/50 border border-dark-4 p-3 rounded-xl font-mono text-[10px] grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-cream-muted uppercase text-[8px] font-black tracking-widest block">Costo Directo Grupo</span>
+                        <span className="text-cream font-bold text-xs">
+                          {formatCurrencyMXN(groupInsumos.reduce((sum, item) => sum + item.quantity * item.insumo.cost, 0))}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-cream-muted uppercase text-[8px] font-black tracking-widest block">Precio de Venta Sugerido (Total)</span>
+                        <span className="text-gold font-bold text-xs">
+                          {formatCurrencyMXN(
+                            calculateMatrixSellingPrice(
+                              groupInsumos.reduce((sum, item) => sum + item.quantity * item.insumo.cost, 0),
+                              customIndirect,
+                              customUtility
+                            ) * groupQty
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-4 flex justify-end">
                     <button
                       type="button"
-                      onClick={handleAddCustomConcept}
+                      onClick={handleCreateAndAddGroupOfInsumos}
                       disabled={subModalSubmitting}
                       className="px-5 py-2.5 bg-gold hover:bg-gold-light text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5 flex items-center gap-1.5"
                     >
                       {subModalSubmitting ? (
                         <>
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Guardando concepto...</span>
+                          <span>Guardando grupo...</span>
                         </>
                       ) : (
-                        <span>Añadir al Presupuesto</span>
+                        <span>Añadir Grupo al Presupuesto</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Crear Agrupador */}
+              {addConceptTab === 'create_group' && (
+                <div className="space-y-4 text-xs">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Nombre del Agrupador (Dependencia/Subdependencia)</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Instalaciones Eléctricas, Obra Civil..."
+                      value={groupName}
+                      onChange={(e) => setGroupName(e.target.value)}
+                      className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. grp, pza, lote"
+                        value={groupUnit}
+                        onChange={(e) => setGroupUnit(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Dependencia Padre (Opcional)</label>
+                      <select
+                        value={selectedMatrixId}
+                        onChange={(e) => setSelectedMatrixId(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 text-xs text-cream rounded-xl focus:outline-none cursor-pointer"
+                      >
+                        <option value="">Ninguno (Raíz / Dependencia Principal)</option>
+                        {concepts
+                          .filter(c => c.type === 'group')
+                          .map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.description}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleCreateAgrupador}
+                      disabled={subModalSubmitting}
+                      className="px-5 py-2.5 bg-gold hover:bg-gold-light text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5 flex items-center gap-1.5"
+                    >
+                      {subModalSubmitting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Creando agrupador...</span>
+                        </>
+                      ) : (
+                        <span>Crear Agrupador</span>
                       )}
                     </button>
                   </div>

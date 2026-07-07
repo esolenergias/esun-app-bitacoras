@@ -47,6 +47,8 @@ interface DbConcepto {
   utility_percentage: number | string;
   matrices: DbMatriz | DbMatriz[] | null;
   order_index?: number | string;
+  parent_id?: string | null;
+  type?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -122,6 +124,8 @@ export function mapConceptoFromDb(pc: DbConcepto): PresupuestoConcepto {
     utility_percentage: Number(pc.utility_percentage),
     matriz: hydratedMatriz,
     order_index: pc.order_index !== undefined ? Number(pc.order_index) : 0,
+    parent_id: pc.parent_id,
+    type: (pc.type as any) || 'concept',
     created_at: pc.created_at,
     updated_at: pc.updated_at
   };
@@ -445,7 +449,9 @@ export async function savePresupuesto(
         cost_price: c.cost_price || 0,
         indirect_percentage: c.indirect_percentage || 0,
         utility_percentage: c.utility_percentage || 0,
-        order_index: c.order_index
+        order_index: c.order_index,
+        parent_id: c.parent_id || null,
+        type: c.type || 'concept'
       }));
 
       const { error: insertError } = await supabase
@@ -467,7 +473,9 @@ export async function savePresupuesto(
         cost_price: c.cost_price || 0,
         indirect_percentage: c.indirect_percentage || 0,
         utility_percentage: c.utility_percentage || 0,
-        order_index: c.order_index
+        order_index: c.order_index,
+        parent_id: c.parent_id || null,
+        type: c.type || 'concept'
       }));
 
       const { error: updateError } = await supabase
