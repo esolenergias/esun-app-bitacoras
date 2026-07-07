@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Plus, Search, Edit, Trash2, X, Loader2, AlertTriangle, Layers, Check, Eye
+  Plus, Search, Edit, Trash2, X, Loader2, AlertTriangle, Layers, Check, Eye, ChevronDown, ChevronRight
 } from 'lucide-react';
 import { 
   getMatrices, getMatrizDetails, saveMatriz, deleteMatriz, getInsumos,
@@ -239,6 +239,31 @@ export default function MatricesTab() {
     }
   };
 
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+
+  const getMatrixSubcategory = (matriz: Matriz): string => {
+    const text = `${matriz.code} ${matriz.description}`.toLowerCase();
+    if (text.includes('panel') || text.includes('modulo') || text.includes('módulo') || text.includes('fotovoltaico') || text.includes('fv')) {
+      return 'Paneles Solares';
+    }
+    if (text.includes('inversor') || text.includes('microinversor') || text.includes('inverter') || text.includes('convertidor')) {
+      return 'Inversores';
+    }
+    if (text.includes('estructura') || text.includes('soporte') || text.includes('montaje') || text.includes('perfil') || text.includes('anclaje') || text.includes('herraje') || text.includes('rack')) {
+      return 'Estructura de Montaje';
+    }
+    if (text.includes('cable') || text.includes('tuber') || text.includes('tubo') || text.includes('canal') || text.includes('conector') || text.includes('fusible') || text.includes('interruptor') || text.includes('tablero') || text.includes('breaker') || text.includes('condulet') || text.includes('eléctrico') || text.includes('electrico') || text.includes('puesta a tierra') || text.includes('tierra') || text.includes('varilla')) {
+      return 'Material Eléctrico y Protecciones';
+    }
+    if (text.includes('mano de obra') || text.includes('instalacio') || text.includes('instalación') || text.includes('viatico') || text.includes('viático') || text.includes('flete') || text.includes('ingenieria') || text.includes('diseño') || text.includes('puesta en marcha')) {
+      return 'Mano de Obra y Servicios';
+    }
+    if (text.includes('monitoreo') || text.includes('wifi') || text.includes('comunicacio') || text.includes('smart meter') || text.includes('medidor') || text.includes('logger')) {
+      return 'Monitoreo y Comunicación';
+    }
+    return 'Otros';
+  };
+
   // Searching
   const filteredMatrices = matrices.filter(matriz => {
     const query = searchQuery.toLowerCase();
@@ -248,6 +273,28 @@ export default function MatricesTab() {
       (matriz.unit || '').toLowerCase().includes(query)
     );
   });
+
+  const groupedMatrices = useMemo(() => {
+    const groups: Record<string, Matriz[]> = {};
+    filteredMatrices.forEach(matriz => {
+      const subcat = getMatrixSubcategory(matriz);
+      if (!groups[subcat]) {
+        groups[subcat] = [];
+      }
+      groups[subcat].push(matriz);
+    });
+    // Sort categories alphabetically but keep 'Otros' at the end
+    return Object.keys(groups)
+      .sort((a, b) => {
+        if (a === 'Otros') return 1;
+        if (b === 'Otros') return -1;
+        return a.localeCompare(b);
+      })
+      .reduce((acc, key) => {
+        acc[key] = groups[key];
+        return acc;
+      }, {} as Record<string, Matriz[]>);
+  }, [filteredMatrices]);
 
   // Calculation helpers
   const getMatrixTotals = (insumosList: { insumo: Insumo; quantity: number }[], indirect: number, utility: number) => {
@@ -352,55 +399,80 @@ export default function MatricesTab() {
                   <th className="py-3 px-4 font-bold text-right">Costo Directo</th>
                   <th className="py-3 px-4 font-bold text-center w-24">Acciones</th>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-4/45">
-                {filteredMatrices.map((matriz) => {
-                  const totals = getMatrixTotals(matriz.insumos || [], 0, 0);
+               <tbody className="divide-y divide-dark-4/45">
+                {Object.entries(groupedMatrices).map(([category, items]) => {
+                  const isCollapsed = collapsedCategories[category];
                   return (
-                     <tr 
-                       key={matriz.id}
-                       className="hover:bg-gold/5 transition-colors cursor-pointer group"
-                       onClick={() => handleOpenDetail(matriz)}
-                     >
-                       <td className="py-3.5 px-4 font-mono font-bold text-gold tracking-wide select-all">
-                         {matriz.code}
-                       </td>
-                       <td className="py-3.5 px-4 text-cream font-body leading-relaxed max-w-xs md:max-w-md lg:max-w-lg truncate" title={matriz.description}>
-                         {matriz.description}
-                       </td>
-                       <td className="py-3.5 px-4 text-cream-muted font-mono select-none">
-                         {matriz.unit}
-                       </td>
-                       <td className="py-3.5 px-4 text-right font-mono text-cream select-all">
-                         {formatCurrencyMXN(totals.directCost)}
-                       </td>
-                      <td className="py-3.5 px-4 text-center select-none" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleOpenDetail(matriz); }}
-                            className="p-1.5 border border-dark-4 bg-dark-1 hover:border-gold/30 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-gold transition-all cursor-pointer"
-                            title="Ver desglose APU"
+                    <React.Fragment key={category}>
+                      {/* Subcategory Group Header Row */}
+                      <tr 
+                        className="bg-dark-3/30 hover:bg-dark-3/50 transition-colors cursor-pointer select-none border-y border-dark-4/50"
+                        onClick={() => setCollapsedCategories(prev => ({ ...prev, [category]: !prev[category] }))}
+                      >
+                        <td colSpan={5} className="py-2.5 px-4">
+                          <div className="flex items-center gap-2 font-display text-[9.5px] font-black uppercase tracking-wider text-cream-dim">
+                            {isCollapsed ? (
+                              <ChevronRight className="w-3.5 h-3.5 text-gold" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5 text-gold" />
+                            )}
+                            <span className="text-cream font-extrabold">{category}</span>
+                            <span className="text-cream-muted lowercase">({items.length} {items.length === 1 ? 'matriz' : 'matrices'})</span>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Group items */}
+                      {!isCollapsed && items.map((matriz) => {
+                        const totals = getMatrixTotals(matriz.insumos || [], 0, 0);
+                        return (
+                          <tr 
+                            key={matriz.id}
+                            className="hover:bg-gold/5 transition-colors cursor-pointer group"
+                            onClick={() => handleOpenDetail(matriz)}
                           >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleOpenEditModal(matriz); }}
-                            disabled={loadingDetails}
-                            className="p-1.5 border border-dark-4 bg-dark-1 hover:border-gold/30 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-gold transition-all cursor-pointer disabled:opacity-40"
-                            title="Editar matriz"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleOpenDeleteConfirm(matriz); }}
-                            className="p-1.5 border border-red-500/10 bg-dark-1 hover:border-red-500/30 hover:bg-red-500/5 rounded-lg text-cream-muted hover:text-red-400 transition-all cursor-pointer"
-                            title="Eliminar matriz"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                            <td className="py-3.5 px-4 font-mono font-bold text-gold tracking-wide select-all">
+                              {matriz.code}
+                            </td>
+                            <td className="py-3.5 px-4 text-cream font-body leading-relaxed max-w-xs md:max-w-md lg:max-w-lg truncate" title={matriz.description}>
+                              {matriz.description}
+                            </td>
+                            <td className="py-3.5 px-4 text-cream-muted font-mono select-none">
+                              {matriz.unit}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-mono text-cream select-all">
+                              {formatCurrencyMXN(totals.directCost)}
+                            </td>
+                            <td className="py-3.5 px-4 text-center select-none" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleOpenDetail(matriz); }}
+                                  className="p-1.5 border border-dark-4 bg-dark-1 hover:border-gold/30 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-gold transition-all cursor-pointer"
+                                  title="Ver desglose APU"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleOpenEditModal(matriz); }}
+                                  disabled={loadingDetails}
+                                  className="p-1.5 border border-dark-4 bg-dark-1 hover:border-gold/30 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-gold transition-all cursor-pointer disabled:opacity-40"
+                                  title="Editar matriz"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleOpenDeleteConfirm(matriz); }}
+                                  className="p-1.5 border border-red-500/10 bg-dark-1 hover:border-red-500/30 hover:bg-red-500/5 rounded-lg text-cream-muted hover:text-red-400 transition-all cursor-pointer"
+                                  title="Eliminar matriz"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

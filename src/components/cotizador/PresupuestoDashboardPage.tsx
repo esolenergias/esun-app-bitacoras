@@ -1161,12 +1161,16 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         .select(`
           id,
           matriz_id,
+          quantity,
           matrices (
             id,
             matriz_insumos (
               quantity,
+              formula,
               insumos (
-                cost
+                id,
+                cost,
+                unit
               )
             )
           )
@@ -1175,12 +1179,21 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
 
       if (!fetchAllErr && allConcepts) {
         for (const c of allConcepts) {
-          if (c.matrices) {
-            const insList = (c.matrices.matriz_insumos || []).map((mi: any) => ({
-              quantity: Number(mi.quantity),
-              insumo: { cost: Number(mi.insumos?.cost || 0) }
-            }));
-            const newDirect = calculateMatrixDirectCost(insList as any);
+          const rawMatriz = Array.isArray(c.matrices) ? c.matrices[0] : c.matrices;
+          if (rawMatriz) {
+            const conceptQty = Number(c.quantity) || 1;
+            const insList = (rawMatriz.matriz_insumos || []).map((mi: any) => {
+              const ins = Array.isArray(mi.insumos) ? mi.insumos[0] : mi.insumos;
+              return {
+                quantity: Number(mi.quantity),
+                formula: mi.formula || null,
+                insumo: ins ? {
+                  cost: Number(ins.cost || 0),
+                  unit: String(ins.unit || '')
+                } : { cost: 0, unit: '' }
+              };
+            });
+            const newDirect = calculateMatrixDirectCost(insList as any, conceptQty);
             
             await supabase
               .from('presupuesto_conceptos')
