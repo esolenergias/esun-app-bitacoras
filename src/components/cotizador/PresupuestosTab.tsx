@@ -1087,15 +1087,25 @@ export default function PresupuestosTab() {
       };
 
       if (sections.resumen) {
-        innerHtml += `<!-- SECOND PAGE HEADER --><div class="header-container html2pdf__page-break" style="page-break-before: always; break-before: page; margin-top: 0px; margin-bottom: 0px; padding-bottom: 5px;"><div><img src="${logoUrl}" class="logo-img" alt="eSol Energías" onerror="this.style.display='none';"></div><div class="meta-block"><h1 class="pdf-title-font">EXPLOSIÓN DE INSUMOS</h1><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Presupuesto:</span> <span style="color: #1e293b;">${details.name}</span></div><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Cliente:</span> <span style="color: #1e293b;">${details.client_name}</span></div><div style="margin: 2px 0;"><span style="color: #64748b; font-weight: 600;">Fecha:</span> <span style="color: #1e293b;">${formattedDate}</span></div></div></div>`;
-        innerHtml += `<div style="font-family: 'Cinzel', serif; font-size: 11px; color: #C49825; margin-top: 0px; margin-bottom: 5px; padding-top: 5px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">Resumen de explosión de insumos</div>`;
+        // Zero-height dedicated page break - completely separate from header content
+        innerHtml += `<div style="page-break-before: always; break-before: page; height: 0px; margin: 0px; padding: 0px; font-size: 0px; line-height: 0px; border: none; display: block;"></div>`;
+        // Second page header - all inline, no CSS classes for spacing
+        innerHtml += `<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C49825; padding-top: 0px; padding-bottom: 8px; margin: 0px 0px 5px 0px;">
+          <div style="margin:0; padding:0;"><img src="${logoUrl}" style="height:48px; width:auto; display:block;" alt="eSol Energías" onerror="this.style.display='none';"></div>
+          <div style="text-align:right; font-size:10px; color:#64748b; margin:0; padding:0; line-height:1.4;">
+            <div style="margin:0 0 3px 0; padding:0; font-family:'Cinzel',serif; font-size:16px; font-weight:900; color:#0f172a; letter-spacing:1px; line-height:1.2;">EXPLOSIÓN DE INSUMOS</div>
+            <div style="margin:2px 0; padding:0;"><span style="color:#64748b; font-weight:600;">Presupuesto:</span> <span style="color:#1e293b;">${details.name}</span></div>
+            <div style="margin:2px 0; padding:0;"><span style="color:#64748b; font-weight:600;">Cliente:</span> <span style="color:#1e293b;">${details.client_name}</span></div>
+            <div style="margin:2px 0; padding:0;"><span style="color:#64748b; font-weight:600;">Fecha:</span> <span style="color:#1e293b;">${formattedDate}</span></div>
+          </div>
+        </div>`;
+        innerHtml += `<div style="font-family:'Cinzel',serif; font-size:11px; color:#C49825; margin:0 0 6px 0; padding:0; text-transform:uppercase; letter-spacing:1px; font-weight:bold; line-height:1.3;">Resumen de explosión de insumos</div>`;
       } else {
-        innerHtml += `<div class="section-header" style="margin-top: 0px; margin-bottom: 0px;">Explosión de Insumos Consolidada</div>`;
+        innerHtml += `<div style="font-family:'Cinzel',serif; font-size:13px; color:#C49825; border-bottom:1px solid #cbd5e1; padding-bottom:6px; margin:0 0 15px 0; text-transform:uppercase; letter-spacing:1.5px;">Explosión de Insumos Consolidada</div>`;
       }
 
-      // Single Table Wrapper for all supply categories
-      innerHtml += `
-        <table style="width: 100%; border-collapse: collapse; margin-top: 0px; table-layout: fixed;">
+      // Single Table Wrapper - zero margin top
+      innerHtml += `<table style="width: 100%; border-collapse: collapse; margin-top: 0px; table-layout: fixed;">
           <thead>
             <tr>
               <th style="width: 15%; text-align: center; vertical-align: middle;">Código</th>
