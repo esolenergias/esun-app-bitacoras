@@ -225,9 +225,18 @@ export default function PresupuestosTab() {
     }
   };
 
-  // Fetch initial budgets and matrices on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchInitialData(); }, []);
+  useEffect(() => { 
+    fetchInitialData(); 
+    
+    const handleWindowFocus = () => {
+      fetchBudgets();
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, []);
 
   // Open modal for creating
   const handleOpenCreateModal = () => {
