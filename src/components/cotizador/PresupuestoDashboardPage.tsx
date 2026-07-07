@@ -1462,7 +1462,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       };
     } else if (c.type === 'insumo_directo') {
       const directUnit = Number(c.cost_price) || 0;
-      const sellingUnit = calculateMatrixSellingPrice(directUnit, c.indirect_percentage || indirectPct, c.utility_percentage || utilityPct);
+      const sellingUnit = calculateMatrixSellingPrice(directUnit, indirectPct, utilityPct);
       const qty = Number(c.quantity) || 0;
       return {
         sellingUnit,
@@ -1473,7 +1473,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       const unitDirect = c.matriz 
         ? calculateMatrixDirectCost(c.matriz.insumos || [], qty) 
         : Number(c.cost_price);
-      const sellingUnit = calculateMatrixSellingPrice(unitDirect, c.indirect_percentage || indirectPct, c.utility_percentage || utilityPct);
+      const sellingUnit = calculateMatrixSellingPrice(unitDirect, indirectPct, utilityPct);
       return {
         sellingUnit,
         totalSelling: qty * sellingUnit
