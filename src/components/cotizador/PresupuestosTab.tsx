@@ -956,8 +956,8 @@ export default function PresupuestosTab() {
     ...c,
     quantity: Number(c.quantity) || 0,
     cost_price: Number(c.cost_price) || 0,
-    indirect_percentage: Number(c.indirect_percentage) || 0,
-    utility_percentage: Number(c.utility_percentage) || 0
+    indirect_percentage: 0,
+    utility_percentage: 0
   })) as PresupuestoConcepto[];
 
   const totals = safeConceptos.length > 0 
@@ -1189,9 +1189,7 @@ export default function PresupuestosTab() {
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider">Descripción</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-center">Unidad</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right w-24">Cantidad</th>
-                              <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Costo Directo U.</th>
-                              <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Ind. %</th>
-                              <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Util %</th>
+                              <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">P.U.</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">P.U. Venta</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Importe Venta</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-center">Acciones</th>
@@ -1199,77 +1197,60 @@ export default function PresupuestosTab() {
                           </thead>
                           <tbody className="divide-y divide-dark-4 text-xs font-body">
                             {formConceptos.map((c, index) => {
-                              const qty = Number(c.quantity) || 0;
-                              const unitDirect = Number(c.cost_price) || 0;
-                              const indirect = Number(c.indirect_percentage) || 0;
-                              const utility = Number(c.utility_percentage) || 0;
+                               const qty = Number(c.quantity) || 0;
+                               const unitDirect = Number(c.cost_price) || 0;
 
-                              const unitSelling = calculateMatrixSellingPrice(unitDirect, indirect, utility);
-                              const totalSelling = qty * unitSelling;
+                               const unitSelling = calculateMatrixSellingPrice(unitDirect, formIndirect, formUtility);
+                               const totalSelling = qty * unitSelling;
 
-                              return (
-                                <tr key={c.id || index} className="hover:bg-dark-1/20 transition-colors">
-                                  <td className="py-2.5 px-3 text-cream leading-relaxed font-bold">
-                                    {c.description}
-                                  </td>
-                                  <td className="py-2.5 px-3 text-cream-muted text-center font-mono">
-                                    {c.unit}
-                                  </td>
-                                  <td className="py-2.5 px-3">
-                                    <NumericInput
-                                      step={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
-                                      min={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
-                                      value={c.quantity || 0}
-                                      onChange={(val) => handleUpdateConceptField(c.id!, 'quantity', val)}
-                                      className="w-full px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"
-                                      required
-                                    />
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right font-mono text-cream-muted">
-                                    <NumericInput
-                                      step="0.01"
-                                      value={c.cost_price || 0}
-                                      onChange={(val) => handleUpdateConceptField(c.id!, 'cost_price', val)}
-                                      className="w-24 px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"
-                                      required
-                                    />
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right font-mono text-cream-dim">
-                                    <NumericInput
-                                      step="0.1"
-                                      value={c.indirect_percentage || 0}
-                                      onChange={(val) => handleUpdateConceptField(c.id!, 'indirect_percentage', val)}
-                                      className="w-16 px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"
-                                      required
-                                    />
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right font-mono text-cream-dim">
-                                    <NumericInput
-                                      step="0.1"
-                                      value={c.utility_percentage || 0}
-                                      onChange={(val) => handleUpdateConceptField(c.id!, 'utility_percentage', val)}
-                                      className="w-16 px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"
-                                      required
-                                    />
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right font-mono text-cream-dim select-all">
-                                    {formatCurrencyMXN(unitSelling)}
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right font-mono font-bold text-gold select-all">
-                                    {formatCurrencyMXN(totalSelling)}
-                                  </td>
-                                  <td className="py-2.5 px-3 text-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveConcepto(c.id!)}
-                                      className="p-1 hover:bg-red-500/10 hover:text-red-400 text-cream-muted rounded-lg transition-colors cursor-pointer"
-                                      title="Quitar concepto"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
+                               return (
+                                 <tr key={c.id || index} className="hover:bg-dark-1/20 transition-colors">
+                                   <td className="py-2.5 px-3 text-cream leading-relaxed font-bold">
+                                     {c.description}
+                                   </td>
+                                   <td className="py-2.5 px-3 text-cream-muted text-center font-mono">
+                                     {c.unit}
+                                   </td>
+                                   <td className="py-2.5 px-3">
+                                     <NumericInput
+                                       step={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
+                                       min={c.unit?.trim().toLowerCase() === 'pza' ? "1" : "0.01"}
+                                       value={c.quantity || 0}
+                                       onChange={(val) => handleUpdateConceptField(c.id!, 'quantity', val)}
+                                       className="w-full px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"
+                                       required
+                                     />
+                                   </td>
+                                   <td className="py-2.5 px-3 text-right font-mono text-cream-muted">
+                                     <div className="inline-flex items-center gap-1 justify-end w-full">
+                                       <span className="text-[10px] text-cream-dim">$</span>
+                                       <NumericInput
+                                         step="0.01"
+                                         value={c.cost_price || 0}
+                                         onChange={(val) => handleUpdateConceptField(c.id!, 'cost_price', val)}
+                                         className="w-20 px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"
+                                         required
+                                       />
+                                     </div>
+                                   </td>
+                                   <td className="py-2.5 px-3 text-right font-mono text-cream-dim select-all">
+                                     {formatCurrencyMXN(unitSelling)}
+                                   </td>
+                                   <td className="py-2.5 px-3 text-right font-mono font-bold text-gold select-all">
+                                     {formatCurrencyMXN(totalSelling * 1.16)}
+                                   </td>
+                                   <td className="py-2.5 px-3 text-center">
+                                     <button
+                                       type="button"
+                                       onClick={() => handleRemoveConcepto(c.id!)}
+                                       className="p-1 hover:bg-red-500/10 hover:text-red-400 text-cream-muted rounded-lg transition-colors cursor-pointer"
+                                       title="Quitar concepto"
+                                     >
+                                       <Trash2 className="w-3.5 h-3.5" />
+                                     </button>
+                                   </td>
+                                 </tr>
+                               );
                             })}
                           </tbody>
                         </table>
