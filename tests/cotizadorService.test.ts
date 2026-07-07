@@ -130,6 +130,29 @@ function runTests() {
   const costPzaQ5 = calculateMatrixDirectCost(mockInsumosPza, 5);
   assertEquals(costPzaQ5, 140, 'Pza unit cost at Q=5 should scale and round (1.4*5=7) -> 140');
 
+  // Test 6: Percentage unit insumos
+  console.log('\nRunning Test 6: Percentage unit insumos...');
+  const mockInsumosPercent = [
+    {
+      insumo: { id: 'm1', code: 'INS-M1', type: 'material', description: 'Insumo 1', unit: 'pza', cost: 100 } as Insumo,
+      quantity: 2
+    },
+    {
+      insumo: { id: 'l1', code: 'INS-L1', type: 'labor', description: 'Insumo 2', unit: 'jor', cost: 50 } as Insumo,
+      quantity: 3
+    },
+    {
+      // Herramienta menor: 3% of direct cost of standard insumos
+      insumo: { id: 'pct1', code: 'INS-PCT1', type: 'tool', description: 'Herramienta menor', unit: '%', cost: 0 } as Insumo,
+      quantity: 3
+    }
+  ];
+  // Direct cost standard = 100 * 2 + 50 * 3 = 350
+  // Plus 3% of 350 = 350 * 0.03 = 10.50
+  // Total direct cost = 360.50
+  const directCostWithPercent = calculateMatrixDirectCost(mockInsumosPercent);
+  assertEquals(directCostWithPercent, 360.50, 'Matrix cost with 3% tool insumo');
+
   console.log('\nAll calculations tests passed successfully!');
 }
 

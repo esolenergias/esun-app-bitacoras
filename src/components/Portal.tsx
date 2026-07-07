@@ -13,6 +13,7 @@ import {
 import InsumosTab from './cotizador/InsumosTab';
 import MatricesTab from './cotizador/MatricesTab';
 import PresupuestosTab from './cotizador/PresupuestosTab';
+import GruposTab from './cotizador/GruposTab';
 
 const CATEGORIES = [
   'Paneles Solares',
@@ -52,7 +53,7 @@ export function Portal() {
 
   // Navigation tab based on user roles
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [cotizadorSubTab, setCotizadorSubTab] = useState<'presupuestos' | 'matrices' | 'insumos'>('presupuestos');
+  const [cotizadorSubTab, setCotizadorSubTab] = useState<'presupuestos' | 'matrices' | 'insumos' | 'grupos'>('presupuestos');
 
   // Sync activeTab default when logging in & enforce role guards
   useEffect(() => {
@@ -785,7 +786,7 @@ export function Portal() {
                         } ${sidebarCollapsed ? 'justify-center' : ''}`}
                       >
                         <Sparkles className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Cotizador IA</span>}
+                        {!sidebarCollapsed && <span>Presupuestos esol</span>}
                       </button>
                       <button
                         onClick={() => setActiveTab('cfeconfig')}
@@ -904,7 +905,7 @@ export function Portal() {
                         } ${sidebarCollapsed ? 'justify-center' : ''}`}
                       >
                         <Sparkles className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Cotizador IA</span>}
+                        {!sidebarCollapsed && <span>Presupuestos esol</span>}
                       </button>
                       <button
                         onClick={() => setActiveTab('cfeconfig')}
@@ -2839,6 +2840,16 @@ export function Portal() {
                     >
                       Catálogo Insumos
                     </button>
+                    <button
+                      onClick={() => setCotizadorSubTab('grupos')}
+                      className={`px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer ${
+                        cotizadorSubTab === 'grupos'
+                          ? 'border-gold text-gold bg-gold/5'
+                          : 'border-transparent text-cream-dim hover:text-cream hover:border-dark-4'
+                      }`}
+                    >
+                      Grupo de Insumos
+                    </button>
                   </div>
 
                   {/* SubTabs Contents */}
@@ -2852,6 +2863,10 @@ export function Portal() {
 
                   {cotizadorSubTab === 'insumos' && (
                     <InsumosTab />
+                  )}
+
+                  {cotizadorSubTab === 'grupos' && (
+                    <GruposTab />
                   )}
                 </div>
               )}

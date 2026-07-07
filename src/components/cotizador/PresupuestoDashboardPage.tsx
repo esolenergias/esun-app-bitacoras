@@ -140,6 +140,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
   const [expandedConcepts, setExpandedConcepts] = useState<Record<string, boolean>>({});
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [editingDescriptionConceptId, setEditingDescriptionConceptId] = useState<string | null>(null);
+  const [editingDescriptionValue, setEditingDescriptionValue] = useState<string>('');
 
   // Auth check states
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -856,6 +858,36 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
+  const handleSaveConceptDescription = async (conceptId: string) => {
+    if (!editingDescriptionValue.trim()) {
+      setEditingDescriptionConceptId(null);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('presupuesto_conceptos')
+        .update({ description: editingDescriptionValue.trim() })
+        .eq('id', conceptId);
+
+      if (error) throw error;
+      
+      setBudget(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          conceptos: prev.conceptos.map(c => 
+            c.id === conceptId ? { ...c, description: editingDescriptionValue.trim() } : c
+          )
+        };
+      });
+      setEditingDescriptionConceptId(null);
+    } catch (err: any) {
+      console.error('Error saving concept description:', err);
+      alert('No se pudo guardar la descripción.');
+    }
+  };
+
   const handleIndentConcept = async (conceptId: string) => {
     if (!budget || !budget.conceptos) return;
     
@@ -863,30 +895,47 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     if (flatIndex <= 0) return;
 
     const currentItem = flatConceptsList[flatIndex].concept;
-    const prevItem = flatConceptsList[flatIndex - 1].concept;
 
     try {
-      const updates: Promise<any>[] = [];
-      updates.push(
-        supabase
-          .from('presupuesto_conceptos')
-          .update({ parent_id: prevItem.id })
-          .eq('id', currentItem.id)
-      );
+      // 1. Create a new agrupador concept row directly at currentItem's current parent level
+      const newGroupRow = {
+        presupuesto_id: budget.id,
+        type: 'group',
+        description: 'NUEVO AGRUPADOR',
+        unit: 'grp',
+        quantity: 1,
+        cost_price: 0,
+        indirect_percentage: 0,
+        utility_percentage: 0,
+        parent_id: currentItem.parent_id,
+        order_index: (currentItem.order_index ?? 0) - 1
+      };
 
-      if (prevItem.type !== 'group') {
-        updates.push(
-          supabase
-            .from('presupuesto_conceptos')
-            .update({ type: 'group', matriz_id: null, cost_price: 0 })
-            .eq('id', prevItem.id)
-        );
-      }
+      const { data: insertedData, error: insertError } = await supabase
+        .from('presupuesto_conceptos')
+        .insert(newGroupRow)
+        .select()
+        .single();
 
-      await Promise.all(updates);
+      if (insertError) throw insertError;
+      const newGroupId = insertedData.id;
+
+      // 2. Set currentItem's parent_id to the new group's id
+      const { error: updateError } = await supabase
+        .from('presupuesto_conceptos')
+        .update({ parent_id: newGroupId })
+        .eq('id', currentItem.id);
+
+      if (updateError) throw updateError;
+
+      // 3. Reload budget details
       await fetchBudgetDetails();
+
+      // 4. Activate description editing state for the new group
+      setEditingDescriptionConceptId(newGroupId);
+      setEditingDescriptionValue('NUEVO AGRUPADOR');
     } catch (err: any) {
-      console.error('Error indenting concept:', err);
+      console.error('Error creating group and indenting concept:', err);
       alert('No se pudo agrupar el concepto.');
     }
   };
@@ -1300,7 +1349,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
           </div>
           <h3 className="font-display font-black text-base text-cream uppercase tracking-wider">Acceso Restringido</h3>
           <p className="text-xs text-cream-muted leading-relaxed font-body">
-            Tu cuenta con rol <strong className="text-gold font-mono">"{currentUser.role}"</strong> no tiene permisos de visualización ni edición en el Cotizador IA.
+            Tu cuenta con rol <strong className="text-gold font-mono">"{currentUser.role}"</strong> no tiene permisos de visualización ni edición en Presupuestos esol.
           </p>
           <div className="pt-2">
             <button 
@@ -1855,7 +1904,33 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                               {isGroup ? (
                                 <Folder className="w-3.5 h-3.5 text-gold/90 flex-shrink-0" />
                               ) : null}
-                              <span className={isGroup ? 'font-black text-cream' : ''}>{c.description}</span>
+                              {editingDescriptionConceptId === c.id ? (
+                                <input
+                                  type="text"
+                                  value={editingDescriptionValue}
+                                  onChange={(e) => setEditingDescriptionValue(e.target.value)}
+                                  onBlur={() => handleSaveConceptDescription(c.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveConceptDescription(c.id);
+                                    if (e.key === 'Escape') setEditingDescriptionConceptId(null);
+                                  }}
+                                  className="bg-dark-1 border border-gold/45 text-cream text-xs rounded px-2 py-0.5 w-72 focus:outline-none font-sans font-bold"
+                                  autoFocus
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              ) : (
+                                <span 
+                                  className={`${isGroup ? 'font-black text-cream hover:underline cursor-pointer' : 'hover:underline cursor-pointer'}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingDescriptionConceptId(c.id);
+                                    setEditingDescriptionValue(c.description);
+                                  }}
+                                  title="Haga clic para editar la descripción"
+                                >
+                                  {c.description}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="py-3 px-4 text-center font-mono text-cream-muted select-none">{isGroup ? 'grp' : c.unit}</td>

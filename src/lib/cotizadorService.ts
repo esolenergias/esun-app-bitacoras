@@ -507,7 +507,10 @@ export function calculateMatrixDirectCost(
   insumos: { insumo: { cost: number; unit?: string }; quantity: number; formula?: string | null }[],
   conceptQty: number = 1
 ): number {
-  return insumos.reduce((sum, item) => {
+  const standardInsumos = insumos.filter(item => item.insumo?.unit?.trim() !== '%');
+  const percentInsumos = insumos.filter(item => item.insumo?.unit?.trim() === '%');
+
+  const sumOthers = standardInsumos.reduce((sum, item) => {
     const qty = item.formula 
       ? evaluateFormula(item.formula, conceptQty) 
       : Number(item.quantity);
@@ -517,6 +520,15 @@ export function calculateMatrixDirectCost(
       : qty;
     return sum + (Number(item.insumo?.cost || 0) * adjustedQty);
   }, 0);
+
+  const totalPercent = percentInsumos.reduce((pctSum, item) => {
+    const qty = item.formula 
+      ? evaluateFormula(item.formula, conceptQty) 
+      : Number(item.quantity);
+    return pctSum + qty;
+  }, 0);
+
+  return sumOthers * (1 + totalPercent / 100);
 }
 
 export function calculateMatrixSellingPrice(
@@ -592,4 +604,45 @@ export function evaluateFormula(formula: string, conceptQty: number): number {
     console.error('Error evaluating formula:', formula, e);
     return 0;
   }
+}
+
+export async function getAllSavedGroups(): Promise<{ group: PresupuestoConcepto; insumos: PresupuestoConcepto[] }[]> {
+  // Query all concepts where type === 'group'
+  const { data: groupsData, error: groupsError } = await supabase
+    .from('presupuesto_conceptos')
+    .select(`
+      *,
+      presupuestos (
+        description
+      )
+    `)
+    .eq('type', 'group');
+
+  if (groupsError) throw groupsError;
+  if (!groupsData) return [];
+
+  // Query all concepts that are children of any group
+  const { data: childrenData, error: childrenError } = await supabase
+    .from('presupuesto_conceptos')
+    .select('*')
+    .not('parent_id', 'is', null);
+
+  if (childrenError) throw childrenError;
+
+  const results: { group: PresupuestoConcepto; insumos: PresupuestoConcepto[] }[] = [];
+
+  for (const dbGroup of groupsData) {
+    const groupConcept = mapConceptoFromDb(dbGroup);
+    // Find children
+    const groupChildren = (childrenData || [])
+      .filter(child => child.parent_id === dbGroup.id)
+      .map(mapConceptoFromDb);
+
+    results.push({
+      group: groupConcept,
+      insumos: groupChildren
+    });
+  }
+
+  return results;
 }
