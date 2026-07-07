@@ -14,7 +14,8 @@ import {
   evaluateFormula,
   getInsumos,
   saveInsumo,
-  saveMatriz
+  saveMatriz,
+  mapConceptoFromDb
 } from '../../lib/cotizadorService';
 import type { PresupuestoDetalle } from '../../lib/cotizadorService';
 import type { Presupuesto, PresupuestoConcepto, Matriz, Insumo, InsumoType, InsumoSubcategory } from '../../types/cotizador';
@@ -158,12 +159,12 @@ export default function PresupuestosTab() {
           *,
           presupuesto_conceptos (
             *,
-            matriz:matrices (
+            matrices (
               *,
-              insumos:matriz_insumos (
+              matriz_insumos (
                 quantity,
                 formula,
-                insumo:insumos (
+                insumos (
                   *
                 )
               )
@@ -177,40 +178,7 @@ export default function PresupuestosTab() {
       if (dbError) throw dbError;
 
       const mapped: PresupuestoWithTotals[] = (data || []).map((row: any) => {
-        const conceptos: PresupuestoConcepto[] = (row.presupuesto_conceptos || []).map((pc: any) => ({
-          id: pc.id,
-          presupuesto_id: pc.presupuesto_id,
-          matriz_id: pc.matriz_id,
-          quantity: Number(pc.quantity),
-          description: pc.description,
-          unit: pc.unit,
-          cost_price: Number(pc.cost_price),
-          indirect_percentage: Number(pc.indirect_percentage),
-          utility_percentage: Number(pc.utility_percentage),
-          created_at: pc.created_at,
-          updated_at: pc.updated_at,
-          matriz: pc.matriz ? {
-            id: pc.matriz.id,
-            code: pc.matriz.code,
-            description: pc.matriz.description,
-            unit: pc.matriz.unit,
-            indirect_percentage: Number(pc.matriz.indirect_percentage),
-            utility_percentage: Number(pc.matriz.utility_percentage),
-            insumos: (pc.matriz.insumos || []).map((mi: any) => ({
-              quantity: Number(mi.quantity),
-              formula: mi.formula,
-              insumo: {
-                id: mi.insumo.id,
-                code: mi.insumo.code,
-                type: mi.insumo.type,
-                subcategory: mi.insumo.subcategory,
-                description: mi.insumo.description,
-                unit: mi.insumo.unit,
-                cost: Number(mi.insumo.cost)
-              }
-            }))
-          } : undefined
-        }));
+        const conceptos: PresupuestoConcepto[] = (row.presupuesto_conceptos || []).map(mapConceptoFromDb);
 
         const indPct = row.indirect_percentage !== undefined ? Number(row.indirect_percentage) : 10.00;
         const utPct = row.utility_percentage !== undefined ? Number(row.utility_percentage) : 8.00;
