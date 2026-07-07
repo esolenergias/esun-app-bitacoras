@@ -157,7 +157,17 @@ export default function PresupuestosTab() {
         .select(`
           *,
           presupuesto_conceptos (
-            *
+            *,
+            matriz:matrices (
+              *,
+              insumos:matriz_insumos (
+                quantity,
+                formula,
+                insumo:insumos (
+                  *
+                )
+              )
+            )
           )
         `)
         .order('created_at', { ascending: false })
@@ -178,7 +188,28 @@ export default function PresupuestosTab() {
           indirect_percentage: Number(pc.indirect_percentage),
           utility_percentage: Number(pc.utility_percentage),
           created_at: pc.created_at,
-          updated_at: pc.updated_at
+          updated_at: pc.updated_at,
+          matriz: pc.matriz ? {
+            id: pc.matriz.id,
+            code: pc.matriz.code,
+            description: pc.matriz.description,
+            unit: pc.matriz.unit,
+            indirect_percentage: Number(pc.matriz.indirect_percentage),
+            utility_percentage: Number(pc.matriz.utility_percentage),
+            insumos: (pc.matriz.insumos || []).map((mi: any) => ({
+              quantity: Number(mi.quantity),
+              formula: mi.formula,
+              insumo: {
+                id: mi.insumo.id,
+                code: mi.insumo.code,
+                type: mi.insumo.type,
+                subcategory: mi.insumo.subcategory,
+                description: mi.insumo.description,
+                unit: mi.insumo.unit,
+                cost: Number(mi.insumo.cost)
+              }
+            }))
+          } : undefined
         }));
 
         const indPct = row.indirect_percentage !== undefined ? Number(row.indirect_percentage) : 10.00;
@@ -801,7 +832,7 @@ export default function PresupuestosTab() {
     md += `- **Utilidad (${utPct.toFixed(1)}%):** $${((totals.directCostTotal + (totals.directCostTotal * (indPct / 100))) * (utPct / 100)).toFixed(2)} MXN\n`;
     md += `- **Subtotal:** $${totals.sellingPriceTotal.toFixed(2)} MXN\n`;
     md += `- **IVA (16.0%):** $${ivaVal.toFixed(2)} MXN\n`;
-    md += `- **Precio de Venta Sugerido (con IVA):** $${totalWithIva.toFixed(2)} MXN\n\n`;
+    md += `- **Precio de Venta Sugerido:** $${totalWithIva.toFixed(2)} MXN\n\n`;
     
     md += `## 2. EXPLOSIÓN DE INSUMOS GENERAL\n\n`;
     md += `Consolidado de materiales, mano de obra, maquinaria y herramientas requeridas para la ejecución total de la obra.\n\n`;
@@ -1000,7 +1031,7 @@ export default function PresupuestosTab() {
                   <th className="py-3 px-4 text-left font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Cliente</th>
                   <th className="py-3 px-4 text-center font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Estado</th>
                   <th className="py-3 px-4 text-right font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Costo Directo</th>
-                  <th className="py-3 px-4 text-right font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Precio de Venta (con IVA)</th>
+                  <th className="py-3 px-4 text-right font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Precio de Venta</th>
                   <th className="py-3 px-4 text-center font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
@@ -1267,7 +1298,7 @@ export default function PresupuestosTab() {
                           <span className="text-cream font-bold">{formatCurrencyMXN(totals.directCostTotal)}</span>
                         </div>
                         <div className="flex justify-between items-center py-1.5 pl-0 sm:pl-4">
-                          <span className="text-cream-dim uppercase font-bold">Total Precio de Venta (con IVA):</span>
+                          <span className="text-cream-dim uppercase font-bold">Total Precio de Venta:</span>
                           <span className="text-gold font-bold text-sm">{formatCurrencyMXN(totals.sellingPriceTotal * 1.16)}</span>
                         </div>
                       </div>
@@ -1446,7 +1477,7 @@ export default function PresupuestosTab() {
                                 <span className="text-cream font-bold">{formatCurrencyMXN(reportTotals.sellingPriceTotal * 0.16)}</span>
                               </div>
                               <div className="flex justify-between items-center border-t border-dark-4/50 pt-2 text-gold">
-                                <span className="uppercase font-black text-sm">Precio Comercial Total (con IVA):</span>
+                                <span className="uppercase font-black text-sm">Precio Comercial Total:</span>
                                 <span className="font-bold text-base">{formatCurrencyMXN(reportTotals.sellingPriceTotal * 1.16)}</span>
                               </div>
                             </div>

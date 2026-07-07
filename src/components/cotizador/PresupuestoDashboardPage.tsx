@@ -1328,7 +1328,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         {/* Card 4: Precio de Venta Sugerido */}
         <div className="bg-dark-2/60 border border-dark-4 rounded-2xl p-5 space-y-2 shadow-sm relative overflow-hidden group hover:border-gold/20 transition-all select-none">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">Precio de Venta Sugerido (con IVA)</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">Precio de Venta Sugerido</span>
             <span className="p-2 bg-dark-1/80 border border-dark-4 rounded-xl text-gold group-hover:scale-105 transition-transform">
               <TrendingUp className="w-4 h-4" />
             </span>
@@ -1569,7 +1569,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                 <span>{formatCurrencyMXN(ivaCost)}</span>
               </div>
               <div className="flex justify-between items-center text-gold font-black border-t border-dark-4/50 pt-2 text-xs">
-                <span>Precio de Venta (con IVA):</span>
+                <span>Precio de Venta Sugerido:</span>
                 <span>{formatCurrencyMXN(totalWithIva)}</span>
               </div>
             </div>
