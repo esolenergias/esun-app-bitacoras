@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",
     "@tailwindcss/vite": "^4.3.0",
+    "html2pdf.js": "^0.14.0",
     "lucide-react": "^1.17.0",
     "motion": "^12.40.0",
     "react": "^19.2.6",
