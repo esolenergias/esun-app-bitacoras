@@ -350,6 +350,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     setSubModalSubmitting(true);
     setSubModalError(null);
     try {
+      const nextOrderIndex = budget.conceptos ? budget.conceptos.length : 0;
       const { error: insertError } = await supabase
         .from('presupuesto_conceptos')
         .insert({
@@ -360,7 +361,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
           quantity: conceptData.quantity,
           cost_price: conceptData.cost_price,
           indirect_percentage: conceptData.indirect_percentage,
-          utility_percentage: conceptData.utility_percentage
+          utility_percentage: conceptData.utility_percentage,
+          order_index: nextOrderIndex
         });
 
       if (insertError) throw insertError;
