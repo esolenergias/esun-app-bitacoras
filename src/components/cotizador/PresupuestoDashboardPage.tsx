@@ -815,24 +815,23 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     const siblingB = siblings[targetIndex];
 
     try {
-      const orderA = siblingA.order_index ?? 0;
-      const orderB = siblingB.order_index ?? 0;
+      // Rewrite all sibling indices sequentially, swapping the target ones to avoid duplicate collision lockups
+      const updates = siblings.map((sib, idx) => {
+        let targetOrder = idx;
+        if (sib.id === siblingA.id) {
+          targetOrder = targetIndex;
+        } else if (sib.id === siblingB.id) {
+          targetOrder = currentIndex;
+        }
+        return supabase
+          .from('presupuesto_conceptos')
+          .update({ order_index: targetOrder })
+          .eq('id', sib.id);
+      });
 
-      // Swap order_index values in Supabase
-      const updateA = supabase
-        .from('presupuesto_conceptos')
-        .update({ order_index: orderB })
-        .eq('id', siblingA.id);
-
-      const updateB = supabase
-        .from('presupuesto_conceptos')
-        .update({ order_index: orderA })
-        .eq('id', siblingB.id);
-
-      const [resA, resB] = await Promise.all([updateA, updateB]);
-
-      if (resA.error) throw resA.error;
-      if (resB.error) throw resB.error;
+      const results = await Promise.all(updates);
+      const errorResult = results.find(r => r.error);
+      if (errorResult) throw errorResult.error;
 
       await fetchBudgetDetails();
     } catch (err: any) {
