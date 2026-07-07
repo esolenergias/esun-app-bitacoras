@@ -158,10 +158,11 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [matrices, setMatrices] = useState<Matriz[]>([]);
   const [insumosCatalog, setInsumosCatalog] = useState<Insumo[]>([]);
   const [isAddConceptModalOpen, setIsAddConceptModalOpen] = useState<boolean>(false);
-  const [addConceptTab, setAddConceptTab] = useState<'apu' | 'custom' | 'new_matrix' | 'new_insumo'>('apu');
+  const [addConceptTab, setAddConceptTab] = useState<'apu' | 'use_insumo' | 'custom' | 'new_matrix' | 'new_insumo'>('apu');
   
-  // Selector / Custom Concept
+  // Selector / Custom Concept / Insumo Concept
   const [selectedMatrixId, setSelectedMatrixId] = useState<string>('');
+  const [selectedInsumoId, setSelectedInsumoId] = useState<string>('');
   const [customDesc, setCustomDesc] = useState<string>('');
   const [customUnit, setCustomUnit] = useState<string>('');
   const [customQty, setCustomQty] = useState<number>(1);
@@ -381,6 +382,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const handleOpenAddConceptModal = () => {
     setAddConceptTab('apu');
     setSelectedMatrixId('');
+    setSelectedInsumoId('');
     
     setCustomDesc('');
     setCustomUnit('pza');
@@ -430,6 +432,33 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       cost_price: costPrice,
       indirect_percentage: matrix.indirect_percentage,
       utility_percentage: matrix.utility_percentage,
+      quantity: finalQty
+    });
+  };
+
+  const handleAddInsumoAsConcept = async () => {
+    if (!selectedInsumoId) {
+      setSubModalError('Selecciona un insumo de la lista.');
+      return;
+    }
+    const ins = insumosCatalog.find(i => i.id === selectedInsumoId);
+    if (!ins) return;
+
+    if (customQty <= 0) {
+      setSubModalError('La cantidad debe ser mayor a 0.');
+      return;
+    }
+
+    const isPza = ins.unit?.trim().toLowerCase() === 'pza';
+    const finalQty = isPza ? Math.max(1, Math.round(customQty)) : customQty;
+
+    await handleSaveConceptToDb({
+      matriz_id: null, // Independiente de matrices
+      description: ins.description,
+      unit: ins.unit,
+      cost_price: ins.cost,
+      indirect_percentage: customIndirect,
+      utility_percentage: customUtility,
       quantity: finalQty
     });
   };
@@ -1592,6 +1621,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
             <div className="flex bg-dark-1 border-b border-dark-4 p-1.5 gap-1 select-none flex-shrink-0 text-[10px] font-black uppercase tracking-wider font-sans">
               {([
                 { key: 'apu', label: 'Usar Plantilla APU' },
+                { key: 'use_insumo', label: 'Usar Insumo' },
                 { key: 'custom', label: 'Concepto Personalizado' },
                 { key: 'new_matrix', label: 'Crear Nueva Matriz' },
                 { key: 'new_insumo', label: 'Crear Nuevo Insumo' }
@@ -1670,6 +1700,116 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       type="button"
                       onClick={handleAddExistingAPU}
                       disabled={!selectedMatrixId || subModalSubmitting}
+                      className="px-5 py-2.5 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5 flex items-center gap-1.5"
+                    >
+                      {subModalSubmitting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Guardando concepto...</span>
+                        </>
+                      ) : (
+                        <span>Añadir al Presupuesto</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Use Catalog Insumo directly */}
+              {addConceptTab === 'use_insumo' && (
+                <div className="space-y-4 font-sans">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Seleccionar Insumo del Catálogo</label>
+                    <select
+                      value={selectedInsumoId}
+                      onChange={(e) => setSelectedInsumoId(e.target.value)}
+                      className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none cursor-pointer font-mono"
+                    >
+                      <option value="">-- Elige un Insumo --</option>
+                      {insumosCatalog.map(ins => (
+                        <option key={ins.id} value={ins.id}>
+                          [{ins.code}] {ins.description} ({ins.unit}) - {formatCurrencyMXN(ins.cost)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Cantidad requerida</label>
+                      <NumericInput
+                        step="0.01"
+                        min="0.01"
+                        value={customQty}
+                        onChange={setCustomQty}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    {selectedInsumoId && (() => {
+                      const ins = insumosCatalog.find(i => i.id === selectedInsumoId);
+                      if (!ins) return null;
+                      return (
+                        <div className="space-y-1 bg-dark-1/50 border border-dark-4 p-3 rounded-xl font-mono text-[10px] select-none">
+                          <span className="text-cream-dim block uppercase text-[8px] font-black tracking-widest">Información Insumo</span>
+                          <span className="text-cream block">Costo Directo Unit: {formatCurrencyMXN(ins.cost)}</span>
+                          <span className="text-cream-muted block">Unidad: {ins.unit}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Indirecto (%)</label>
+                      <NumericInput
+                        step="0.1"
+                        min="0"
+                        value={customIndirect}
+                        onChange={setCustomIndirect}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Utilidad (%)</label>
+                      <NumericInput
+                        step="0.1"
+                        min="0"
+                        value={customUtility}
+                        onChange={setCustomUtility}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {selectedInsumoId && (() => {
+                    const ins = insumosCatalog.find(i => i.id === selectedInsumoId);
+                    if (!ins) return null;
+                    const directCost = ins.cost;
+                    const sellingPrice = calculateMatrixSellingPrice(directCost, customIndirect, customUtility);
+                    const totalDirect = directCost * customQty;
+                    const totalSelling = sellingPrice * customQty;
+                    return (
+                      <div className="bg-dark-1/50 border border-dark-4 p-4 rounded-xl font-mono text-xs select-none space-y-1">
+                        <span className="text-cream-dim block uppercase text-[8px] font-black tracking-widest mb-1">Cálculo de Precios</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-cream-muted block">Directo Unit: {formatCurrencyMXN(directCost)}</span>
+                            <span className="text-cream-muted block">Venta Unit: {formatCurrencyMXN(sellingPrice)}</span>
+                          </div>
+                          <div>
+                            <span className="text-cream block font-bold">Total Directo: {formatCurrencyMXN(totalDirect)}</span>
+                            <span className="text-gold block font-black">Total Venta: {formatCurrencyMXN(totalSelling)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleAddInsumoAsConcept}
+                      disabled={!selectedInsumoId || subModalSubmitting}
                       className="px-5 py-2.5 bg-gold hover:bg-gold-light disabled:opacity-40 disabled:hover:bg-gold text-dark-1 text-xs font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-md shadow-gold/5 flex items-center gap-1.5"
                     >
                       {subModalSubmitting ? (
