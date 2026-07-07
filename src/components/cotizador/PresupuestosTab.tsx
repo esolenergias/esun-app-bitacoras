@@ -792,11 +792,16 @@ export default function PresupuestosTab() {
       md += `| ${safeDesc} | ${safeUnit} | ${formatQty(Number(c.quantity), c.unit, 2)} | $${unitSelling.toFixed(2)} | $${totalSelling.toFixed(2)} |\n`;
     }
     
+    const ivaVal = totals.sellingPriceTotal * 0.16;
+    const totalWithIva = totals.sellingPriceTotal + ivaVal;
+
     md += `\n**Resumen de Totales:**\n`;
     md += `- **Costo Directo Consolidado:** $${totals.directCostTotal.toFixed(2)} MXN\n`;
     md += `- **Indirectos (${indPct.toFixed(1)}%):** $${(totals.directCostTotal * (indPct / 100)).toFixed(2)} MXN\n`;
     md += `- **Utilidad (${utPct.toFixed(1)}%):** $${((totals.directCostTotal + (totals.directCostTotal * (indPct / 100))) * (utPct / 100)).toFixed(2)} MXN\n`;
-    md += `- **Precio de Venta Sugerido (con Indirectos y Utilidad):** $${totals.sellingPriceTotal.toFixed(2)} MXN\n\n`;
+    md += `- **Subtotal:** $${totals.sellingPriceTotal.toFixed(2)} MXN\n`;
+    md += `- **IVA (16.0%):** $${ivaVal.toFixed(2)} MXN\n`;
+    md += `- **Precio de Venta Sugerido (con IVA):** $${totalWithIva.toFixed(2)} MXN\n\n`;
     
     md += `## 2. EXPLOSIÓN DE INSUMOS GENERAL\n\n`;
     md += `Consolidado de materiales, mano de obra, maquinaria y herramientas requeridas para la ejecución total de la obra.\n\n`;
@@ -995,7 +1000,7 @@ export default function PresupuestosTab() {
                   <th className="py-3 px-4 text-left font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Cliente</th>
                   <th className="py-3 px-4 text-center font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Estado</th>
                   <th className="py-3 px-4 text-right font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Costo Directo</th>
-                  <th className="py-3 px-4 text-right font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Precio de Venta</th>
+                  <th className="py-3 px-4 text-right font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Precio de Venta (con IVA)</th>
                   <th className="py-3 px-4 text-center font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
@@ -1022,7 +1027,7 @@ export default function PresupuestosTab() {
                       {formatCurrencyMXN(budget.totals.directCostTotal)}
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono font-bold text-gold select-all">
-                      {formatCurrencyMXN(budget.totals.sellingPriceTotal)}
+                      {formatCurrencyMXN(budget.totals.sellingPriceTotal * 1.16)}
                     </td>
                     <td className="py-3.5 px-4 text-center select-none" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1.5">
@@ -1262,8 +1267,8 @@ export default function PresupuestosTab() {
                           <span className="text-cream font-bold">{formatCurrencyMXN(totals.directCostTotal)}</span>
                         </div>
                         <div className="flex justify-between items-center py-1.5 pl-0 sm:pl-4">
-                          <span className="text-cream-dim uppercase font-bold">Total Precio de Venta:</span>
-                          <span className="text-gold font-bold text-sm">{formatCurrencyMXN(totals.sellingPriceTotal)}</span>
+                          <span className="text-cream-dim uppercase font-bold">Total Precio de Venta (con IVA):</span>
+                          <span className="text-gold font-bold text-sm">{formatCurrencyMXN(totals.sellingPriceTotal * 1.16)}</span>
                         </div>
                       </div>
                     </div>
@@ -1432,9 +1437,17 @@ export default function PresupuestosTab() {
                                 <span className="uppercase font-bold">Utilidad ({utPct.toFixed(1)}%):</span>
                                 <span className="text-cream font-bold">{formatCurrencyMXN(utVal)}</span>
                               </div>
+                              <div className="flex justify-between items-center border-t border-dark-4/30 pt-2 text-cream font-bold">
+                                <span className="uppercase font-bold">Subtotal:</span>
+                                <span className="font-bold">{formatCurrencyMXN(reportTotals.sellingPriceTotal)}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-cream-dim">
+                                <span className="uppercase font-bold">IVA (16.0%):</span>
+                                <span className="text-cream font-bold">{formatCurrencyMXN(reportTotals.sellingPriceTotal * 0.16)}</span>
+                              </div>
                               <div className="flex justify-between items-center border-t border-dark-4/50 pt-2 text-gold">
-                                <span className="uppercase font-black text-sm">Precio Comercial Total (Venta):</span>
-                                <span className="font-bold text-base">{formatCurrencyMXN(reportTotals.sellingPriceTotal)}</span>
+                                <span className="uppercase font-black text-sm">Precio Comercial Total (con IVA):</span>
+                                <span className="font-bold text-base">{formatCurrencyMXN(reportTotals.sellingPriceTotal * 1.16)}</span>
                               </div>
                             </div>
                           );
