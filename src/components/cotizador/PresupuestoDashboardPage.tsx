@@ -1328,12 +1328,12 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         {/* Card 4: Precio de Venta Sugerido */}
         <div className="bg-dark-2/60 border border-dark-4 rounded-2xl p-5 space-y-2 shadow-sm relative overflow-hidden group hover:border-gold/20 transition-all select-none">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">Precio de Venta Sugerido</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-cream-muted">Precio de Venta Sugerido (con IVA)</span>
             <span className="p-2 bg-dark-1/80 border border-dark-4 rounded-xl text-gold group-hover:scale-105 transition-transform">
               <TrendingUp className="w-4 h-4" />
             </span>
           </div>
-          <p className="text-xl font-mono font-bold tracking-wide select-all text-gold">{formatCurrencyMXN(sellingPrice)}</p>
+          <p className="text-xl font-mono font-bold tracking-wide select-all text-gold">{formatCurrencyMXN(totalWithIva)}</p>
         </div>
 
         {/* Card 5: Margen Estimado */}
