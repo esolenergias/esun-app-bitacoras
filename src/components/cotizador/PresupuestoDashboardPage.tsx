@@ -1123,8 +1123,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         code: matrixFormCode.trim().toUpperCase(),
         description: matrixFormDesc.trim(),
         unit: matrixFormUnit.trim(),
-        indirect_percentage: matrixFormIndirect,
-        utility_percentage: matrixFormUtility,
+        indirect_percentage: 0,
+        utility_percentage: 0,
         insumos: matrixFormInsumos
       };
 
@@ -2192,7 +2192,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
                       const matrix = matrices.find(m => m.id === selectedMatrixId);
                       if (!matrix) return null;
                       const directCost = calculateMatrixDirectCost(matrix.insumos || []);
-                      const sellingPrice = calculateMatrixSellingPrice(directCost, matrix.indirect_percentage, matrix.utility_percentage);
+                      const sellingPrice = calculateMatrixSellingPrice(directCost, indirectPct, utilityPct);
                       return (
                         <div className="space-y-1 bg-dark-1/50 border border-dark-4 p-3 rounded-xl font-mono text-[10px] select-none">
                           <span className="text-cream-dim block uppercase text-[8px] font-black tracking-widest">Previsualización APU</span>

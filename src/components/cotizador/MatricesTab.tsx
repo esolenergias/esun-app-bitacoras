@@ -179,10 +179,6 @@ export default function MatricesTab() {
       setFormValidationError('La unidad de medida es obligatoria.');
       return;
     }
-    if (formIndirectPercentage < 0 || formUtilityPercentage < 0) {
-      setFormValidationError('Los porcentajes de indirecto y utilidad deben ser mayores o iguales a 0.');
-      return;
-    }
     if (formInsumos.length === 0) {
       setFormValidationError('Debe añadir al menos un insumo al desglose.');
       return;
@@ -194,8 +190,8 @@ export default function MatricesTab() {
         code: formCode.trim().toUpperCase(),
         description: formDescription.trim(),
         unit: formUnit.trim(),
-        indirect_percentage: formIndirectPercentage,
-        utility_percentage: formUtilityPercentage,
+        indirect_percentage: 0,
+        utility_percentage: 0,
         insumos: formInsumos,
         ...(editingMatriz?.id ? { id: editingMatriz.id } : {})
       };
@@ -354,42 +350,30 @@ export default function MatricesTab() {
                   <th className="py-3 px-4 font-bold">Descripción</th>
                   <th className="py-3 px-4 font-bold">Unidad</th>
                   <th className="py-3 px-4 font-bold text-right">Costo Directo</th>
-                  <th className="py-3 px-4 font-bold text-right">Indirecto %</th>
-                  <th className="py-3 px-4 font-bold text-right">Utilidad %</th>
-                  <th className="py-3 px-4 font-bold text-right">Precio de Venta</th>
                   <th className="py-3 px-4 font-bold text-center w-24">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-4/45">
                 {filteredMatrices.map((matriz) => {
-                  const totals = getMatrixTotals(matriz.insumos || [], matriz.indirect_percentage, matriz.utility_percentage);
+                  const totals = getMatrixTotals(matriz.insumos || [], 0, 0);
                   return (
-                    <tr 
-                      key={matriz.id}
-                      className="hover:bg-gold/5 transition-colors cursor-pointer group"
-                      onClick={() => handleOpenDetail(matriz)}
-                    >
-                      <td className="py-3.5 px-4 font-mono font-bold text-gold tracking-wide select-all">
-                        {matriz.code}
-                      </td>
-                      <td className="py-3.5 px-4 text-cream font-body leading-relaxed max-w-xs md:max-w-md lg:max-w-lg truncate" title={matriz.description}>
-                        {matriz.description}
-                      </td>
-                      <td className="py-3.5 px-4 text-cream-muted font-mono select-none">
-                        {matriz.unit}
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-cream select-all">
-                        {formatCurrencyMXN(totals.directCost)}
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-cream-dim">
-                        {matriz.indirect_percentage.toFixed(1)}%
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-cream-dim">
-                        {matriz.utility_percentage.toFixed(1)}%
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-gold select-all">
-                        {formatCurrencyMXN(totals.sellingPrice)}
-                      </td>
+                     <tr 
+                       key={matriz.id}
+                       className="hover:bg-gold/5 transition-colors cursor-pointer group"
+                       onClick={() => handleOpenDetail(matriz)}
+                     >
+                       <td className="py-3.5 px-4 font-mono font-bold text-gold tracking-wide select-all">
+                         {matriz.code}
+                       </td>
+                       <td className="py-3.5 px-4 text-cream font-body leading-relaxed max-w-xs md:max-w-md lg:max-w-lg truncate" title={matriz.description}>
+                         {matriz.description}
+                       </td>
+                       <td className="py-3.5 px-4 text-cream-muted font-mono select-none">
+                         {matriz.unit}
+                       </td>
+                       <td className="py-3.5 px-4 text-right font-mono text-cream select-all">
+                         {formatCurrencyMXN(totals.directCost)}
+                       </td>
                       <td className="py-3.5 px-4 text-center select-none" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1.5">
                           <button
@@ -483,12 +467,10 @@ export default function MatricesTab() {
                 return (
                   <>
                     {/* Encabezado de la Matriz */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       {[
                         { label: 'Código', value: detailMatriz.code, mono: true, gold: true },
-                        { label: 'Unidad', value: detailMatriz.unit, mono: true },
-                        { label: 'Indirecto', value: `${detailMatriz.indirect_percentage.toFixed(1)}%`, mono: true },
-                        { label: 'Utilidad', value: `${detailMatriz.utility_percentage.toFixed(1)}%`, mono: true }
+                        { label: 'Unidad', value: detailMatriz.unit, mono: true }
                       ].map(item => (
                         <div key={item.label} className="bg-dark-1/60 border border-dark-4 rounded-xl p-3 space-y-1">
                           <p className="text-[9px] font-black uppercase tracking-widest text-cream-muted select-none">{item.label}</p>
@@ -539,32 +521,11 @@ export default function MatricesTab() {
                       );
                     })}
 
-                    {/* Resumen de precios en cascada */}
+                    {/* Resumen de Costo Directo */}
                     <div className="bg-dark-1/40 border border-dark-4 rounded-xl overflow-hidden">
-                      <div className="px-4 py-2 border-b border-dark-4 select-none">
-                        <h6 className="text-[9px] font-black uppercase tracking-widest text-gold">Resumen de Precio en Cascada</h6>
-                      </div>
-                      <div className="divide-y divide-dark-4 text-xs font-mono">
-                        <div className="flex justify-between items-center px-4 py-2.5">
-                          <span className="text-cream-dim font-bold uppercase">Costo Directo Unitario</span>
-                          <span className="text-cream font-bold select-all">{formatCurrencyMXN(directCost)}</span>
-                        </div>
-                        <div className="flex justify-between items-center px-4 py-2.5 bg-dark-2/30">
-                          <span className="text-cream-dim font-bold uppercase">+ Indirectos ({detailMatriz.indirect_percentage.toFixed(1)}%)</span>
-                          <span className="text-cream-dim select-all">{formatCurrencyMXN(directCost * (detailMatriz.indirect_percentage / 100))}</span>
-                        </div>
-                        <div className="flex justify-between items-center px-4 py-2.5">
-                          <span className="text-cream-dim font-bold uppercase">= Subtotal con Indirectos</span>
-                          <span className="text-cream select-all">{formatCurrencyMXN(subtotal)}</span>
-                        </div>
-                        <div className="flex justify-between items-center px-4 py-2.5 bg-dark-2/30">
-                          <span className="text-cream-dim font-bold uppercase">+ Utilidad ({detailMatriz.utility_percentage.toFixed(1)}%)</span>
-                          <span className="text-cream-dim select-all">{formatCurrencyMXN(subtotal * (detailMatriz.utility_percentage / 100))}</span>
-                        </div>
-                        <div className="flex justify-between items-center px-4 py-3 bg-gold/5">
-                          <span className="text-gold font-black uppercase tracking-wide">= Precio de Venta Unitario</span>
-                          <span className="text-gold font-black text-base select-all">{formatCurrencyMXN(sellingPrice)}</span>
-                        </div>
+                      <div className="flex justify-between items-center px-4 py-4 bg-gold/5 font-mono text-xs select-none">
+                        <span className="text-gold font-black uppercase tracking-wide">Costo Directo Unitario</span>
+                        <span className="text-gold font-black text-base select-all">{formatCurrencyMXN(directCost)}</span>
                       </div>
                     </div>
                   </>
@@ -660,7 +621,7 @@ export default function MatricesTab() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     {/* Unit */}
                     <div className="space-y-1.5">
                       <label htmlFor="matriz-unit" className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Unidad</label>
@@ -670,38 +631,6 @@ export default function MatricesTab() {
                         placeholder="pza, m, equipo, etc."
                         value={formUnit}
                         onChange={(e) => setFormUnit(e.target.value)}
-                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none transition-colors font-mono"
-                        required
-                      />
-                    </div>
-
-                    {/* Indirect Cost % */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="matriz-indirect" className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Costo Indirecto (%)</label>
-                      <input
-                        id="matriz-indirect"
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        placeholder="15.0"
-                        value={formIndirectPercentage}
-                        onChange={(e) => setFormIndirectPercentage(e.target.value === '' ? 0 : parseFloat(e.target.value))}
-                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none transition-colors font-mono"
-                        required
-                      />
-                    </div>
-
-                    {/* Utility % */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="matriz-utility" className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Utilidad (%)</label>
-                      <input
-                        id="matriz-utility"
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        placeholder="10.0"
-                        value={formUtilityPercentage}
-                        onChange={(e) => setFormUtilityPercentage(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                         className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none transition-colors font-mono"
                         required
                       />
@@ -819,28 +748,12 @@ export default function MatricesTab() {
 
               {/* Live Calculations Footer */}
               <div className="bg-dark-2 border-t border-dark-4 p-5 flex-shrink-0 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
-                <div className="grid grid-cols-3 gap-6 text-left select-none font-mono">
+                <div className="text-left select-none font-mono">
                   {/* Direct Cost */}
                   <div className="space-y-0.5">
-                    <span className="text-[9px] uppercase tracking-widest text-cream-muted font-sans font-bold">Costo Directo Total</span>
-                    <p className="text-sm font-bold text-cream">
-                      {formatCurrencyMXN(getMatrixTotals(formInsumos, formIndirectPercentage, formUtilityPercentage).directCost)}
-                    </p>
-                  </div>
-                  
-                  {/* Subtotal (Indirect added) */}
-                  <div className="space-y-0.5">
-                    <span className="text-[9px] uppercase tracking-widest text-cream-muted font-sans font-bold">Subtotal (Indirecto)</span>
-                    <p className="text-sm font-bold text-cream">
-                      {formatCurrencyMXN(getMatrixTotals(formInsumos, formIndirectPercentage, formUtilityPercentage).subtotal)}
-                    </p>
-                  </div>
-
-                  {/* Selling Price */}
-                  <div className="space-y-0.5">
-                    <span className="text-[9px] uppercase tracking-widest text-gold font-sans font-bold">Precio de Venta Final</span>
+                    <span className="text-[9px] uppercase tracking-widest text-gold font-sans font-bold">Costo Directo Total</span>
                     <p className="text-sm font-black text-gold">
-                      {formatCurrencyMXN(getMatrixTotals(formInsumos, formIndirectPercentage, formUtilityPercentage).sellingPrice)}
+                      {formatCurrencyMXN(getMatrixTotals(formInsumos, 0, 0).directCost)}
                     </p>
                   </div>
                 </div>

@@ -1190,7 +1190,7 @@ export default function PresupuestosTab() {
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-center">Unidad</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right w-24">Cantidad</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">P.U.</th>
-                              <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Importe Venta</th>
+                              <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-right">Total</th>
                               <th className="py-2.5 px-3 font-display font-black text-[9px] text-cream-dim uppercase tracking-wider text-center">Acciones</th>
                             </tr>
                           </thead>
@@ -1200,9 +1200,6 @@ export default function PresupuestosTab() {
                                const unitDirect = c.matriz
                                  ? calculateMatrixDirectCost(c.matriz.insumos || [], qty)
                                  : Number(c.cost_price) || 0;
-
-                               const unitSelling = calculateMatrixSellingPrice(unitDirect, formIndirect, formUtility);
-                               const totalSelling = qty * unitSelling;
 
                                return (
                                  <tr key={c.id || index} className="hover:bg-dark-1/20 transition-colors">
@@ -1223,19 +1220,25 @@ export default function PresupuestosTab() {
                                      />
                                    </td>
                                    <td className="py-2.5 px-3 text-right font-mono text-cream-muted">
-                                     <div className="inline-flex items-center gap-1 justify-end w-full">
-                                       <span className="text-[10px] text-cream-dim">$</span>
-                                       <NumericInput
-                                         step="0.01"
-                                         value={c.cost_price || 0}
-                                         onChange={(val) => handleUpdateConceptField(c.id!, 'cost_price', val)}
-                                         className="w-20 px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"
-                                         required
-                                       />
-                                     </div>
+                                     {c.matriz ? (
+                                       <span className="text-cream-dim select-none">
+                                         {formatCurrencyMXN(unitDirect)}
+                                       </span>
+                                     ) : (
+                                       <div className="inline-flex items-center gap-1 justify-end w-full">
+                                         <span className="text-[10px] text-cream-dim">$</span>
+                                         <NumericInput
+                                           step="0.01"
+                                           value={c.cost_price || 0}
+                                           onChange={(val) => handleUpdateConceptField(c.id!, 'cost_price', val)}
+                                           className="w-20 px-2 py-1 bg-dark-1 border border-dark-4 focus:border-gold/40 text-cream rounded-lg text-right font-mono focus:outline-none"
+                                           required
+                                         />
+                                       </div>
+                                     )}
                                    </td>
                                    <td className="py-2.5 px-3 text-right font-mono font-bold text-gold select-all">
-                                     {formatCurrencyMXN(totalSelling * 1.16)}
+                                     {formatCurrencyMXN(qty * unitDirect)}
                                    </td>
                                    <td className="py-2.5 px-3 text-center">
                                      <button
@@ -1653,7 +1656,7 @@ export default function PresupuestosTab() {
                       const matrix = matrices.find(m => m.id === selectedMatrixId);
                       if (!matrix) return null;
                       const directCost = calculateMatrixDirectCost(matrix.insumos || []);
-                      const sellingPrice = calculateMatrixSellingPrice(directCost, matrix.indirect_percentage, matrix.utility_percentage);
+                      const sellingPrice = calculateMatrixSellingPrice(directCost, formIndirect, formUtility);
                       return (
                         <div className="space-y-1 bg-dark-1/50 border border-dark-4 p-3 rounded-xl font-mono text-[10px] select-none">
                           <span className="text-cream-dim block uppercase text-[8px] font-black tracking-widest">Previsualización APU</span>
