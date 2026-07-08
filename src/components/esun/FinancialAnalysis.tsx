@@ -5,8 +5,8 @@ import {
 } from 'recharts';
 import { DollarSign, Landmark, TrendingUp, Calendar, ShieldCheck, Edit3 } from 'lucide-react';
 import { SOLAR_CONSTANTS } from './lib/solarConstants';
-import { calculateFinancials, FinancialResult } from './lib/financialEngine';
-import { CFEData } from './lib/cfeParser';
+import { calculateFinancials, type FinancialResult } from './lib/financialEngine';
+import type { CFEData } from './lib/cfeParser';
 
 interface FinancialAnalysisProps {
   system: any;

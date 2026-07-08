@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { FileText, AlertTriangle, Loader2, ArrowRight } from 'lucide-react';
-import { extractTextFromPdf, parseCFEText, CFEData } from './lib/cfeParser';
+import { extractTextFromPdf, parseCFEText, type CFEData } from './lib/cfeParser';
 
 interface CFEUploaderProps {
   onParsed: (data: CFEData) => void;

@@ -14,6 +14,7 @@ import InsumosTab from './cotizador/InsumosTab';
 import MatricesTab from './cotizador/MatricesTab';
 import PresupuestosTab from './cotizador/PresupuestosTab';
 import GruposTab from './cotizador/GruposTab';
+import EsunPage from './esun/EsunPage';
 
 const CATEGORIES = [
   'Paneles Solares',
@@ -778,6 +779,17 @@ export function Portal() {
                         {!sidebarCollapsed && <span>CFE Manager</span>}
                       </button>
                       <button
+                        onClick={() => setActiveTab('esun')}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          activeTab === 'esun'
+                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                      >
+                        <Sun className="w-4 h-4 stroke-[2]" />
+                        {!sidebarCollapsed && <span>Esun Solar</span>}
+                      </button>
+                      <button
                         onClick={() => setActiveTab('cotizador')}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                           activeTab === 'cotizador'
@@ -895,6 +907,17 @@ export function Portal() {
                       >
                         <FileText className="w-4 h-4 stroke-[2]" />
                         {!sidebarCollapsed && <span>CFE Manager</span>}
+                      </button>
+                       <button
+                        onClick={() => setActiveTab('esun')}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          activeTab === 'esun'
+                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                      >
+                        <Sun className="w-4 h-4 stroke-[2]" />
+                        {!sidebarCollapsed && <span>Esun Solar</span>}
                       </button>
                       <button
                         onClick={() => setActiveTab('cotizador')}
@@ -2803,6 +2826,12 @@ export function Portal() {
                     title="CFE Manager"
                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                   />
+                </div>
+              )}
+
+              {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'esun' && (
+                <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+                  <EsunPage />
                 </div>
               )}
 

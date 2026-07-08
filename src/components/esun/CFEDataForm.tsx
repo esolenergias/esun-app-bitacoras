@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, FileText, ArrowRight, Zap, Info } from 'lucide-react';
-import { CFEData } from './lib/cfeParser';
+import type { CFEData } from './lib/cfeParser';
 
 interface CFEDataFormProps {
   data: CFEData;

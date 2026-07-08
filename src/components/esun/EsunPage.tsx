@@ -7,6 +7,7 @@ import FinancialAnalysis from './FinancialAnalysis';
 import EnvironmentalImpact from './EnvironmentalImpact';
 import { calculateFinancials } from './lib/financialEngine';
 import { SOLAR_CONSTANTS } from './lib/solarConstants';
+import html2pdf from 'html2pdf.js';
 
 export default function EsunPage() {
   const [view, setView] = useState<'upload' | 'form' | 'results' | 'export'>('upload');
@@ -129,10 +130,201 @@ export default function EsunPage() {
 
   const handleTriggerExport = () => {
     setView('export');
-    setTimeout(() => {
-      // PDF download action will be connected in Task 6
-      setView('results');
-    }, 2000);
+    
+    // Retrieve quote data
+    const quoteData = quotes.find(q => q.id === currentQuoteId) || {
+      client_name: cfeData?.client_name || 'Sin Nombre',
+      city: system?.city || 'CDMX',
+      system: system,
+      cfe_data: cfeData,
+      financial: calculateFinancials({
+        system_kWp: system?.system_kWp,
+        installed_kWp: system?.installed_kWp,
+        annual_production_kWh: system?.annual_production_kWh,
+        monthly_consumption_kWh: cfeData?.monthly_kWh,
+        tariff_rate_mxn: cfeData?.tariff_rate,
+        custom_cost: financialParams.manualCost,
+      }),
+      financialParams: financialParams
+    };
+
+    // Create the container element for printing
+    const element = document.createElement('div');
+    element.style.padding = "24px";
+    element.style.color = "#1e293b";
+    element.style.backgroundColor = "#ffffff";
+    element.style.fontFamily = "sans-serif";
+    
+    const isCredit = quoteData.financialParams?.isCredit;
+    const rate = quoteData.financialParams?.interestRate || 15;
+    const term = quoteData.financialParams?.termMonths || 36;
+    const inv = quoteData.financial?.investment_mxn || 0;
+    const r = (rate / 100) / 12;
+    const monthlyCreditPayment = isCredit ? (r > 0 ? (inv * r * Math.pow(1 + r, term)) / (Math.pow(1 + r, term) - 1) : inv / term) : 0;
+    
+    element.innerHTML = `
+      <div style="border-bottom: 2px solid #C49825; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h1 style="color: #C49825; font-size: 24px; font-weight: 800; margin: 0;">eSol Energías</h1>
+          <p style="font-size: 11px; color: #64748b; margin: 2px 0 0 0;">Propuesta de Sistema Solar Fotovoltaico — Esun</p>
+        </div>
+        <div style="text-align: right;">
+          <p style="font-size: 11px; font-weight: bold; color: #0f172a; margin: 0;">Fecha: ${new Date().toLocaleDateString('es-MX')}</p>
+          <p style="font-size: 10px; color: #64748b; margin: 2px 0 0 0;">Servicio: ${quoteData.cfe_data?.service_number || 'N/A'}</p>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Datos del Cliente</h2>
+        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Cliente:</span> ${quoteData.client_name}</td>
+            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Consumo Bimestral:</span> ${quoteData.cfe_data?.bimonthly_kWh} kWh</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Tarifa CFE:</span> ${quoteData.cfe_data?.tariff}</td>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Pago Promedio CFE:</span> $${quoteData.cfe_data?.total_mxn?.toLocaleString('es-MX')} MXN</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Ciudad:</span> ${quoteData.city}</td>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Costo promedio/kWh:</span> $${quoteData.cfe_data?.tariff_rate?.toFixed(2)} MXN</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Propuesta Técnica del Sistema</h2>
+        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Capacidad Instalada:</span> ${quoteData.system?.installed_kWp?.toFixed(2)} kWp</td>
+            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Arreglo Eléctrico:</span> ${quoteData.system?.num_strings} strings de ${quoteData.system?.panels_per_string} paneles</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Cantidad de Paneles:</span> ${quoteData.system?.num_panels} módulos de ${quoteData.system?.panel_Wp}W</td>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Voltaje de String Voc:</span> ${quoteData.system?.string_Voc?.toFixed(1)} VDC (${quoteData.system?.is_electrical_safe ? 'Eléctricamente Seguro' : 'Excede límites'})</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Superficie Techo:</span> ${quoteData.system?.area_m2?.toFixed(1)} m²</td>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Producción Anual Estimada:</span> ${Math.round(quoteData.system?.annual_production_kWh || 0)?.toLocaleString('es-MX')} kWh</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Análisis Financiero y Retorno</h2>
+        <table style="width: 100%; font-size: 11px; border-collapse: collapse; margin-bottom: 12px;">
+          <tr>
+            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Inversión Total:</span> $${quoteData.financial?.investment_mxn?.toLocaleString('es-MX')} MXN</td>
+            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Valor Presente Neto (NPV):</span> $${quoteData.financial?.npv?.toLocaleString('es-MX')} MXN</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Ahorro Año 1:</span> $${quoteData.financial?.annual_savings_yr1?.toLocaleString('es-MX')} MXN</td>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">ROI 25 años:</span> ${quoteData.financial?.roi_pct?.toFixed(0)}%</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Período de Retorno:</span> ${quoteData.financial?.payback_years?.toFixed(1)} años</td>
+            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Esquema:</span> ${isCredit ? `Crédito (${term} meses, Tasa ${rate}%)` : 'Contado'}</td>
+          </tr>
+        </table>
+        ${isCredit ? `
+        <div style="background-color: #f8fafc; border-left: 4px solid #C49825; padding: 12px; border-radius: 8px; font-size: 10px;">
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">Detalles del Financiamiento:</p>
+          <p style="margin: 4px 0 0 0; color: #334155;">Mensualidad del Crédito: <strong>$${Math.round(monthlyCreditPayment).toLocaleString('es-MX')} MXN</strong>. El ahorro neto anual ya deduce el costo del crédito.</p>
+        </div>
+        ` : ''}
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Proyección de Ahorro Acumulado</h2>
+        <table style="width: 100%; border-collapse: collapse; font-size: 10px; text-align: left;">
+          <thead>
+            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+              <th style="padding: 6px; width: 10%;">Año</th>
+              <th style="padding: 6px; width: 22.5%;">Ahorro Anual</th>
+              <th style="padding: 6px; width: 22.5%;">Pago Sin Solar (6% Inf)</th>
+              <th style="padding: 6px; width: 22.5%;">Pago Con Solar</th>
+              <th style="padding: 6px; width: 22.5%;">Ahorro Neto Acum.</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[1, 5, 10, 15, 20, 25].map(yr => {
+              const annualSavings = quoteData.financial?.cashflows_25yr[yr - 1] || 0;
+              const bimonthlyTotal = quoteData.cfe_data?.total_mxn || 0;
+              const yearlyPaymentWithoutSolar = (bimonthlyTotal * (quoteData.cfe_data?.is_bimonthly ? 6 : 12)) * Math.pow(1.06, yr - 1);
+              const minAnnualFee = quoteData.cfe_data?.is_bimonthly ? 600 : 1200;
+              const yearlyPaymentWithSolar = Math.max(minAnnualFee, yearlyPaymentWithoutSolar - annualSavings);
+              
+              // Sum up cashflows up to yr
+              let cumulative = 0;
+              for (let i = 0; i < yr; i++) {
+                cumulative += (quoteData.financial?.cashflows_25yr[i] || 0);
+              }
+              // Calculate bimonthly/credit cumulative paid
+              let totalCreditPaidSoFar = 0;
+              if (isCredit) {
+                const nMonths = Math.min(term, yr * 12);
+                totalCreditPaidSoFar = monthlyCreditPayment * nMonths;
+              }
+              const netCumulative = cumulative - (isCredit ? totalCreditPaidSoFar : inv);
+
+              return `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 6px; font-weight: bold;">Año ${yr}</td>
+                  <td style="padding: 6px;">$${Math.round(annualSavings).toLocaleString('es-MX')} MXN</td>
+                  <td style="padding: 6px; color: #dc2626;">$${Math.round(yearlyPaymentWithoutSolar).toLocaleString('es-MX')} MXN</td>
+                  <td style="padding: 6px; color: #16a34a;">$${Math.round(yearlyPaymentWithSolar).toLocaleString('es-MX')} MXN</td>
+                  <td style="padding: 6px; font-weight: bold; color: #0f172a;">$${Math.round(netCumulative).toLocaleString('es-MX')} MXN</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Beneficios Ecológicos en 25 Años</h2>
+        <div style="display: flex; gap: 12px; justify-content: space-between;">
+          <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; text-align: center;">
+            <p style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0;">${(quoteData.environmental?.co2_kg_25yr / 1000).toFixed(1)} t</p>
+            <p style="font-size: 9px; color: #166534; font-weight: bold; margin: 2px 0 0 0; text-transform: uppercase;">CO2 Evitado</p>
+          </div>
+          <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; text-align: center;">
+            <p style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0;">${Math.round(quoteData.environmental?.trees_25yr || 0)}</p>
+            <p style="font-size: 9px; color: #166534; font-weight: bold; margin: 2px 0 0 0; text-transform: uppercase;">Árboles Plantados</p>
+          </div>
+          <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; text-align: center;">
+            <p style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0;">${Math.round(quoteData.environmental?.cars_25yr || 0)}</p>
+            <p style="font-size: 9px; color: #166534; font-weight: bold; margin: 2px 0 0 0; text-transform: uppercase;">Autos Evitados</p>
+          </div>
+          <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; text-align: center;">
+            <p style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0;">${Math.round(quoteData.environmental?.coal_ton_25yr || 0)}</p>
+            <p style="font-size: 9px; color: #166534; font-weight: bold; margin: 2px 0 0 0; text-transform: uppercase;">Tons Carbón</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #cbd5e1; padding-top: 12px; text-align: center; font-size: 9px; color: #64748b; margin-top: 32px;">
+        <p style="margin: 0;">Este documento es una estimación del dimensionamiento técnico preliminar. eSol Energías Renovables es responsable de la ejecución técnica definitiva.</p>
+        <p style="margin: 2px 0 0 0; font-weight: bold; color: #C49825;">eSol Energías Renovables — Hermosillo, Sonora</p>
+      </div>
+    `;
+
+    const opt = {
+      margin:       15,
+      filename:     `Propuesta_Solar_${quoteData.client_name.replace(/\s+/g, '_')}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().from(element).set(opt).save()
+      .then(() => {
+        setView('results');
+      })
+      .catch((err) => {
+        console.error("Error al exportar PDF:", err);
+        setView('results');
+      });
   };
 
   return (

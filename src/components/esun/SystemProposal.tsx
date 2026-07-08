@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, ShieldCheck, AlertOctagon, Sun, Maximize2, Zap, Landmark } from 'lucide-react';
 import { SOLAR_CONSTANTS } from './lib/solarConstants';
-import { calculateSizing, SizingResult } from './lib/solarCalculator';
-import { CFEData } from './lib/cfeParser';
+import { calculateSizing, type SizingResult } from './lib/solarCalculator';
+import type { CFEData } from './lib/cfeParser';
 
 interface SystemProposalProps {
   cfeData: CFEData;
