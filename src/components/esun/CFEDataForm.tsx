@@ -19,8 +19,7 @@ const generateDefaultPeriods = (isBim: boolean, currentKwh: number, currentAmoun
     result.push({
       period: `${mStr} ${yStr}`,
       kwh: currentKwh || 1200,
-      amount: currentAmount || 5400,
-      status: "PAGADO"
+      amount: currentAmount || 5400
     });
     
     currentMonthIdx -= step;
@@ -61,9 +60,24 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
 
   // New fields: Historic periods list
   const isBimTariff = !tariff.startsWith('GDM') && !tariff.startsWith('APM') && !tariff.startsWith('RAM') && !tariff.startsWith('DIS') && !tariff.startsWith('DI');
-  const initialPeriods = data.historic_periods && data.historic_periods.length === (isBimTariff ? 6 : 12)
-    ? data.historic_periods
-    : generateDefaultPeriods(isBimTariff, isBimTariff ? (data.bimonthly_kWh || 1200) : (data.monthly_kWh || 600), data.total_mxn || 5400);
+  const targetLength = isBimTariff ? 6 : 12;
+  
+  const getInitialPeriods = (): CFEHistoricPeriod[] => {
+    let result: CFEHistoricPeriod[] = [];
+    if (data.historic_periods && data.historic_periods.length > 0) {
+      result = data.historic_periods.slice(0, targetLength);
+      if (result.length < targetLength) {
+        const missing = targetLength - result.length;
+        const defaults = generateDefaultPeriods(isBimTariff, isBimTariff ? (data.bimonthly_kWh || 1200) : (data.monthly_kWh || 600), data.total_mxn || 5400);
+        result.push(...defaults.slice(0, missing));
+      }
+    } else {
+      result = generateDefaultPeriods(isBimTariff, isBimTariff ? (data.bimonthly_kWh || 1200) : (data.monthly_kWh || 600), data.total_mxn || 5400);
+    }
+    return result;
+  };
+
+  const initialPeriods = getInitialPeriods();
 
   const [historicPeriods, setHistoricPeriods] = useState<CFEHistoricPeriod[]>(initialPeriods);
   const [historicKwhStr, setHistoricKwhStr] = useState<string[]>(initialPeriods.map(p => String(p.kwh)));
@@ -83,12 +97,19 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
 
     const requiredLength = isBim ? 6 : 12;
     if (historicPeriods.length !== requiredLength) {
-      const fresh = generateDefaultPeriods(isBim, isBim ? bimonthlyKWh : monthlyKWh, totalMxn);
-      setHistoricPeriods(fresh);
-      setHistoricKwhStr(fresh.map(p => String(p.kwh)));
-      setHistoricAmountStr(fresh.map(p => String(p.amount)));
+      let updated = [...historicPeriods];
+      if (updated.length > requiredLength) {
+        updated = updated.slice(0, requiredLength);
+      } else {
+        const missing = requiredLength - updated.length;
+        const defaults = generateDefaultPeriods(isBim, isBim ? bimonthlyKWh : monthlyKWh, totalMxn);
+        updated.push(...defaults.slice(0, missing));
+      }
+      setHistoricPeriods(updated);
+      setHistoricKwhStr(updated.map(p => String(p.kwh)));
+      setHistoricAmountStr(updated.map(p => String(p.amount)));
     }
-  }, [tariff, bimonthlyKWh]);
+  }, [tariff]);
 
   // Sync last payment date and amount automatically from the most recent period (index 0) of the table
   useEffect(() => {
