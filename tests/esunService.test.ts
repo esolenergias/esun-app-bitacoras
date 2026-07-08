@@ -1,4 +1,5 @@
 import { calculateSizing } from '../src/components/esun/lib/solarCalculator';
+import { calculateFinancials } from '../src/components/esun/lib/financialEngine';
 
 function assertEquals(actual: any, expected: any, message: string) {
   if (typeof actual === 'number' && typeof expected === 'number') {
@@ -126,6 +127,27 @@ function runTests() {
   assertEquals(result5.num_strings, 0, 'num_strings is 0');
   assertEquals(result5.string_Voc, 0, 'string_Voc is 0');
   assertEquals(result5.is_electrical_safe, false, 'is_electrical_safe is false');
+
+  console.log('\nRunning Esun Financial Engine tests...');
+  const finResult = calculateFinancials({
+    system_kWp: 5.67,
+    installed_kWp: 6.05,
+    annual_production_kWh: 9351.93875,
+    monthly_consumption_kWh: 600, // 7200 kWh/year
+    tariff_rate_mxn: 4.50 // DAC
+  });
+
+  // Investment should be 6.05 kWp * 1000 * 15 MXN/W (since size is between 5 and 10 kWp) = 90750 MXN
+  assertEquals(finResult.investment_mxn, 90750, 'investment calculation');
+  
+  // Year 1 savings = min(9351.94, 7200) * 4.50 = 7200 * 4.50 = 32400 MXN
+  assertEquals(finResult.annual_savings_yr1, 32400, 'annual savings year 1');
+
+  // Payback = 90750 / 32400 = 2.80 years
+  assertEquals(finResult.payback_years, 2.800925925925926, 'simple payback years');
+
+  // CO2 saved 25yr = 9351.93875 * 25 * 0.444 = 103806.519825 kg
+  assertEquals(finResult.co2_saved_kg_25yr, 103806.520125, 'CO2 savings over 25 years');
 
   console.log('\nAll Esun Sizing Engine tests passed successfully.');
 }
