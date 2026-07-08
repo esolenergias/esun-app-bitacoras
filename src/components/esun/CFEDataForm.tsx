@@ -21,6 +21,8 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
   const [tariffRate, setTariffRate] = useState(data.tariff_rate || 4.50);
   const [demandKw, setDemandKw] = useState(data.demand_kw || 0);
   const [powerFactor, setPowerFactor] = useState(data.power_factor || 0);
+  const [demandKwStr, setDemandKwStr] = useState(data.demand_kw ? String(data.demand_kw) : '');
+  const [powerFactorStr, setPowerFactorStr] = useState(data.power_factor ? String(data.power_factor) : '');
 
   // Sync is_bimonthly when tariff changes
   useEffect(() => {
@@ -251,8 +253,17 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
               <input
                 type="number"
                 step="0.1"
-                value={demandKw || ''}
-                onChange={(e) => setDemandKw(parseFloat(e.target.value) || 0)}
+                value={demandKwStr}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDemandKwStr(val);
+                  const parsed = parseFloat(val);
+                  if (!isNaN(parsed) && parsed >= 0) {
+                    setDemandKw(parsed);
+                  } else {
+                    setDemandKw(0);
+                  }
+                }}
                 placeholder="Ej. 15.5"
                 className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors font-mono"
               />
@@ -268,8 +279,17 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
                 step="0.1"
                 max={100}
                 min={0}
-                value={powerFactor || ''}
-                onChange={(e) => setPowerFactor(parseFloat(e.target.value) || 0)}
+                value={powerFactorStr}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPowerFactorStr(val);
+                  const parsed = parseFloat(val);
+                  if (!isNaN(parsed) && parsed >= 0) {
+                    setPowerFactor(parsed);
+                  } else {
+                    setPowerFactor(0);
+                  }
+                }}
                 placeholder="Ej. 95"
                 className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors font-mono"
               />

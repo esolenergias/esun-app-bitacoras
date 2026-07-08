@@ -82,7 +82,7 @@ export default function EsunPage() {
     localStorage.setItem('esun_quotes', JSON.stringify(existingQuotes));
     setCurrentQuoteId(newQuote.id);
     setQuotes(existingQuotes);
-  }, [currentQuoteId, quotes]);
+  }, [currentQuoteId]);
 
   // Auto-save quote in results view when system or cfeData updates
   useEffect(() => {
