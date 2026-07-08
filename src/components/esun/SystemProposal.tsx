@@ -6,40 +6,21 @@ import { CFEData } from './lib/cfeParser';
 
 interface SystemProposalProps {
   cfeData: CFEData;
+  system?: any; // Loaded quote system settings
   onUpdate: (systemResult: any) => void;
 }
 
-export default function SystemProposal({ cfeData, onUpdate }: SystemProposalProps) {
-  const [city, setCity] = useState('CDMX');
-  const [panelWp, setPanelWp] = useState(550);
-  const [panelVoc, setPanelVoc] = useState(50);
-  const [inverterMaxVdc, setInverterMaxVdc] = useState(600);
+export default function SystemProposal({ cfeData, system, onUpdate }: SystemProposalProps) {
+  const [city, setCity] = useState(system?.city || 'CDMX');
+  const [panelWp, setPanelWp] = useState(system?.panel_Wp || 550);
+  const [panelVoc, setPanelVoc] = useState(system?.panel_Voc || 50);
+  const [inverterMaxVdc, setInverterMaxVdc] = useState(system?.inverter_max_vdc || 600);
 
   // We can calculate target inverter kW automatically
   // Inverter kW ≈ system_kWp / DC_AC_RATIO
   const psh = SOLAR_CONSTANTS.PSH[city] || SOLAR_CONSTANTS.PSH['default'];
   const targetkWp = (cfeData.monthly_kWh * SOLAR_CONSTANTS.SIZING_MARGIN) / (psh * SOLAR_CONSTANTS.DAYS_IN_MONTH * SOLAR_CONSTANTS.PR_DEFAULT);
   const targetInverterKw = parseFloat((targetkWp / SOLAR_CONSTANTS.DC_AC_RATIO).toFixed(2));
-
-  // Run calculation whenever inputs change
-  useEffect(() => {
-    const sizingResult = calculateSizing({
-      monthly_kWh: cfeData.monthly_kWh,
-      city,
-      panel_Wp: panelWp,
-      panel_Voc: panelVoc,
-      inverter_max_vdc: inverterMaxVdc,
-      inverter_kw: targetInverterKw
-    });
-
-    onUpdate({
-      ...sizingResult,
-      panel_Wp: panelWp,
-      panel_Voc: panelVoc,
-      inverter_max_vdc: inverterMaxVdc,
-      city
-    });
-  }, [cfeData.monthly_kWh, city, panelWp, panelVoc, inverterMaxVdc]);
 
   const sizingResult = calculateSizing({
     monthly_kWh: cfeData.monthly_kWh,
@@ -49,6 +30,17 @@ export default function SystemProposal({ cfeData, onUpdate }: SystemProposalProp
     inverter_max_vdc: inverterMaxVdc,
     inverter_kw: targetInverterKw
   });
+
+  // Run calculation whenever inputs change
+  useEffect(() => {
+    onUpdate({
+      ...sizingResult,
+      panel_Wp: panelWp,
+      panel_Voc: panelVoc,
+      inverter_max_vdc: inverterMaxVdc,
+      city
+    });
+  }, [cfeData.monthly_kWh, city, panelWp, panelVoc, inverterMaxVdc]);
 
   const cityOptions = Object.keys(SOLAR_CONSTANTS.PSH).filter(c => c !== 'default').sort();
 

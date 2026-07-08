@@ -14,6 +14,12 @@ export default function EsunPage() {
   const [system, setSystem] = useState<any>(null);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
+  const [financialParams, setFinancialParams] = useState<any>({
+    isCredit: false,
+    interestRate: 15,
+    termMonths: 36,
+    manualCost: undefined
+  });
 
   // Load quotes from localStorage
   const loadQuotes = () => {
@@ -31,7 +37,7 @@ export default function EsunPage() {
     loadQuotes();
   }, []);
 
-  const saveQuote = (cfe: any, sys: any) => {
+  const saveQuote = (cfe: any, sys: any, finParams: any) => {
     if (!cfe || !sys) return;
     
     const finResult = calculateFinancials({
@@ -40,6 +46,7 @@ export default function EsunPage() {
       annual_production_kWh: sys.annual_production_kWh,
       monthly_consumption_kWh: cfe.monthly_kWh,
       tariff_rate_mxn: cfe.tariff_rate,
+      custom_cost: finParams.manualCost, // Pass manual cost override
     });
 
     const totalProduction25yr = sys.annual_production_kWh * SOLAR_CONSTANTS.SYSTEM_LIFE;
@@ -54,6 +61,7 @@ export default function EsunPage() {
       city: sys.city,
       cfe_data: cfe,
       system: sys,
+      financialParams: finParams, // Persist overrides
       financial: finResult,
       environmental: {
         co2_kg_25yr: co2SavedKg,
@@ -79,14 +87,20 @@ export default function EsunPage() {
   // Auto-save quote in results view when system or cfeData updates
   useEffect(() => {
     if (view === 'results' && cfeData && system) {
-      saveQuote(cfeData, system);
+      saveQuote(cfeData, system, financialParams);
     }
-  }, [view, cfeData, system]);
+  }, [view, cfeData, system, financialParams]);
 
   const loadQuote = (quote: any) => {
     setCurrentQuoteId(quote.id);
     setCfeData(quote.cfe_data);
     setSystem(quote.system);
+    setFinancialParams(quote.financialParams || {
+      isCredit: false,
+      interestRate: 15,
+      termMonths: 36,
+      manualCost: undefined
+    });
     setView('results');
   };
 
@@ -105,6 +119,12 @@ export default function EsunPage() {
     setCfeData(null);
     setSystem(null);
     setCurrentQuoteId(null);
+    setFinancialParams({
+      isCredit: false,
+      interestRate: 15,
+      termMonths: 36,
+      manualCost: undefined
+    });
   };
 
   const handleTriggerExport = () => {
@@ -234,7 +254,9 @@ export default function EsunPage() {
             {/* Left Column - Sizing proposal */}
             <div className="space-y-6">
               <SystemProposal
+                key={currentQuoteId || 'new'}
                 cfeData={cfeData}
+                system={system}
                 onUpdate={setSystem}
               />
             </div>
@@ -244,8 +266,11 @@ export default function EsunPage() {
               {system && (
                 <>
                   <FinancialAnalysis
+                    key={currentQuoteId || 'new-fin'}
                     system={system}
                     cfeData={cfeData}
+                    financialParams={financialParams}
+                    onChangeFinancialParams={setFinancialParams}
                   />
                   <EnvironmentalImpact
                     system={system}

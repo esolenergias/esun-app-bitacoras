@@ -9,15 +9,19 @@ import { calculateFinancials, FinancialResult } from './lib/financialEngine';
 import { CFEData } from './lib/cfeParser';
 
 interface FinancialAnalysisProps {
-  system: any; // Result from SystemProposal
+  system: any;
   cfeData: CFEData;
+  financialParams: any;
+  onChangeFinancialParams: (params: any) => void;
 }
 
-export default function FinancialAnalysis({ system, cfeData }: FinancialAnalysisProps) {
-  const [isCredit, setIsCredit] = useState(false);
-  const [interestRate, setInterestRate] = useState(15); // Default 15% annual
-  const [termMonths, setTermMonths] = useState(36); // Default 36 months
-  const [manualCost, setManualCost] = useState<number | undefined>(undefined);
+export default function FinancialAnalysis({
+  system,
+  cfeData,
+  financialParams,
+  onChangeFinancialParams
+}: FinancialAnalysisProps) {
+  const { isCredit, interestRate, termMonths, manualCost } = financialParams;
   const [isEditingCost, setIsEditingCost] = useState(false);
 
   // Compute financials based on system inputs
@@ -164,7 +168,10 @@ export default function FinancialAnalysis({ system, cfeData }: FinancialAnalysis
               <input
                 type="number"
                 value={manualCost !== undefined ? manualCost : Math.round(investment)}
-                onChange={(e) => setManualCost(parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const costVal = parseInt(e.target.value) || 0;
+                  onChangeFinancialParams({ ...financialParams, manualCost: costVal });
+                }}
                 placeholder="Costo MXN"
                 className="w-32 bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream text-xs px-2.5 py-1.5 rounded-lg focus:outline-none font-mono"
               />
@@ -192,7 +199,7 @@ export default function FinancialAnalysis({ system, cfeData }: FinancialAnalysis
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setIsCredit(false)}
+            onClick={() => onChangeFinancialParams({ ...financialParams, isCredit: false })}
             className={`px-4 py-2 rounded-lg text-xs font-extrabold uppercase tracking-wide transition-all cursor-pointer ${
               !isCredit 
                 ? 'bg-[#C49825] text-dark-1 shadow-md shadow-gold/10' 
@@ -203,7 +210,7 @@ export default function FinancialAnalysis({ system, cfeData }: FinancialAnalysis
           </button>
           <button
             type="button"
-            onClick={() => setIsCredit(true)}
+            onClick={() => onChangeFinancialParams({ ...financialParams, isCredit: true })}
             className={`px-4 py-2 rounded-lg text-xs font-extrabold uppercase tracking-wide transition-all cursor-pointer ${
               isCredit 
                 ? 'bg-[#C49825] text-dark-1 shadow-md shadow-gold/10' 
@@ -245,7 +252,7 @@ export default function FinancialAnalysis({ system, cfeData }: FinancialAnalysis
                 max={72}
                 step={12}
                 value={termMonths}
-                onChange={(e) => setTermMonths(parseInt(e.target.value))}
+                onChange={(e) => onChangeFinancialParams({ ...financialParams, termMonths: Number(e.target.value) })}
                 className="w-full h-1.5 bg-dark-4 rounded-lg appearance-none cursor-pointer accent-[#C49825]"
               />
               <div className="flex justify-between text-[9px] text-cream-muted font-mono">
@@ -267,7 +274,7 @@ export default function FinancialAnalysis({ system, cfeData }: FinancialAnalysis
                 max={20}
                 step={0.5}
                 value={interestRate}
-                onChange={(e) => setInterestRate(parseFloat(e.target.value))}
+                onChange={(e) => onChangeFinancialParams({ ...financialParams, interestRate: Number(e.target.value) })}
                 className="w-full h-1.5 bg-dark-4 rounded-lg appearance-none cursor-pointer accent-[#C49825]"
               />
               <div className="flex justify-between text-[9px] text-cream-muted font-mono">
