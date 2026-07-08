@@ -9,7 +9,7 @@ import { calculateFinancials } from './lib/financialEngine';
 import { SOLAR_CONSTANTS } from './lib/solarConstants';
 
 export default function EsunPage() {
-  const [view, setView] = useState<'upload' | 'form' | 'results'>('upload');
+  const [view, setView] = useState<'upload' | 'form' | 'results' | 'export'>('upload');
   const [cfeData, setCfeData] = useState<any>(null);
   const [system, setSystem] = useState<any>(null);
   const [quotes, setQuotes] = useState<any[]>([]);
@@ -107,6 +107,14 @@ export default function EsunPage() {
     setCurrentQuoteId(null);
   };
 
+  const handleTriggerExport = () => {
+    setView('export');
+    setTimeout(() => {
+      // PDF download action will be connected in Task 6
+      setView('results');
+    }, 2000);
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-6 w-full text-cream font-body">
       {/* Sidebar - Cotizaciones Guardadas */}
@@ -175,15 +183,26 @@ export default function EsunPage() {
             <p className="text-cream-muted text-xs">Propuesta y dimensionamiento solar fotovoltaico instantáneo</p>
           </div>
 
-          {view !== 'upload' && (
-            <button
-              onClick={handleReset}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-dark-4 bg-dark-3/30 hover:border-gold/30 text-cream-muted hover:text-gold rounded-xl text-xs transition-all cursor-pointer font-bold uppercase tracking-wider"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Atrás / Limpiar</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {view === 'results' && (
+              <button
+                onClick={handleTriggerExport}
+                className="px-4 py-1.5 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs transition-all cursor-pointer uppercase tracking-wider shadow-[0_0_15px_rgba(196,152,37,0.3)] hover:scale-[1.02]"
+              >
+                Exportar Propuesta PDF
+              </button>
+            )}
+
+            {view !== 'upload' && (
+              <button
+                onClick={handleReset}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-dark-4 bg-dark-3/30 hover:border-gold/30 text-cream-muted hover:text-gold rounded-xl text-xs transition-all cursor-pointer font-bold uppercase tracking-wider"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Atrás / Limpiar</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Dynamic Views */}
@@ -236,7 +255,21 @@ export default function EsunPage() {
             </div>
           </div>
         )}
+
+        {view === 'export' && (
+          <div className="bg-dark-2 border border-dark-4 p-8 rounded-2xl flex flex-col items-center justify-center space-y-6 py-20 animate-[fadeIn_0.2s_ease-out]">
+            <div className="relative flex items-center justify-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-gold"></div>
+              <div className="absolute font-display text-gold text-lg font-black uppercase">eSol</div>
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-bold font-display text-gold">Generando Reporte de Cotización</h3>
+              <p className="text-xs text-cream-muted max-w-sm">Compilando gráficos, matrices de insumo y equivalencias de carbono en formato PDF de alta calidad...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
+}
 }
