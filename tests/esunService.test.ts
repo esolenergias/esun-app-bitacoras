@@ -1,7 +1,11 @@
 import { calculateSizing } from '../src/components/esun/lib/solarCalculator';
 
 function assertEquals(actual: any, expected: any, message: string) {
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+  if (typeof actual === 'number' && typeof expected === 'number') {
+    if (Math.abs(actual - expected) > 1e-3) {
+      throw new Error(`FAIL: ${message}. Expected ${expected}, got ${actual}`);
+    }
+  } else if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error(`FAIL: ${message}. Expected ${expected}, got ${actual}`);
   }
   console.log(`✓ PASS: ${message}`);
@@ -22,20 +26,20 @@ function runTests() {
   });
 
   // system_kWp = (600 * 1.20) / (5.5 * 30 * 0.77) = 720 / 127.05 = 5.667 kWp
-  assertEquals(Math.round(result1.system_kWp * 100) / 100, 5.67, 'system_kWp calculation');
+  assertEquals(result1.system_kWp, 5.667060212514758, 'system_kWp calculation');
   // Panels = ceil(5.667 * 1000 / 550) = ceil(10.3) = 11 panels
   assertEquals(result1.num_panels, 11, 'num_panels calculation');
   // installed_kWp = (11 * 550) / 1000 = 6.05
   assertEquals(result1.installed_kWp, 6.05, 'installed_kWp calculation');
   // Max panels per string = floor(600 / (50 * 1.05)) = 11.
   // num_strings = ceil(11 / 11) = 1.
-  // panels_per_string = ceil(11 / 1) = 11.
+  // panels_per_string = 11.
   assertEquals(result1.panels_per_string, 11, 'panels_per_string calculation');
   assertEquals(result1.num_strings, 1, 'num_strings calculation');
   assertEquals(result1.string_Voc, 577.5, 'string_Voc calculation');
   assertEquals(result1.is_electrical_safe, true, 'electrical safety check');
-  // annual_production_kWh = 6.05 * 5.5 * 365 * 0.77 = 9351.9375 (round to 2 decimals)
-  assertEquals(Math.round(result1.annual_production_kWh * 100) / 100, 9351.94, 'annual_production_kWh calculation');
+  // annual_production_kWh = 6.05 * 5.5 * 365 * 0.77 = 9351.93875
+  assertEquals(result1.annual_production_kWh, 9351.93875, 'annual_production_kWh calculation');
 
 
   // Test Case 2: Balanced string configurations where num_panels > max_panels_per_string
@@ -50,14 +54,14 @@ function runTests() {
   });
 
   // system_kWp = 5.67 kWp (same)
-  // Panels = ceil(5.667 * 1000 / 500) = ceil(11.33) = 12 panels
-  assertEquals(result2.num_panels, 12, 'num_panels calculation');
-  // installed_kWp = (12 * 500) / 1000 = 6.0
-  assertEquals(result2.installed_kWp, 6.0, 'installed_kWp calculation');
+  // Panels initial = ceil(5.667 * 1000 / 500) = ceil(11.33) = 12 panels
   // Max panels per string = floor(600 / (50 * 1.05)) = 11
   // num_strings = ceil(12 / 11) = 2
-  assertEquals(result2.num_strings, 2, 'num_strings calculation');
   // panels_per_string = ceil(12 / 2) = 6
+  // num_panels = 2 * 6 = 12
+  assertEquals(result2.num_panels, 12, 'num_panels calculation');
+  assertEquals(result2.installed_kWp, 6.0, 'installed_kWp calculation');
+  assertEquals(result2.num_strings, 2, 'num_strings calculation');
   assertEquals(result2.panels_per_string, 6, 'panels_per_string calculation');
   // string_Voc = 6 * 50 * 1.05 = 315
   assertEquals(result2.string_Voc, 315, 'string_Voc calculation');
