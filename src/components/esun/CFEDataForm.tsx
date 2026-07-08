@@ -1,6 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { Save, FileText, ArrowRight, Zap, Info } from 'lucide-react';
-import type { CFEData } from './lib/cfeParser';
+import type { CFEData, CFEHistoricPeriod } from './lib/cfeParser';
+
+// Helper to auto-generate CFE-like historic periods retroactively based on current month/year
+const generateDefaultPeriods = (isBim: boolean, currentKwh: number, currentAmount: number): CFEHistoricPeriod[] => {
+  const months = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+  const result: CFEHistoricPeriod[] = [];
+  const now = new Date();
+  let currentMonthIdx = now.getMonth();
+  let currentYear = now.getFullYear() % 100;
+  
+  const count = isBim ? 6 : 12;
+  const step = isBim ? 2 : 1;
+  
+  for (let i = 0; i < count; i++) {
+    const mStr = months[currentMonthIdx];
+    const yStr = String(currentYear).padStart(2, '0');
+    result.push({
+      period: `${mStr} ${yStr}`,
+      kwh: currentKwh || 1200,
+      amount: currentAmount || 5400,
+      status: "PAGADO"
+    });
+    
+    currentMonthIdx -= step;
+    if (currentMonthIdx < 0) {
+      currentMonthIdx += 12;
+      currentYear -= 1;
+    }
+  }
+  return result;
+};
 
 interface CFEDataFormProps {
   data: CFEData;
@@ -24,23 +54,22 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
   const [demandKwStr, setDemandKwStr] = useState(data.demand_kw ? String(data.demand_kw) : '');
   const [powerFactorStr, setPowerFactorStr] = useState(data.power_factor ? String(data.power_factor) : '');
 
-  // New fields: Last payment info
+  // New fields: Last payment info (derived automatically from the first period of the historic list)
   const [lastPaymentDate, setLastPaymentDate] = useState(data.last_payment_date || '');
   const [lastPaymentAmountStr, setLastPaymentAmountStr] = useState(data.last_payment_amount ? String(data.last_payment_amount) : '');
   const [lastPaymentAmount, setLastPaymentAmount] = useState(data.last_payment_amount || 0);
 
-  // New fields: Historic consumptions
+  // New fields: Historic periods list
   const isBimTariff = !tariff.startsWith('GDM') && !tariff.startsWith('APM') && !tariff.startsWith('RAM') && !tariff.startsWith('DIS') && !tariff.startsWith('DI');
-  const defaultHistoricLength = isBimTariff ? 6 : 12;
-  const defaultVal = isBimTariff ? (data.bimonthly_kWh || 0) : (data.monthly_kWh || 0);
-  const initialHistoric = data.historic_consumptions && data.historic_consumptions.length === defaultHistoricLength
-    ? data.historic_consumptions
-    : Array(defaultHistoricLength).fill(defaultVal);
+  const initialPeriods = data.historic_periods && data.historic_periods.length === (isBimTariff ? 6 : 12)
+    ? data.historic_periods
+    : generateDefaultPeriods(isBimTariff, isBimTariff ? (data.bimonthly_kWh || 1200) : (data.monthly_kWh || 600), data.total_mxn || 5400);
 
-  const [historicConsumptions, setHistoricConsumptions] = useState<number[]>(initialHistoric);
-  const [historicConsumptionsStr, setHistoricConsumptionsStr] = useState<string[]>(initialHistoric.map(String));
+  const [historicPeriods, setHistoricPeriods] = useState<CFEHistoricPeriod[]>(initialPeriods);
+  const [historicKwhStr, setHistoricKwhStr] = useState<string[]>(initialPeriods.map(p => String(p.kwh)));
+  const [historicAmountStr, setHistoricAmountStr] = useState<string[]>(initialPeriods.map(p => String(p.amount)));
 
-  // Sync is_bimonthly and reset historic list length when tariff changes
+  // Sync is_bimonthly and adapt historic periods length when tariff changes
   useEffect(() => {
     const isBim = !tariff.startsWith('GDM') && !tariff.startsWith('APM') && !tariff.startsWith('RAM') && !tariff.startsWith('DIS') && !tariff.startsWith('DI');
     setIsBimonthly(isBim);
@@ -52,15 +81,24 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
       setMonthlyKWh(bimonthlyKWh);
     }
 
-    // Adapt historic consumptions array length
     const requiredLength = isBim ? 6 : 12;
-    const currentVal = isBim ? bimonthlyKWh : monthlyKWh;
-    if (historicConsumptions.length !== requiredLength) {
-      const adapted = Array(requiredLength).fill(currentVal || 0);
-      setHistoricConsumptions(adapted);
-      setHistoricConsumptionsStr(adapted.map(String));
+    if (historicPeriods.length !== requiredLength) {
+      const fresh = generateDefaultPeriods(isBim, isBim ? bimonthlyKWh : monthlyKWh, totalMxn);
+      setHistoricPeriods(fresh);
+      setHistoricKwhStr(fresh.map(p => String(p.kwh)));
+      setHistoricAmountStr(fresh.map(p => String(p.amount)));
     }
   }, [tariff, bimonthlyKWh]);
+
+  // Sync last payment date and amount automatically from the most recent period (index 0) of the table
+  useEffect(() => {
+    if (historicPeriods.length > 0) {
+      const latest = historicPeriods[0];
+      setLastPaymentDate(latest.period);
+      setLastPaymentAmount(latest.amount);
+      setLastPaymentAmountStr(String(latest.amount));
+    }
+  }, [historicPeriods]);
 
   // Handle bimonthly kWh changes
   const handleBimonthlyChange = (val: number) => {
@@ -92,27 +130,43 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
     }
   };
 
-  // Handle changes in historic consumptions list, automatically updating average monthly/bimonthly kWh fields
-  const handleHistoricChange = (index: number, valStr: string) => {
-    const updatedStr = [...historicConsumptionsStr];
-    updatedStr[index] = valStr;
-    setHistoricConsumptionsStr(updatedStr);
+  // Handle cell edits inside historic periods table
+  const handleHistoricCellChange = (index: number, field: 'period' | 'kwh' | 'amount' | 'status', value: string) => {
+    const updatedPeriods = [...historicPeriods];
+    
+    if (field === 'kwh') {
+      const shadowKwh = [...historicKwhStr];
+      shadowKwh[index] = value;
+      setHistoricKwhStr(shadowKwh);
 
-    const parsed = parseInt(valStr) || 0;
-    const updated = [...historicConsumptions];
-    updated[index] = parsed;
-    setHistoricConsumptions(updated);
+      const parsed = parseInt(value) || 0;
+      updatedPeriods[index] = { ...updatedPeriods[index], kwh: parsed };
+    } else if (field === 'amount') {
+      const shadowAmount = [...historicAmountStr];
+      shadowAmount[index] = value;
+      setHistoricAmountStr(shadowAmount);
 
-    // Calculate total consumption and average
-    const sum = updated.reduce((acc, v) => acc + v, 0);
-    const avg = Math.round(sum / updated.length);
+      const parsed = parseFloat(value) || 0;
+      updatedPeriods[index] = { ...updatedPeriods[index], amount: parsed };
+    } else if (field === 'period') {
+      updatedPeriods[index] = { ...updatedPeriods[index], period: value.toUpperCase() };
+    } else if (field === 'status') {
+      updatedPeriods[index] = { ...updatedPeriods[index], status: value.toUpperCase() };
+    }
 
-    if (isBimonthly) {
-      setBimonthlyKWh(avg);
-      setMonthlyKWh(Math.round(avg / 2));
-    } else {
-      setMonthlyKWh(avg);
-      setBimonthlyKWh(avg);
+    setHistoricPeriods(updatedPeriods);
+
+    // Recalculate average consumption of the main field based on historic inputs
+    if (field === 'kwh') {
+      const sum = updatedPeriods.reduce((acc, p) => acc + p.kwh, 0);
+      const avg = Math.round(sum / updatedPeriods.length);
+      if (isBimonthly) {
+        setBimonthlyKWh(avg);
+        setMonthlyKWh(Math.round(avg / 2));
+      } else {
+        setMonthlyKWh(avg);
+        setBimonthlyKWh(avg);
+      }
     }
   };
 
@@ -134,7 +188,7 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
       is_bimonthly: isBimonthly,
       last_payment_date: lastPaymentDate || undefined,
       last_payment_amount: lastPaymentAmount || undefined,
-      historic_consumptions: historicConsumptions
+      historic_periods: historicPeriods
     };
     onSubmit(finalData);
   };
@@ -388,29 +442,62 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
         {/* Historic Consumptions Section */}
         <div className="border-t border-dark-4 pt-6 space-y-4">
           <div>
-            <h3 className="text-sm font-bold text-gold uppercase tracking-wide">Historial de Consumo (Último Año)</h3>
+            <h3 className="text-sm font-bold text-gold uppercase tracking-wide">Historial de Consumo y Pagos (Último Año)</h3>
             <p className="text-cream-muted text-[11px] mt-0.5 leading-relaxed">
-              Ingresa o ajusta el consumo en kWh de cada periodo para estimar con precisión el número de paneles, compensando la estacionalidad del año.
+              Edita directamente la tabla histórica del recibo de CFE. El primer periodo (Fila 1) representa el periodo facturado actual y actualizará el campo de "Último Pago" automáticamente.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-            {historicConsumptions.map((val, idx) => {
-              const label = isBimonthly ? `Bimestre ${idx + 1}` : `Mes ${idx + 1}`;
-              return (
-                <div key={idx} className="space-y-1">
-                  <label className="text-[10px] font-semibold text-cream-muted uppercase tracking-wider block">{label}</label>
-                  <input
-                    type="number"
-                    value={historicConsumptionsStr[idx] || ''}
-                    onChange={(e) => handleHistoricChange(idx, e.target.value)}
-                    placeholder="kWh"
-                    required
-                    className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2 rounded-lg text-xs focus:outline-none transition-colors font-mono text-center"
-                  />
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto rounded-xl border border-dark-4">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-dark-2 text-gold border-b border-dark-4 select-none">
+                  <th className="p-3 font-semibold uppercase tracking-wider">Periodo</th>
+                  <th className="p-3 font-semibold uppercase tracking-wider text-center">kWh Consumidos</th>
+                  <th className="p-3 font-semibold uppercase tracking-wider text-center">Importe ($ MXN)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-4 bg-dark-1/30">
+                {historicPeriods.map((p, idx) => (
+                  <tr key={idx} className="hover:bg-dark-2/45 transition-colors">
+                    {/* Period Input */}
+                    <td className="p-2 w-1/3">
+                      <input
+                        type="text"
+                        value={p.period}
+                        onChange={(e) => handleHistoricCellChange(idx, 'period', e.target.value)}
+                        placeholder="Ej. ENE 26"
+                        required
+                        className="w-full bg-transparent focus:bg-dark-1 border border-transparent focus:border-gold/30 text-cream px-2 py-1.5 rounded focus:outline-none transition-colors font-mono font-bold uppercase"
+                      />
+                    </td>
+                    {/* kWh Input */}
+                    <td className="p-2 w-1/3">
+                      <input
+                        type="number"
+                        value={historicKwhStr[idx] || ''}
+                        onChange={(e) => handleHistoricCellChange(idx, 'kwh', e.target.value)}
+                        placeholder="kWh"
+                        required
+                        className="w-full bg-transparent focus:bg-dark-1 border border-transparent focus:border-gold/30 text-cream px-2 py-1.5 rounded focus:outline-none transition-colors font-mono text-center"
+                      />
+                    </td>
+                    {/* Amount Input */}
+                    <td className="p-2 w-1/3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={historicAmountStr[idx] || ''}
+                        onChange={(e) => handleHistoricCellChange(idx, 'amount', e.target.value)}
+                        placeholder="Importe"
+                        required
+                        className="w-full bg-transparent focus:bg-dark-1 border border-transparent focus:border-gold/30 text-cream px-2 py-1.5 rounded focus:outline-none transition-colors font-mono text-center text-gold"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 

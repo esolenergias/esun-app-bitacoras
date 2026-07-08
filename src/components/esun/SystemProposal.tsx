@@ -33,7 +33,7 @@ export default function SystemProposal({ cfeData, system, onUpdate }: SystemProp
     panel_Voc: panelVoc,
     inverter_max_vdc: inverterMaxVdc,
     inverter_kw: targetInverterKw,
-    historic_consumptions: cfeData.historic_consumptions
+    historic_periods: cfeData.historic_periods
   });
 
   // Run calculation whenever inputs change
@@ -45,7 +45,7 @@ export default function SystemProposal({ cfeData, system, onUpdate }: SystemProp
       inverter_max_vdc: inverterMaxVdc,
       city
     });
-  }, [cfeData.monthly_kWh, city, panelWp, panelVoc, inverterMaxVdc, cfeData.historic_consumptions, onUpdate]);
+  }, [cfeData.monthly_kWh, city, panelWp, panelVoc, inverterMaxVdc, cfeData.historic_periods, onUpdate]);
 
   const cityOptions = Object.keys(SOLAR_CONSTANTS.PSH).filter(c => c !== 'default').sort();
 

@@ -3,6 +3,12 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Configure worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+export interface CFEHistoricPeriod {
+  period: string;
+  kwh: number;
+  amount: number;
+}
+
 export interface CFEData {
   service_number?: string;
   client_name?: string;
@@ -18,7 +24,7 @@ export interface CFEData {
   is_bimonthly: boolean;
   last_payment_date?: string;
   last_payment_amount?: number;
-  historic_consumptions?: number[];
+  historic_periods?: CFEHistoricPeriod[];
 }
 
 export async function extractTextFromPdf(file: File): Promise<string> {
@@ -69,63 +75,155 @@ export function parseCFEText(fullText: string): CFEData {
   const pfMatch = normalizedText.match(/(?:Factor\s+de\s+Potencia|F\.?\s*P\.?)\s*[\s:]+\s*(\d+\.?\d*)/i) ||
                   normalizedText.match(/(?:Factor\s+de\s+Potencia|F\.?\s*P\.?)\s+(\d+\.?\d*)/i);
 
-  // 6. Client Name (supports person or company name)
-  // Usually the client name is in the first lines of the bill. We'll search for labels first,
-  // or fall back to the first line of the PDF that has words but no numbers (which is typically the name).
+  // 6. Client Name Extraction
+  // Find the header of the CFE bill. The name of the client is on the line(s) below it.
+  // We must skip lines containing metadata like "REGIMEN FISCAL", "RFC", "CP", "DOMICILIO", etc.
   let client_name = undefined;
-  const nameMatch = normalizedText.match(/(?:Nombre|Razón\s+Social|Cliente)[\s:]*([A-ZÁÉÍÓÚÑ\s\.&,]{4,50})/i);
-  if (nameMatch) {
-    client_name = nameMatch[1].trim();
-  } else {
-    // Fallback: search for first capital word line in fullText
-    const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 5);
-    // Find a line that looks like a name (words, no numbers/tariffs/addresses)
-    const nameCandidate = lines.find(line => 
-      /^[A-ZÁÉÍÓÚÑa-záéíóúñ\s\.&,]+$/i.test(line) && 
-      !/Tarifa|CFE|Servicio|Total|Pagar|Consumo|Baja|Media|Dirección|Teléfono/i.test(line)
+  const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  
+  // Find the address of the main office as the anchor
+  const cfeAddressIdx = lines.findIndex(l => 
+    /Av\. Paseo de la Reforma/i.test(l) || 
+    /Juárez, Alcaldía/i.test(l) || 
+    /Ciudad de México/i.test(l)
+  );
+
+  if (cfeAddressIdx !== -1 && cfeAddressIdx + 1 < lines.length) {
+    client_name = lines[cfeAddressIdx + 1];
+  }
+  
+  if (!client_name || /Regimen|Régimen|Fiscal|RFC|Domicilio|Teléfono|Clave|CP|C\.P\.|Pagar/i.test(client_name)) {
+    // Fallback A: Scan up to 5 lines below the header to find the real name
+    const headerIdx = lines.findIndex(l => 
+      /CFE\s+Suministrador\s+de\s+Servicios/i.test(l) || 
+      /Suministrador\s+de\s+Servicios\s+Básicos/i.test(l)
     );
-    if (nameCandidate) {
-      client_name = nameCandidate;
+    if (headerIdx !== -1) {
+      for (let i = headerIdx + 1; i <= Math.min(headerIdx + 5, lines.length - 1); i++) {
+        const line = lines[i];
+        if (
+          line.length > 3 &&
+          !/Regimen|Régimen|Fiscal|RFC|Domicilio|Teléfono|Clave|CP|C\.P\.|Pagar|Servicio|Tarifa|Medidor/i.test(line) &&
+          /^[A-ZÁÉÍÓÚÑa-záéíóúñ\s\.&,]+$/i.test(line)
+        ) {
+          client_name = line;
+          break;
+        }
+      }
     }
   }
 
-  // 7. Last payment date and amount
-  const paymentDateMatch = normalizedText.match(/(?:Fecha\s+de\s+Corte|Límite\s+de\s+pago|Pague\s+antes\s+de|Fecha\s+de\s+emisión)[\s:]*([\d\s\w\-]{8,18})/i);
-  const paymentAmountMatch = normalizedText.match(/(?:Último\s+pago|Pago\s+anterior|Su\s+pago\s+por)[\s:]*\$?\s*([\d,]+\.?\d*)/i);
+  if (!client_name) {
+    // Fallback B: search for first capital word line in fullText
+    const nameMatch = normalizedText.match(/(?:Nombre|Razón\s+Social|Cliente)[\s:]*([A-ZÁÉÍÓÚÑ\s\.&,]{4,50})/i);
+    if (nameMatch) {
+      client_name = nameMatch[1].trim();
+    } else {
+      const nameCandidate = lines.find(line => 
+        line.length > 5 &&
+        /^[A-ZÁÉÍÓÚÑa-záéíóúñ\s\.&,]+$/i.test(line) && 
+        !/Tarifa|CFE|Servicio|Total|Pagar|Consumo|Baja|Media|Dirección|Teléfono|Régimen|Fiscal|RFC/i.test(line)
+      );
+      if (nameCandidate) {
+        client_name = nameCandidate;
+      }
+    }
+  }
+
+  // 7. Extract Period Match
+  const periodMatch = normalizedText.match(/PERIODO FACTURADO\s*:\s*([\d\s\w-]{10,25})/i) ||
+                      normalizedText.match(/PERIODO\s+FACTURADO\s*:\s*([\d\s\w-]{10,25})/i);
+  const current_period = periodMatch ? periodMatch[1].replace(/-/g, ' - ').replace(/\s+/g, ' ').trim() : undefined;
+
+  // 8. Extract Historic Periods: Period, kWh, Amount
+  const historic_periods: CFEHistoricPeriod[] = [];
   
-  const last_payment_date = paymentDateMatch ? paymentDateMatch[1].trim() : undefined;
-  const last_payment_amount = paymentAmountMatch ? parseFloat(paymentAmountMatch[1].replace(/,/g, '')) : undefined;
-
-  // 8. Historic consumption (Cascading Strategy for kWh list)
-  const historic_consumptions: number[] = [];
-  const monthRegex = /\b(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\s+\d{2}\s+(\d+)\b/gi;
+  // Strategy A: Direct line-by-line regex match for table rows (Mes Año kWh Importe)
+  // Coincides on the end of the line, ignoring payment status if present
+  const tableRowRegex = /\b(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\s+(\d{2})\s+(\d+)\s+\$?([\d,]+(?:\.\d{2})?)\b/gi;
   let hMatch;
-  while ((hMatch = monthRegex.exec(normalizedText)) !== null) {
-    historic_consumptions.push(parseInt(hMatch[1]));
+  while ((hMatch = tableRowRegex.exec(normalizedText)) !== null) {
+    historic_periods.push({
+      period: `${hMatch[1]} ${hMatch[2]}`,
+      kwh: parseInt(hMatch[3]),
+      amount: parseFloat(hMatch[4].replace(/,/g, ''))
+    });
   }
 
-  // 9. Consumption kWh (Cascading Strategy for current period)
+  // Strategy B: Proximity-based extraction if desynced columns (PDF.js reads column blocks separately)
+  if (historic_periods.length === 0) {
+    const periods = normalizedText.match(/\b(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\s+\d{2}\b/gi) || [];
+    const kwhMatches = normalizedText.match(/\b\d{2,5}\b/g) || [];
+    const amountMatches = normalizedText.match(/\$?[\d,]+\.\d{2}\b/g) || normalizedText.match(/\$?[\d,]{3,6}\b/g) || [];
+    
+    const filteredKwh = kwhMatches
+      .map(Number)
+      .filter(n => n > 50 && n < 80000 && !periods.some(p => p.includes(String(n))));
+
+    if (periods.length > 0) {
+      periods.forEach((p, idx) => {
+        const kwh = filteredKwh[idx] || 0;
+        const amountStr = amountMatches[idx] || "0";
+        const amount = parseFloat(amountStr.replace(/[\$,]/g, '')) || 0;
+        historic_periods.push({
+          period: p,
+          kwh,
+          amount
+        });
+      });
+    }
+  }
+
+  // Insert current period at the beginning if extracted
+  if (current_period) {
+    const total_mxn = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
+    const consumptionMatch = normalizedText.match(/(?:Consumo(?:\s+de\s+energía)?(?:\s*\(kWh\))?|Consumo\s+Total)[\s:]*(\d+)/i);
+    const consumption = consumptionMatch ? parseInt(consumptionMatch[1]) : 0;
+    
+    historic_periods.unshift({
+        period: current_period,
+        kwh: consumption,
+        amount: total_mxn
+    });
+  }
+
+  // 9. Auto-determine last payment details from the most recent period of the historic table
+  let last_payment_date = undefined;
+  let last_payment_amount = undefined;
+  
+  if (historic_periods.length > 0) {
+    const latestPeriod = historic_periods[0];
+    last_payment_date = latestPeriod.period;
+    last_payment_amount = latestPeriod.amount;
+  } else {
+    // Standard regex fallback
+    const paymentDateMatch = normalizedText.match(/(?:Fecha\s+de\s+Corte|Límite\s+de\s+pago|Pague\s+antes\s+de|Fecha\s+de\s+emisión)[\s:]*([\d\s\w\-]{8,18})/i);
+    const paymentAmountMatch = normalizedText.match(/(?:Último\s+pago|Pago\s+anterior|Su\s+pago\s+por)[\s:]*\$?\s*([\d,]+\.?\d*)/i);
+    last_payment_date = paymentDateMatch ? paymentDateMatch[1].trim() : undefined;
+    last_payment_amount = paymentAmountMatch ? parseFloat(paymentAmountMatch[1].replace(/,/g, '')) : undefined;
+  }
+
+  // 10. Consumption kWh (Cascading Strategy for current period)
   let consumption: number | null = null;
-
-  // Strategy A: Strict match
-  const consumptionStrict = normalizedText.match(/(?:Consumo(?:\s+de\s+energía)?(?:\s*\(kWh\))?|Consumo\s+Total)[\s:]*(\d+)/i);
-  if (consumptionStrict) {
-    consumption = parseInt(consumptionStrict[1]);
+  
+  if (historic_periods.length > 0) {
+    // If we have historic periods, the current period consumption is the most recent one
+    consumption = historic_periods[0].kwh;
   }
 
-  // Strategy B: Table-based residential "Diferencia Totales Energía <Current> <Previous> <Diff>"
   if (consumption === null) {
+    // Strategy A: Strict match
+    const consumptionStrict = normalizedText.match(/(?:Consumo(?:\s+de\s+energía)?(?:\s*\(kWh\))?|Consumo\s+Total)[\s:]*(\d+)/i);
+    if (consumptionStrict) {
+      consumption = parseInt(consumptionStrict[1]);
+    }
+  }
+
+  if (consumption === null) {
+    // Strategy B: Table-based residential "Diferencia Totales Energía <Current> <Previous> <Diff>"
     const tableMatch = normalizedText.match(/(?:Diferencia\s+Totales\s+Energía|Energía)\s+(\d+)\s+(\d+)\s+(\d+)/i);
     if (tableMatch) {
       consumption = parseInt(tableMatch[3]);
-    }
-  }
-
-  // Strategy C: Flexible proximity-based match
-  if (consumption === null) {
-    const energyMatch = normalizedText.match(/(?:Consumo\s+de\s+energía|Consumo\s+Total|Energía).*?\b(\d+)\b/i);
-    if (energyMatch) {
-      consumption = parseInt(energyMatch[1]);
     }
   }
 
@@ -156,7 +254,7 @@ export function parseCFEText(fullText: string): CFEData {
     is_bimonthly,
     last_payment_date,
     last_payment_amount,
-    historic_consumptions: historic_consumptions.length > 0 ? historic_consumptions : undefined
+    historic_periods: historic_periods.length > 0 ? historic_periods : undefined
   };
 }
 

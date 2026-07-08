@@ -1,4 +1,5 @@
 import { SOLAR_CONSTANTS } from './solarConstants';
+import type { CFEHistoricPeriod } from './cfeParser';
 
 export interface SizingInput {
   monthly_kWh: number;
@@ -7,7 +8,7 @@ export interface SizingInput {
   panel_Voc: number;
   inverter_max_vdc: number;
   inverter_kw: number;
-  historic_consumptions?: number[];
+  historic_periods?: CFEHistoricPeriod[];
 }
 
 export interface SizingResult {
@@ -44,11 +45,11 @@ export function calculateSizing(input: SizingInput): SizingResult {
 
   // Compute effective monthly kWh from historic list if present to balance yearly seasonality
   let effectiveMonthlyKWh = input.monthly_kWh;
-  if (input.historic_consumptions && input.historic_consumptions.length > 0) {
-    const sum = input.historic_consumptions.reduce((acc, v) => acc + v, 0);
+  if (input.historic_periods && input.historic_periods.length > 0) {
+    const sum = input.historic_periods.reduce((acc, p) => acc + p.kwh, 0);
     // 6 bimonthly periods = 12 months, 12 monthly periods = 12 months
-    const isBim = input.historic_consumptions.length <= 6;
-    const totalMonths = isBim ? input.historic_consumptions.length * 2 : input.historic_consumptions.length;
+    const isBim = input.historic_periods.length <= 6;
+    const totalMonths = isBim ? input.historic_periods.length * 2 : input.historic_periods.length;
     effectiveMonthlyKWh = totalMonths > 0 ? (sum / totalMonths) : input.monthly_kWh;
   }
 
