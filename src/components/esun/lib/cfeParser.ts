@@ -42,7 +42,8 @@ export async function extractTextFromPdf(file: File): Promise<string> {
   return fullText;
 }
 
-export function parseCFEText(fullText: string): CFEData {
+export function parseCFEText(rawFullText: string): CFEData {
+  const fullText = rawFullText.normalize("NFC");
   // Print full text in console to simplify developer/user debugging of PDF layouts
   console.log("=== ESUN CFE PARSER DEBUG: EXTRACTED TEXT FROM PDF ===");
   console.log(fullText);
@@ -79,21 +80,19 @@ export function parseCFEText(fullText: string): CFEData {
   // Find the header of the CFE bill. The name of the client is on the line(s) below it.
   // We must skip lines containing metadata like "REGIMEN FISCAL", "RFC", "CP", "DOMICILIO", etc.
   let client_name = undefined;
-  const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   
-  // Find the address of the main office as the anchor
-  const cfeAddressIdx = lines.findIndex(l => 
-    /Av\. Paseo de la Reforma/i.test(l) || 
-    /Juárez, Alcaldía/i.test(l) || 
-    /Ciudad de México/i.test(l)
-  );
-
-  if (cfeAddressIdx !== -1 && cfeAddressIdx + 1 < lines.length) {
-    client_name = lines[cfeAddressIdx + 1];
+  // Strategy A: Multi-anchor match immediately after CFE office zip code stopping before client address keywords
+  const anchorMatch = fullText.match(/06600,?\s*[a-zA-Z\s\.,áéíóúñÁÉÍÓÚÑ]{10,45}\s+([A-ZÁÉÍÓÚÑ0-9\ .&,-]{3,50}?)(?:\s{2,}|\r|\n)/i) ||
+                      fullText.match(/06600,?\s*[a-zA-Z\s\.,áéíóúñÁÉÍÓÚÑ]{10,45}\s+([A-ZÁÉÍÓÚÑ0-9\-]{3,30})\s+/i);
+  
+  if (anchorMatch && !/\b(?:Regimen|Régimen|Fiscal|RFC|Domicilio|Teléfono|Clave|CP|C\.P\.|Uso|CFDI)\b/i.test(anchorMatch[1])) {
+    client_name = anchorMatch[1].trim();
   }
-  
-  if (!client_name || /Regimen|Régimen|Fiscal|RFC|Domicilio|Teléfono|Clave|CP|C\.P\.|Pagar/i.test(client_name)) {
-    // Fallback A: Scan up to 5 lines below the header to find the real name
+  console.log("ESUN PARSER DEBUG client_name assigned:", client_name, "anchorMatch:", anchorMatch ? anchorMatch[1] : "null");
+
+  // Strategy B: Fallback to line scanning below header
+  if (!client_name) {
+    const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const headerIdx = lines.findIndex(l => 
       /CFE\s+Suministrador\s+de\s+Servicios/i.test(l) || 
       /Suministrador\s+de\s+Servicios\s+Básicos/i.test(l)
@@ -103,7 +102,7 @@ export function parseCFEText(fullText: string): CFEData {
         const line = lines[i];
         if (
           line.length > 3 &&
-          !/Regimen|Régimen|Fiscal|RFC|Domicilio|Teléfono|Clave|CP|C\.P\.|Pagar|Servicio|Tarifa|Medidor/i.test(line) &&
+          !/\b(?:Regimen|Régimen|Fiscal|RFC|Domicilio|Teléfono|Clave|CP|C\.P\.|Pagar|Servicio|Tarifa|Medidor)\b/i.test(line) &&
           /^[A-ZÁÉÍÓÚÑa-záéíóúñ\s\.&,]+$/i.test(line)
         ) {
           client_name = line;
@@ -113,16 +112,17 @@ export function parseCFEText(fullText: string): CFEData {
     }
   }
 
+  // Strategy C: Search for general labels
   if (!client_name) {
-    // Fallback B: search for first capital word line in fullText
     const nameMatch = normalizedText.match(/(?:Nombre|Razón\s+Social|Cliente)[\s:]*([A-ZÁÉÍÓÚÑ\s\.&,]{4,50})/i);
-    if (nameMatch) {
+    if (nameMatch && !/\b(?:Regimen|Régimen|Fiscal|RFC|Domicilio|Teléfono|Clave|CP|C\.P\.|Uso|CFDI)\b/i.test(nameMatch[1])) {
       client_name = nameMatch[1].trim();
     } else {
+      const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       const nameCandidate = lines.find(line => 
         line.length > 5 &&
         /^[A-ZÁÉÍÓÚÑa-záéíóúñ\s\.&,]+$/i.test(line) && 
-        !/Tarifa|CFE|Servicio|Total|Pagar|Consumo|Baja|Media|Dirección|Teléfono|Régimen|Fiscal|RFC/i.test(line)
+        !/\b(?:Tarifa|CFE|Servicio|Total|Pagar|Consumo|Baja|Media|Dirección|Teléfono|Régimen|Fiscal|RFC|CP|C\.P\.|Uso|CFDI)\b/i.test(line)
       );
       if (nameCandidate) {
         client_name = nameCandidate;
@@ -177,12 +177,27 @@ export function parseCFEText(fullText: string): CFEData {
   // Insert current period at the beginning if extracted
   if (current_period) {
     const total_mxn = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
-    const consumptionMatch = normalizedText.match(/(?:Consumo(?:\s+de\s+energía)?(?:\s*\(kWh\))?|Consumo\s+Total)[\s:]*(\d+)/i);
-    const consumption = consumptionMatch ? parseInt(consumptionMatch[1]) : 0;
+    
+    // Cascading extraction for current period consumption
+    let current_consumption = 0;
+    const readingTableMatch = normalizedText.match(/([\d,]+)\s+([\d,]+)\s+(\d+)\s+(?:Suministro|Distribución|Transmisión|CENACE)/i);
+    if (readingTableMatch) {
+      current_consumption = parseInt(readingTableMatch[3]);
+    } else {
+      const consumptionStrict = normalizedText.match(/(?:Consumo(?:\s+de\s+energía)?(?:\s*\(kWh\))?|Consumo\s+Total)[\s:]*(\d+)/i);
+      if (consumptionStrict) {
+        current_consumption = parseInt(consumptionStrict[1]);
+      } else {
+        const tableMatch = normalizedText.match(/(?:Diferencia\s+Totales\s+Energía|Energía)\s+(\d+)\s+(\d+)\s+(\d+)/i);
+        if (tableMatch) {
+          current_consumption = parseInt(tableMatch[3]);
+        }
+      }
+    }
     
     historic_periods.unshift({
         period: current_period,
-        kwh: consumption,
+        kwh: current_consumption,
         amount: total_mxn
     });
   }
@@ -207,20 +222,27 @@ export function parseCFEText(fullText: string): CFEData {
   let consumption: number | null = null;
   
   if (historic_periods.length > 0) {
-    // If we have historic periods, the current period consumption is the most recent one
     consumption = historic_periods[0].kwh;
   }
 
-  if (consumption === null) {
-    // Strategy A: Strict match
+  if (consumption === null || isNaN(consumption) || consumption <= 0) {
+    // Strategy A: Table-based reading check
+    const readingTableMatch = normalizedText.match(/([\d,]+)\s+([\d,]+)\s+(\d+)\s+(?:Suministro|Distribución|Transmisión|CENACE)/i);
+    if (readingTableMatch) {
+      consumption = parseInt(readingTableMatch[3]);
+    }
+  }
+
+  if (consumption === null || isNaN(consumption) || consumption <= 0) {
+    // Strategy B: Strict match
     const consumptionStrict = normalizedText.match(/(?:Consumo(?:\s+de\s+energía)?(?:\s*\(kWh\))?|Consumo\s+Total)[\s:]*(\d+)/i);
     if (consumptionStrict) {
       consumption = parseInt(consumptionStrict[1]);
     }
   }
 
-  if (consumption === null) {
-    // Strategy B: Table-based residential "Diferencia Totales Energía <Current> <Previous> <Diff>"
+  if (consumption === null || isNaN(consumption) || consumption <= 0) {
+    // Strategy C: Table-based residential "Diferencia Totales Energía <Current> <Previous> <Diff>"
     const tableMatch = normalizedText.match(/(?:Diferencia\s+Totales\s+Energía|Energía)\s+(\d+)\s+(\d+)\s+(\d+)/i);
     if (tableMatch) {
       consumption = parseInt(tableMatch[3]);
