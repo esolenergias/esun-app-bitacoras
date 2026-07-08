@@ -149,7 +149,21 @@ function runTests() {
   // CO2 saved 25yr = 9351.93875 * 25 * 0.444 = 103806.519825 kg
   assertEquals(finResult.co2_saved_kg_25yr, 103806.520125, 'CO2 savings over 25 years');
 
-  console.log('\nAll Esun Sizing Engine tests passed successfully.');
+  // Test Case 6: Sanitized financial inputs (<= 0)
+  console.log('\n--- Test Case 6: Sanitized financial inputs (<= 0) ---');
+  const finResultSanitized = calculateFinancials({
+    system_kWp: 5.67,
+    installed_kWp: 0,
+    annual_production_kWh: -10,
+    monthly_consumption_kWh: 600,
+    tariff_rate_mxn: 4.50
+  });
+  assertEquals(finResultSanitized.investment_mxn, 0, 'sanitized investment is 0');
+  assertEquals(finResultSanitized.annual_savings_yr1, 0, 'sanitized savings is 0');
+  assertEquals(finResultSanitized.payback_years, 99, 'sanitized payback is 99');
+  assertEquals(finResultSanitized.co2_saved_kg_25yr, 0, 'sanitized CO2 is 0');
+
+  console.log('\nAll Esun Sizing and Financial Engine tests passed successfully.');
 }
 
 try {

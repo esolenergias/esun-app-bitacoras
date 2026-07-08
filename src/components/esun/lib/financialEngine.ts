@@ -23,6 +23,25 @@ export interface FinancialResult {
 }
 
 export function calculateFinancials(input: FinancialInput): FinancialResult {
+  if (
+    input.installed_kWp <= 0 ||
+    input.annual_production_kWh <= 0 ||
+    input.monthly_consumption_kWh <= 0 ||
+    input.tariff_rate_mxn <= 0
+  ) {
+    return {
+      investment_mxn: 0,
+      annual_savings_yr1: 0,
+      payback_years: 99,
+      npv: 0,
+      roi_pct: 0,
+      cashflows_25yr: Array(25).fill(0),
+      co2_saved_kg_25yr: 0,
+      trees_equivalent: 0,
+      cars_equivalent: 0,
+      coal_equivalent_tons: 0
+    };
+  }
   // 1. Calculate investment cost based on installed size if not custom overridden
   let costPerWatt = SOLAR_CONSTANTS.COST_PER_W_MXN.small;
   const size = input.installed_kWp; // Use installed size for cost
