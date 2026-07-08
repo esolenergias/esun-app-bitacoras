@@ -56,8 +56,8 @@ export function parseCFEText(fullText: string): CFEData {
   const is_bimonthly = !tariff.startsWith('G') && !tariff.startsWith('P'); // GDMTH, PDBT monthly
   const monthly_kWh = is_bimonthly ? Math.round(bimonthly_kWh / 2) : bimonthly_kWh;
 
-  // Simplify Tariff Rate Division using total bimonthly divisor
-  const tariff_rate = bimonthly_kWh > 0 ? (total_mxn / bimonthly_kWh) : 4.50;
+  // Simplify Tariff Rate Division using total bimonthly divisor, fallback to 4.50 if total amount is missing
+  const tariff_rate = (bimonthly_kWh > 0 && total_mxn > 0) ? (total_mxn / bimonthly_kWh) : 4.50;
 
   return {
     service_number: serviceMatch ? serviceMatch[1].replace(/\s/g, '') : undefined,
