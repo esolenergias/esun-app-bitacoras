@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import CFEUploader from './CFEUploader';
 import CFEDataForm from './CFEDataForm';
@@ -37,7 +37,7 @@ export default function EsunPage() {
     loadQuotes();
   }, []);
 
-  const saveQuote = (cfe: any, sys: any, finParams: any) => {
+  const saveQuote = useCallback((cfe: any, sys: any, finParams: any) => {
     if (!cfe || !sys) return;
     
     const finResult = calculateFinancials({
@@ -82,14 +82,14 @@ export default function EsunPage() {
     localStorage.setItem('esun_quotes', JSON.stringify(existingQuotes));
     setCurrentQuoteId(newQuote.id);
     setQuotes(existingQuotes);
-  };
+  }, [currentQuoteId, quotes]);
 
   // Auto-save quote in results view when system or cfeData updates
   useEffect(() => {
     if (view === 'results' && cfeData && system) {
       saveQuote(cfeData, system, financialParams);
     }
-  }, [view, cfeData, system, financialParams]);
+  }, [view, cfeData, system, financialParams, saveQuote]);
 
   const loadQuote = (quote: any) => {
     setCurrentQuoteId(quote.id);

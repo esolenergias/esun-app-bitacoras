@@ -14,6 +14,9 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
   const [isBimonthly, setIsBimonthly] = useState(data.is_bimonthly);
   const [monthlyKWh, setMonthlyKWh] = useState(data.monthly_kWh || 0);
   const [bimonthlyKWh, setBimonthlyKWh] = useState(data.bimonthly_kWh || 0);
+  const [totalMxnStr, setTotalMxnStr] = useState(String(data.total_mxn || 0));
+  const [tariffRateStr, setTariffRateStr] = useState(String(data.tariff_rate || 4.50));
+
   const [totalMxn, setTotalMxn] = useState(data.total_mxn || 0);
   const [tariffRate, setTariffRate] = useState(data.tariff_rate || 4.50);
   const [demandKw, setDemandKw] = useState(data.demand_kw || 0);
@@ -21,19 +24,14 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
 
   // Sync is_bimonthly when tariff changes
   useEffect(() => {
-    const bimonthly = !tariff.startsWith('G') && !tariff.startsWith('P');
-    setIsBimonthly(bimonthly);
-    
-    if (!bimonthly) {
-      // For monthly tariffs, bimonthly kWh is equal to monthly kWh
-      setBimonthlyKWh(monthlyKWh);
+    const isBim = !tariff.startsWith('G') && !tariff.startsWith('P');
+    setIsBimonthly(isBim);
+    if (isBim) {
+      setMonthlyKWh(Math.round(bimonthlyKWh / 2));
     } else {
-      // For bimonthly tariffs, set bimonthly if it was equal to monthly
-      if (bimonthlyKWh === monthlyKWh && monthlyKWh > 0) {
-        setBimonthlyKWh(monthlyKWh * 2);
-      }
+      setMonthlyKWh(bimonthlyKWh);
     }
-  }, [tariff]);
+  }, [tariff, bimonthlyKWh]);
 
   // Handle bimonthly kWh changes
   const handleBimonthlyChange = (val: number) => {
@@ -61,6 +59,7 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
     if (divisor > 0 && totalMxn > 0) {
       const calculated = parseFloat((totalMxn / divisor).toFixed(2));
       setTariffRate(calculated);
+      setTariffRateStr(String(calculated));
     }
   };
 
@@ -75,8 +74,8 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
       tariff,
       monthly_kWh: monthlyKWh,
       bimonthly_kWh: bimonthlyKWh,
-      total_mxn: totalMxn,
-      tariff_rate: tariffRate,
+      total_mxn: parseFloat(totalMxnStr) || 0,
+      tariff_rate: parseFloat(tariffRateStr) || 0,
       demand_kw: showDemand ? demandKw : undefined,
       power_factor: showPowerFactor ? powerFactor : undefined,
       is_bimonthly: isBimonthly,
@@ -198,8 +197,15 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
             <input
               type="number"
               step="0.01"
-              value={totalMxn || ''}
-              onChange={(e) => setTotalMxn(parseFloat(e.target.value) || 0)}
+              value={totalMxnStr}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTotalMxnStr(val);
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed) && parsed >= 0) {
+                  setTotalMxn(parsed);
+                }
+              }}
               placeholder="Ej. 2500"
               required
               className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors font-mono"
@@ -223,8 +229,15 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
             <input
               type="number"
               step="0.01"
-              value={tariffRate || ''}
-              onChange={(e) => setTariffRate(parseFloat(e.target.value) || 0)}
+              value={tariffRateStr}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTariffRateStr(val);
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed) && parsed >= 0) {
+                  setTariffRate(parsed);
+                }
+              }}
               placeholder="Ej. 4.50"
               required
               className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors font-mono"

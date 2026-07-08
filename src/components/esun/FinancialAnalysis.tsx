@@ -181,6 +181,18 @@ export default function FinancialAnalysis({
               >
                 Aceptar
               </button>
+              {manualCost !== undefined && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChangeFinancialParams({ ...financialParams, manualCost: undefined });
+                    setIsEditingCost(false);
+                  }}
+                  className="px-2.5 py-1.5 bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 text-red-400 font-bold text-xs rounded-lg transition-all cursor-pointer"
+                >
+                  Restablecer automático
+                </button>
+              )}
             </div>
           ) : (
             <button

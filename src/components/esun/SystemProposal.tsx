@@ -11,6 +11,10 @@ interface SystemProposalProps {
 }
 
 export default function SystemProposal({ cfeData, system, onUpdate }: SystemProposalProps) {
+  const [panelVocStr, setPanelVocStr] = useState(String(system?.panel_Voc || 50));
+  const [panelWpStr, setPanelWpStr] = useState(String(system?.panel_Wp || 550));
+  const [inverterMaxVdcStr, setInverterMaxVdcStr] = useState(String(system?.inverter_max_vdc || 600));
+
   const [city, setCity] = useState(system?.city || 'CDMX');
   const [panelWp, setPanelWp] = useState(system?.panel_Wp || 550);
   const [panelVoc, setPanelVoc] = useState(system?.panel_Voc || 50);
@@ -40,7 +44,7 @@ export default function SystemProposal({ cfeData, system, onUpdate }: SystemProp
       inverter_max_vdc: inverterMaxVdc,
       city
     });
-  }, [cfeData.monthly_kWh, city, panelWp, panelVoc, inverterMaxVdc]);
+  }, [cfeData.monthly_kWh, city, panelWp, panelVoc, inverterMaxVdc, onUpdate]);
 
   const cityOptions = Object.keys(SOLAR_CONSTANTS.PSH).filter(c => c !== 'default').sort();
 
@@ -84,8 +88,15 @@ export default function SystemProposal({ cfeData, system, onUpdate }: SystemProp
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-cream uppercase tracking-wide">Potencia del Panel (Wp)</label>
             <select
-              value={panelWp}
-              onChange={(e) => setPanelWp(parseInt(e.target.value))}
+              value={panelWpStr}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPanelWpStr(val);
+                const parsed = parseInt(val, 10);
+                if (!isNaN(parsed) && parsed > 0) {
+                  setPanelWp(parsed);
+                }
+              }}
               className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2 rounded-xl focus:outline-none transition-colors cursor-pointer text-sm font-medium"
             >
               <option value={400}>400W</option>
@@ -101,8 +112,15 @@ export default function SystemProposal({ cfeData, system, onUpdate }: SystemProp
             <label className="text-xs font-semibold text-cream uppercase tracking-wide">Voc del Panel (V)</label>
             <input
               type="number"
-              value={panelVoc || ''}
-              onChange={(e) => setPanelVoc(parseFloat(e.target.value) || 0)}
+              value={panelVocStr}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPanelVocStr(val);
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed) && parsed > 0) {
+                  setPanelVoc(parsed);
+                }
+              }}
               placeholder="Ej. 50"
               className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2 rounded-xl focus:outline-none transition-colors font-mono text-sm"
             />
@@ -113,8 +131,15 @@ export default function SystemProposal({ cfeData, system, onUpdate }: SystemProp
             <label className="text-xs font-semibold text-cream uppercase tracking-wide">Voltaje Máx Inversor (Vdc)</label>
             <input
               type="number"
-              value={inverterMaxVdc || ''}
-              onChange={(e) => setInverterMaxVdc(parseInt(e.target.value) || 0)}
+              value={inverterMaxVdcStr}
+              onChange={(e) => {
+                const val = e.target.value;
+                setInverterMaxVdcStr(val);
+                const parsed = parseInt(val, 10);
+                if (!isNaN(parsed) && parsed > 0) {
+                  setInverterMaxVdc(parsed);
+                }
+              }}
               placeholder="Ej. 600"
               className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2 rounded-xl focus:outline-none transition-colors font-mono text-sm"
             />
