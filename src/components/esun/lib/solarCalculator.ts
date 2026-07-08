@@ -23,7 +23,7 @@ export interface SizingResult {
 }
 
 export function calculateSizing(input: SizingInput): SizingResult {
-  if (input.panel_Wp <= 0 || input.panel_Voc <= 0 || input.monthly_kWh <= 0) {
+  if (input.panel_Wp <= 0 || input.panel_Voc <= 0 || input.monthly_kWh <= 0 || input.inverter_max_vdc <= 0) {
     return {
       system_kWp: 0,
       installed_kWp: 0,
@@ -44,21 +44,24 @@ export function calculateSizing(input: SizingInput): SizingResult {
   // 1. Target kWp sizing with 20% margin
   const system_kWp = (input.monthly_kWh * SOLAR_CONSTANTS.SIZING_MARGIN) / (psh * SOLAR_CONSTANTS.DAYS_IN_MONTH * pr);
   
-  // 2. Number of panels
-  const num_panels = Math.ceil((system_kWp * 1000) / input.panel_Wp);
+  // 2. Initial number of panels
+  const initial_num_panels = Math.ceil((system_kWp * 1000) / input.panel_Wp);
 
-  // Calculate installed capacity
-  const installed_kWp = (num_panels * input.panel_Wp) / 1000;
-
-  // 3. Electrical strings check
-  // Fix String balancing and string_Voc logic
+  // 3. Electrical strings check & Balancing
   const max_panels_per_string = Math.floor(input.inverter_max_vdc / (input.panel_Voc * SOLAR_CONSTANTS.TEMP_COEFF_VOC));
-  const num_strings = max_panels_per_string > 0 ? Math.ceil(num_panels / max_panels_per_string) : 0;
+  const num_strings = max_panels_per_string > 0 ? Math.ceil(initial_num_panels / max_panels_per_string) : 0;
   
   // Distribute panels evenly across strings
-  const panels_per_string = num_strings > 0 ? Math.ceil(num_panels / num_strings) : 0;
+  const panels_per_string = num_strings > 0 ? Math.ceil(initial_num_panels / num_strings) : 0;
+  
+  // Adjust num_panels to match balanced configuration (strings * panels_per_string)
+  const num_panels = num_strings * panels_per_string;
+
   const string_Voc = panels_per_string * input.panel_Voc * SOLAR_CONSTANTS.TEMP_COEFF_VOC;
   const is_electrical_safe = max_panels_per_string > 0 && string_Voc <= input.inverter_max_vdc;
+
+  // Calculate actual installed capacity based on balanced panels
+  const installed_kWp = (num_panels * input.panel_Wp) / 1000;
 
   // 4. Area
   const area_m2 = num_panels * SOLAR_CONSTANTS.AREA_PER_PANEL_M2 * SOLAR_CONSTANTS.AREA_SPACING;
