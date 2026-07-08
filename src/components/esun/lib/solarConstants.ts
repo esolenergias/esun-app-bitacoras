@@ -12,6 +12,9 @@ export const SOLAR_CONSTANTS = {
   AREA_PER_PANEL_M2: 2.1,    // Average 550W panel area
   AREA_SPACING: 1.15,        // Spacing factor (15% additional)
   SIZING_MARGIN: 1.20,       // 20% sizing safety margin for production offset
+  TEMP_COEFF_VOC: 1.05,
+  DAYS_IN_MONTH: 30,
+  DAYS_IN_YEAR: 365,
   PSH: {
     'Hermosillo': 6.3,
     'Mexicali': 6.0,
