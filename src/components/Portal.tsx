@@ -76,6 +76,22 @@ export function Portal() {
   // Collapsed sidebar state (for mobile responsiveness)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Load esun quotes to feed general dashboard statistics
+  const [esunQuotes, setEsunQuotes] = useState<any[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('esun_quotes');
+      if (stored) {
+        setEsunQuotes(JSON.parse(stored));
+      } else {
+        setEsunQuotes([]);
+      }
+    } catch (e) {
+      console.error("Error loading esun quotes for dashboard stats:", e);
+    }
+  }, [activeTab]);
+
 
 
   // B2B Products Management states
@@ -2116,14 +2132,16 @@ export function Portal() {
                         {/* Stat 1 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
                           <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Total Cotizado</span>
-                          <h4 className="text-2xl font-black text-gold mt-2 font-display">$4.2M MXN</h4>
-                          <span className="text-[9px] text-green-400 font-bold block mt-3">↑ 18.5% respecto al mes anterior</span>
+                          <h4 className="text-2xl font-black text-gold mt-2 font-display">
+                            ${esunQuotes.reduce((acc, q) => acc + (q.financial?.investment_mxn || 0), 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })} MXN
+                          </h4>
+                          <span className="text-[9px] text-green-400 font-bold block mt-3">↑ Total acumulado en Esun Solar</span>
                         </div>
                         {/* Stat 2 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
                           <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Leads por IA</span>
-                          <h4 className="text-2xl font-black text-gold mt-2 font-display">{leads.length} leads</h4>
-                          <span className="text-[9px] text-cream-muted block mt-3">Calificados automáticamente por Carlos</span>
+                          <h4 className="text-2xl font-black text-gold mt-2 font-display">{esunQuotes.length} leads</h4>
+                          <span className="text-[9px] text-cream-muted block mt-3">Cotizaciones creadas en Esun Solar</span>
                         </div>
                         {/* Stat 3 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
