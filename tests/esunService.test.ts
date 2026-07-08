@@ -1,5 +1,6 @@
 import { calculateSizing } from '../src/components/esun/lib/solarCalculator';
 import { calculateFinancials } from '../src/components/esun/lib/financialEngine';
+import { parseCFEText } from '../src/components/esun/lib/cfeParser';
 
 function assertEquals(actual: any, expected: any, message: string) {
   if (typeof actual === 'number' && typeof expected === 'number') {
@@ -162,6 +163,43 @@ function runTests() {
   assertEquals(finResultSanitized.annual_savings_yr1, 0, 'sanitized savings is 0');
   assertEquals(finResultSanitized.payback_years, 99, 'sanitized payback is 99');
   assertEquals(finResultSanitized.co2_saved_kg_25yr, 0, 'sanitized CO2 is 0');
+
+  // Test Case 7: Mock Residential CFE bill string
+  console.log('\n--- Test Case 7: Mock Residential CFE Bill ---');
+  const resBill = parseCFEText("NO. DE SERVICIO 123456789012 Tarifa 1C Consumo de energía (kWh) 850 Total a Pagar $3,450");
+  assertEquals(resBill.service_number, '123456789012', 'Residential service number');
+  assertEquals(resBill.tariff, '1C', 'Residential tariff');
+  assertEquals(resBill.bimonthly_kWh, 850, 'Residential bimonthly kWh');
+  assertEquals(resBill.monthly_kWh, 425, 'Residential monthly kWh');
+  assertEquals(resBill.total_mxn, 3450, 'Residential total MXN');
+  assertEquals(resBill.tariff_rate, 4.06, 'Residential tariff rate');
+  assertEquals(resBill.is_bimonthly, true, 'Residential is_bimonthly');
+  assertEquals(resBill.demand_kw, undefined, 'Residential demand_kw');
+  assertEquals(resBill.power_factor, undefined, 'Residential power_factor');
+
+  // Test Case 8: Mock GDMTH Commercial CFE bill string
+  console.log('\n--- Test Case 8: Mock GDMTH Commercial CFE Bill ---');
+  const commBill = parseCFEText("NÚMERO DE SERVICIO 987654321098 Tarifa GDMTH Consumo Total 15000 Demanda Máxima 45 kW Total a Pagar $45,000");
+  assertEquals(commBill.service_number, '987654321098', 'Commercial service number');
+  assertEquals(commBill.tariff, 'GDMTH', 'Commercial tariff');
+  assertEquals(commBill.bimonthly_kWh, 15000, 'Commercial bimonthly kWh');
+  assertEquals(commBill.monthly_kWh, 15000, 'Commercial monthly kWh');
+  assertEquals(commBill.total_mxn, 45000, 'Commercial total MXN');
+  assertEquals(commBill.tariff_rate, 3.00, 'Commercial tariff rate');
+  assertEquals(commBill.is_bimonthly, false, 'Commercial is_bimonthly');
+  assertEquals(commBill.demand_kw, 45, 'Commercial demand_kw');
+  assertEquals(commBill.power_factor, undefined, 'Commercial power_factor');
+
+  // Test Case 9: Mock Invalid bill string
+  console.log('\n--- Test Case 9: Mock Invalid Bill (Throws error) ---');
+  let threwError = false;
+  try {
+    parseCFEText("NO. DE SERVICIO 123456789012 Tarifa 1C Total a Pagar $3,450");
+  } catch (err: any) {
+    threwError = true;
+    assertEquals(err.message, "No se pudo extraer el consumo del recibo CFE. Ingrésalo manualmente.", "Expected parser error message");
+  }
+  assertEquals(threwError, true, "Invalid bill throws an error");
 
   console.log('\nAll Esun Sizing and Financial Engine tests passed successfully.');
 }
