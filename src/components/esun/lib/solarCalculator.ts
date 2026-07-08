@@ -7,6 +7,7 @@ export interface SizingInput {
   panel_Voc: number;
   inverter_max_vdc: number;
   inverter_kw: number;
+  historic_consumptions?: number[];
 }
 
 export interface SizingResult {
@@ -41,8 +42,18 @@ export function calculateSizing(input: SizingInput): SizingResult {
   const psh = SOLAR_CONSTANTS.PSH[input.city] || SOLAR_CONSTANTS.PSH['default'];
   const pr = SOLAR_CONSTANTS.PR_DEFAULT;
 
+  // Compute effective monthly kWh from historic list if present to balance yearly seasonality
+  let effectiveMonthlyKWh = input.monthly_kWh;
+  if (input.historic_consumptions && input.historic_consumptions.length > 0) {
+    const sum = input.historic_consumptions.reduce((acc, v) => acc + v, 0);
+    // 6 bimonthly periods = 12 months, 12 monthly periods = 12 months
+    const isBim = input.historic_consumptions.length <= 6;
+    const totalMonths = isBim ? input.historic_consumptions.length * 2 : input.historic_consumptions.length;
+    effectiveMonthlyKWh = totalMonths > 0 ? (sum / totalMonths) : input.monthly_kWh;
+  }
+
   // 1. Target kWp sizing with 20% margin
-  const system_kWp = (input.monthly_kWh * SOLAR_CONSTANTS.SIZING_MARGIN) / (psh * SOLAR_CONSTANTS.DAYS_IN_MONTH * pr);
+  const system_kWp = (effectiveMonthlyKWh * SOLAR_CONSTANTS.SIZING_MARGIN) / (psh * SOLAR_CONSTANTS.DAYS_IN_MONTH * pr);
   
   // 2. Initial number of panels
   const initial_num_panels = Math.ceil((system_kWp * 1000) / input.panel_Wp);

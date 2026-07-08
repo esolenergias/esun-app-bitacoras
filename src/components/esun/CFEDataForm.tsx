@@ -24,14 +24,41 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
   const [demandKwStr, setDemandKwStr] = useState(data.demand_kw ? String(data.demand_kw) : '');
   const [powerFactorStr, setPowerFactorStr] = useState(data.power_factor ? String(data.power_factor) : '');
 
-  // Sync is_bimonthly when tariff changes
+  // New fields: Last payment info
+  const [lastPaymentDate, setLastPaymentDate] = useState(data.last_payment_date || '');
+  const [lastPaymentAmountStr, setLastPaymentAmountStr] = useState(data.last_payment_amount ? String(data.last_payment_amount) : '');
+  const [lastPaymentAmount, setLastPaymentAmount] = useState(data.last_payment_amount || 0);
+
+  // New fields: Historic consumptions
+  const isBimTariff = !tariff.startsWith('GDM') && !tariff.startsWith('APM') && !tariff.startsWith('RAM') && !tariff.startsWith('DIS') && !tariff.startsWith('DI');
+  const defaultHistoricLength = isBimTariff ? 6 : 12;
+  const defaultVal = isBimTariff ? (data.bimonthly_kWh || 0) : (data.monthly_kWh || 0);
+  const initialHistoric = data.historic_consumptions && data.historic_consumptions.length === defaultHistoricLength
+    ? data.historic_consumptions
+    : Array(defaultHistoricLength).fill(defaultVal);
+
+  const [historicConsumptions, setHistoricConsumptions] = useState<number[]>(initialHistoric);
+  const [historicConsumptionsStr, setHistoricConsumptionsStr] = useState<string[]>(initialHistoric.map(String));
+
+  // Sync is_bimonthly and reset historic list length when tariff changes
   useEffect(() => {
-    const isBim = !tariff.startsWith('G') && !tariff.startsWith('P');
+    const isBim = !tariff.startsWith('GDM') && !tariff.startsWith('APM') && !tariff.startsWith('RAM') && !tariff.startsWith('DIS') && !tariff.startsWith('DI');
     setIsBimonthly(isBim);
+    
+    // Sync monthly/bimonthly kWh fields
     if (isBim) {
       setMonthlyKWh(Math.round(bimonthlyKWh / 2));
     } else {
       setMonthlyKWh(bimonthlyKWh);
+    }
+
+    // Adapt historic consumptions array length
+    const requiredLength = isBim ? 6 : 12;
+    const currentVal = isBim ? bimonthlyKWh : monthlyKWh;
+    if (historicConsumptions.length !== requiredLength) {
+      const adapted = Array(requiredLength).fill(currentVal || 0);
+      setHistoricConsumptions(adapted);
+      setHistoricConsumptionsStr(adapted.map(String));
     }
   }, [tariff, bimonthlyKWh]);
 
@@ -65,6 +92,30 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
     }
   };
 
+  // Handle changes in historic consumptions list, automatically updating average monthly/bimonthly kWh fields
+  const handleHistoricChange = (index: number, valStr: string) => {
+    const updatedStr = [...historicConsumptionsStr];
+    updatedStr[index] = valStr;
+    setHistoricConsumptionsStr(updatedStr);
+
+    const parsed = parseInt(valStr) || 0;
+    const updated = [...historicConsumptions];
+    updated[index] = parsed;
+    setHistoricConsumptions(updated);
+
+    // Calculate total consumption and average
+    const sum = updated.reduce((acc, v) => acc + v, 0);
+    const avg = Math.round(sum / updated.length);
+
+    if (isBimonthly) {
+      setBimonthlyKWh(avg);
+      setMonthlyKWh(Math.round(avg / 2));
+    } else {
+      setMonthlyKWh(avg);
+      setBimonthlyKWh(avg);
+    }
+  };
+
   const showDemand = tariff === 'PDBT' || tariff === 'GDBT' || tariff === 'GDMTH';
   const showPowerFactor = showDemand && demandKw > 0;
 
@@ -81,6 +132,9 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
       demand_kw: showDemand ? demandKw : undefined,
       power_factor: showPowerFactor ? powerFactor : undefined,
       is_bimonthly: isBimonthly,
+      last_payment_date: lastPaymentDate || undefined,
+      last_payment_amount: lastPaymentAmount || undefined,
+      historic_consumptions: historicConsumptions
     };
     onSubmit(finalData);
   };
@@ -295,6 +349,69 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
               />
             </div>
           )}
+
+          {/* Last Payment Date */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-cream uppercase tracking-wide">Fecha del Último Pago</label>
+            <input
+              type="text"
+              value={lastPaymentDate}
+              onChange={(e) => setLastPaymentDate(e.target.value)}
+              placeholder="Ej. 15 ENE 26 o 2026-01-15"
+              className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors"
+            />
+          </div>
+
+          {/* Last Payment Amount */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-cream uppercase tracking-wide">Monto del Último Pago ($ MXN)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={lastPaymentAmountStr}
+              onChange={(e) => {
+                const val = e.target.value;
+                setLastPaymentAmountStr(val);
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed) && parsed >= 0) {
+                  setLastPaymentAmount(parsed);
+                } else {
+                  setLastPaymentAmount(0);
+                }
+              }}
+              placeholder="Ej. 3450"
+              className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors font-mono"
+            />
+          </div>
+        </div>
+
+        {/* Historic Consumptions Section */}
+        <div className="border-t border-dark-4 pt-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-gold uppercase tracking-wide">Historial de Consumo (Último Año)</h3>
+            <p className="text-cream-muted text-[11px] mt-0.5 leading-relaxed">
+              Ingresa o ajusta el consumo en kWh de cada periodo para estimar con precisión el número de paneles, compensando la estacionalidad del año.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+            {historicConsumptions.map((val, idx) => {
+              const label = isBimonthly ? `Bimestre ${idx + 1}` : `Mes ${idx + 1}`;
+              return (
+                <div key={idx} className="space-y-1">
+                  <label className="text-[10px] font-semibold text-cream-muted uppercase tracking-wider block">{label}</label>
+                  <input
+                    type="number"
+                    value={historicConsumptionsStr[idx] || ''}
+                    onChange={(e) => handleHistoricChange(idx, e.target.value)}
+                    placeholder="kWh"
+                    required
+                    className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2 rounded-lg text-xs focus:outline-none transition-colors font-mono text-center"
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Action Button */}
