@@ -1,0 +1,599 @@
+package com.example.ui.screens
+
+import android.content.ContentValues
+import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.ui.theme.*
+import com.example.ui.viewmodel.BitacoraViewModel
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
+@Composable
+fun NewBitacoraScreen(
+    viewModel: BitacoraViewModel,
+    projectName: String,
+    onNavigateToDashboard: () -> Unit
+) {
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Core states from ViewModel
+    val userName by viewModel.userName.collectAsState()
+    val supervisorName by viewModel.supervisorName.collectAsState()
+    val weather by viewModel.weather.collectAsState()
+    val capturedPhotoUri by viewModel.capturedPhotoUri.collectAsState()
+    
+    // Auto-bind site/project name
+    LaunchedEffect(projectName) {
+        viewModel.setSiteName(projectName)
+    }
+    
+    // Dynamic formatted date
+    val currentDateStr = remember { SimpleDateFormat("dd MMMM, yyyy", Locale("es", "MX")).format(Date()) }
+    
+    // Section expansions
+    var expPersonnel by remember { mutableStateOf(true) }
+    var expMachinery by remember { mutableStateOf(false) }
+    var expActivities by remember { mutableStateOf(true) }
+    var expIncidents by remember { mutableStateOf(false) }
+    
+    // State variables for the advanced form
+    var internalCrew by remember { mutableStateOf("12") }
+    var subCrew by remember { mutableStateOf("8") }
+    var machineryUsed by remember { mutableStateOf("Excavadora Cat 320, Grúa Telescópica") }
+    var activitiesText by remember { mutableStateOf("Instalación de estructuras metálicas en zona norte y canalización subterránea.") }
+    var progressVal by remember { mutableStateOf(45f) }
+    var safetyRemarks by remember { mutableStateOf("Charcos por lluvia previa, se acordonó el área.") }
+    
+    // Launchers for Camera and Gallery
+    // Permiso de cámara
+    val cameraPermission = rememberPermissionState(android.Manifest.permission.CAMERA)
+
+    // URI mutable para la foto que se tomará con TakePicture
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Crea un URI en MediaStore para guardar la foto con alta calidad
+    fun createPhotoUri(): Uri? {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "Bitacora_${timestamp}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ESunBitacora")
+        }
+        return context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+    }
+
+    // Launcher de galería
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.setCapturedPhotoUri(uri.toString())
+            Toast.makeText(context, "Imagen de galería adjuntada", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Launcher de cámara con TakePicture — guarda la foto en MediaStore con calidad original
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && photoUri != null) {
+            viewModel.setCapturedPhotoUri(photoUri.toString())
+            Toast.makeText(context, "¡Foto capturada y guardada!", Toast.LENGTH_SHORT).show()
+        } else if (!success) {
+            Toast.makeText(context, "Captura cancelada", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    // Save button states
+    var isSaving by remember { mutableStateOf(false) }
+    var saveButtonText by remember { mutableStateOf("FIRMAR Y GUARDAR REPORTE") }
+    
+    Column(modifier = Modifier.fillMaxSize().background(SlateBg)) {
+        // Sticky Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(PureWhite)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onNavigateToDashboard) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Regresar", tint = SlateDeep)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text("Seguimiento de Obra", fontWeight = FontWeight.Black, fontSize = 18.sp, color = SlateDeep)
+                    Text(currentDateStr, fontSize = 12.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        
+        HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
+
+        // Main Form Content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            
+            // --- 1. INFORMACIÓN AUTOMÁTICA Y CLIMA ---
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = PureWhite)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "INFORMACIÓN AUTOMÁTICA",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = ConnectedBlue,
+                            letterSpacing = 1.sp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .background(SuccessGreenBg, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "SINCRO",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                color = SuccessGreen
+                            )
+                        }
+                    }
+
+                    Column {
+                        Text("Proyecto / Frente de Obra", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                        Text(projectName, fontSize = 16.sp, fontWeight = FontWeight.Black, color = SlateDeep)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Quién Reporta", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                            Text(userName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Supervisor a Cargo", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                            Text(supervisorName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
+                        }
+                    }
+
+                    HorizontalDivider(color = SubtleOutline.copy(alpha = 0.5f), thickness = 1.dp)
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Clima de Hoy", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            WeatherChip(icon = Icons.Default.WbSunny, label = "Soleado", selected = weather == "Soleado") { viewModel.setWeather("Soleado") }
+                            WeatherChip(icon = Icons.Default.Cloud, label = "Nublado", selected = weather == "Nublado") { viewModel.setWeather("Nublado") }
+                            WeatherChip(icon = Icons.Default.WaterDrop, label = "Lluvia", selected = weather == "Lluvia") { viewModel.setWeather("Lluvia") }
+                        }
+                    }
+                }
+            }
+            
+            // --- 2. PERSONAL EN OBRA ---
+            ExpandableFormSection(
+                title = "Personal en Obra",
+                icon = Icons.Default.People,
+                isExpanded = expPersonnel,
+                onToggle = { expPersonnel = !expPersonnel }
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = internalCrew,
+                        onValueChange = { internalCrew = it },
+                        label = { Text("Plantilla Interna") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = outlinedTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = subCrew,
+                        onValueChange = { subCrew = it },
+                        label = { Text("Contratistas") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = outlinedTextFieldColors()
+                    )
+                }
+            }
+
+            // --- 3. MAQUINARIA Y EQUIPOS ---
+            ExpandableFormSection(
+                title = "Maquinaria y Equipos",
+                icon = Icons.Default.PrecisionManufacturing,
+                isExpanded = expMachinery,
+                onToggle = { expMachinery = !expMachinery }
+            ) {
+                OutlinedTextField(
+                    value = machineryUsed,
+                    onValueChange = { machineryUsed = it },
+                    label = { Text("Equipo Mayor Utilizado") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    colors = outlinedTextFieldColors()
+                )
+            }
+
+            // --- 4. ACTIVIDADES Y AVANCE ---
+            ExpandableFormSection(
+                title = "Actividades y Avance Físico",
+                icon = Icons.Default.Engineering,
+                isExpanded = expActivities,
+                onToggle = { expActivities = !expActivities }
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(
+                        value = activitiesText,
+                        onValueChange = { activitiesText = it },
+                        label = { Text("Descripción de trabajos ejecutados") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        colors = outlinedTextFieldColors()
+                    )
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Avance Diario Estimado", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = SlateDeep)
+                            Text("${progressVal.toInt()}%", fontWeight = FontWeight.Black, fontSize = 13.sp, color = ConnectedBlue)
+                        }
+                        Slider(
+                            value = progressVal,
+                            onValueChange = { progressVal = it },
+                            valueRange = 0f..100f,
+                            colors = SliderDefaults.colors(thumbColor = ConnectedBlue, activeTrackColor = ConnectedBlue)
+                        )
+                    }
+                }
+            }
+
+            // --- 5. INCIDENTES Y SEGURIDAD ---
+            ExpandableFormSection(
+                title = "Incidentes y Seguridad",
+                icon = Icons.Default.Warning,
+                isExpanded = expIncidents,
+                onToggle = { expIncidents = !expIncidents }
+            ) {
+                OutlinedTextField(
+                    value = safetyRemarks,
+                    onValueChange = { safetyRemarks = it },
+                    label = { Text("Observaciones / Riesgos / Accidentes") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    colors = outlinedTextFieldColors()
+                )
+            }
+
+            // --- 6. EVIDENCIA FOTOGRÁFICA (CAMARA Y GALERIA) ---
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = PureWhite)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "EVIDENCIA FOTOGRÁFICA",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OnSurfaceVariant,
+                        letterSpacing = 1.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Botón 1: Camara
+                        Button(
+                            onClick = {
+                                if (cameraPermission.status.isGranted) {
+                                    val uri = createPhotoUri()
+                                    if (uri != null) {
+                                        photoUri = uri
+                                        cameraLauncher.launch(uri)
+                                    } else {
+                                        Toast.makeText(context, "Error al crear archivo de imagen", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    cameraPermission.launchPermissionRequest()
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ConnectedBlue,
+                                contentColor = PureWhite
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.PhotoCamera, contentDescription = "Abrir Cámara", modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Cámara", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+
+                        // Button 2: Galería
+                        Button(
+                            onClick = { galleryLauncher.launch("image/*") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = LightGrayBg,
+                                contentColor = SlateDeep
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, SubtleOutline)
+                        ) {
+                            Icon(Icons.Default.PhotoLibrary, contentDescription = "Abrir Galería", modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Galería", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+
+                    // Previsualizar la imagen capturada o de galería
+                    if (capturedPhotoUri != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(12.dp))
+                        ) {
+                            AsyncImage(
+                                model = capturedPhotoUri,
+                                contentDescription = "Evidencia fotográfica",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+
+                            // Clean Remove Button
+                            IconButton(
+                                onClick = { viewModel.setCapturedPhotoUri(null) },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+                                    .size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Quitar foto",
+                                    tint = PureWhite,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        // Empty photo state
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp)
+                                .background(LightGrayBg, RoundedCornerShape(12.dp))
+                                .border(BorderStroke(1.dp, SubtleOutline.copy(alpha = 0.5f)), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = OnSurfaceVariant.copy(alpha = 0.7f))
+                                Text(
+                                    text = "Ninguna evidencia adjuntada aún.",
+                                    fontSize = 12.sp,
+                                    color = OnSurfaceVariant,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Save Button
+            Button(
+                onClick = {
+                    coroutineScope.launch {
+                        isSaving = true
+                        saveButtonText = "GUARDANDO..."
+                        delay(800)
+
+                        // Pasar todos los campos al ViewModel
+                        viewModel.setSiteName(projectName)
+                        val formattedDescription = "Reportado por: $userName\nSupervisor a cargo: $supervisorName\n\n$activitiesText"
+                        viewModel.setDescription(formattedDescription)
+                        val totalCrew = (internalCrew.toIntOrNull() ?: 0) + (subCrew.toIntOrNull() ?: 0)
+                        viewModel.setCrewCount(totalCrew)
+                        viewModel.setPhysicalProgress(progressVal.toDouble())
+                        // El progreso financiero se deja como porcentaje (se calcula desde budget_items)
+                        viewModel.setFinancialProgress(progressVal.toDouble())
+                        // Pasar los nuevos campos
+                        viewModel.setSafetyRemarks(safetyRemarks)
+                        viewModel.setMachinery(machineryUsed)
+
+                        viewModel.submitDailyLog {
+                            coroutineScope.launch {
+                                isSaving = false
+                                saveButtonText = "¡LISTO!"
+                                delay(500)
+                                onNavigateToDashboard()
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                enabled = !isSaving
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(color = PureWhite, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(saveButtonText, fontWeight = FontWeight.Black, fontSize = 16.sp, color = PureWhite)
+                } else {
+                    Icon(Icons.Default.Draw, contentDescription = null, tint = PureWhite)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(saveButtonText, fontWeight = FontWeight.Black, fontSize = 16.sp, color = PureWhite)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+        }
+    }
+}
+
+@Composable
+fun ExpandableFormSection(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = PureWhite)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggle() }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(icon, contentDescription = null, tint = ConnectedBlue)
+                    Text(title, fontWeight = FontWeight.Black, fontSize = 15.sp, color = SlateDeep)
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = OnSurfaceVariant
+                )
+            }
+            
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(animationSpec = tween(300)),
+                exit = shrinkVertically(animationSpec = tween(300))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(bottom = 8.dp)
+                ) {
+                    content()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RowScope.WeatherChip(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+    val bgColor = if (selected) ConnectedBlue else LightGrayBg
+    val contentColor = if (selected) PureWhite else OnSurfaceVariant
+    val borderColor = if (selected) ConnectedBlue else SubtleOutline
+
+    Row(
+        modifier = Modifier
+            .weight(1f)
+            .height(48.dp)
+            .background(bgColor, RoundedCornerShape(8.dp))
+            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = contentColor)
+    }
+}
+
+@Composable
+fun outlinedTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = ConnectedBlue,
+    unfocusedBorderColor = SubtleOutline,
+    focusedContainerColor = PureWhite,
+    unfocusedContainerColor = LightGrayBg,
+    focusedLabelColor = ConnectedBlue,
+    unfocusedLabelColor = OnSurfaceVariant,
+    focusedTextColor = Color.Black,
+    unfocusedTextColor = Color.Black
+)

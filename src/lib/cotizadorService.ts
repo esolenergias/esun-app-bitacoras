@@ -59,6 +59,7 @@ interface DbPresupuesto {
   name: string;
   client_name: string;
   status: string;
+  produccion?: boolean;
   presupuesto_conceptos?: DbConcepto[];
   created_at?: string;
   updated_at?: string;
@@ -319,6 +320,7 @@ export async function getPresupuestos(): Promise<Presupuesto[]> {
     name: row.name,
     client_name: row.client_name,
     status: row.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
+    produccion: row.produccion ?? false,
     indirect_percentage: Number(row.indirect_percentage ?? 10.00),
     utility_percentage: Number(row.utility_percentage ?? 8.00),
     created_at: row.created_at,
@@ -375,6 +377,7 @@ export async function getPresupuestoDetails(idOrName: string): Promise<Presupues
     name: dbPresupuesto.name,
     client_name: dbPresupuesto.client_name,
     status: dbPresupuesto.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
+    produccion: dbPresupuesto.produccion ?? false,
     indirect_percentage: Number(dbPresupuesto.indirect_percentage ?? 10.00),
     utility_percentage: Number(dbPresupuesto.utility_percentage ?? 8.00),
     conceptos,
@@ -391,6 +394,7 @@ export async function savePresupuesto(
     name: presupuesto.name,
     client_name: presupuesto.client_name,
     status: presupuesto.status,
+    produccion: presupuesto.produccion ?? false,
     indirect_percentage: presupuesto.indirect_percentage ?? 10.00,
     utility_percentage: presupuesto.utility_percentage ?? 8.00,
     ...(presupuesto.id ? { id: presupuesto.id } : {})

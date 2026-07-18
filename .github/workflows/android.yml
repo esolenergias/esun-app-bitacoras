@@ -1,0 +1,42 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+      with:
+        gradle-version: current
+
+    - name: Build Debug APK
+      working-directory: ./esun-bitácoras
+      run: |
+        # Generate wrapper in case it's missing
+        gradle wrapper
+        # Build the APK
+        ./gradlew assembleDebug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Esun-Bitacora-APK
+        path: esun-bitácoras/app/build/outputs/apk/debug/app-debug.apk

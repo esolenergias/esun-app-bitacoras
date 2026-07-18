@@ -15,6 +15,7 @@ import MatricesTab from './cotizador/MatricesTab';
 import PresupuestosTab from './cotizador/PresupuestosTab';
 import GruposTab from './cotizador/GruposTab';
 import EsunPage from './esun/EsunPage';
+import BitacorasApp from './BitacorasApp';
 
 const CATEGORIES = [
   'Paneles Solares',
@@ -805,16 +806,19 @@ export function Portal() {
                         <Sun className="w-4 h-4 stroke-[2]" />
                         {!sidebarCollapsed && <span>Esun Solar</span>}
                       </button>
+                        <Sparkles className="w-4 h-4 stroke-[2]" />
+                        {!sidebarCollapsed && <span>Presupuestos esol</span>}
+                      </button>
                       <button
-                        onClick={() => setActiveTab('cotizador')}
+                        onClick={() => setActiveTab('bitacoras')}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cotizador'
+                          activeTab === 'bitacoras'
                             ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                             : 'text-cream-muted hover:text-cream hover:bg-dark-3'
                         } ${sidebarCollapsed ? 'justify-center' : ''}`}
                       >
-                        <Sparkles className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Presupuestos esol</span>}
+                        <Layers className="w-4 h-4 stroke-[2]" />
+                        {!sidebarCollapsed && <span>Bitácoras (App)</span>}
                       </button>
                       <button
                         onClick={() => setActiveTab('cfeconfig')}
@@ -945,6 +949,17 @@ export function Portal() {
                       >
                         <Sparkles className="w-4 h-4 stroke-[2]" />
                         {!sidebarCollapsed && <span>Presupuestos esol</span>}
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('bitacoras')}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          activeTab === 'bitacoras'
+                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                      >
+                        <Layers className="w-4 h-4 stroke-[2]" />
+                        {!sidebarCollapsed && <span>Bitácoras (App)</span>}
                       </button>
                       <button
                         onClick={() => setActiveTab('cfeconfig')}
@@ -2850,6 +2865,12 @@ export function Portal() {
               {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'esun' && (
                 <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
                   <EsunPage />
+                </div>
+              )}
+
+              {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'bitacoras' && (
+                <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+                  <BitacorasApp />
                 </div>
               )}
 

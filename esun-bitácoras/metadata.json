@@ -1,0 +1,8 @@
+{
+  "name": "ESun Bitacora",
+  "description": "Gestión de bitácoras de obra en campo, avance físico y financiero, reportes PDF, geolocalización, cámara y soporte offline con sincronización de ERP y Google Workspace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

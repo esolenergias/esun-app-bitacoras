@@ -96,6 +96,7 @@ export default function PresupuestosTab() {
   const [formName, setFormName] = useState<string>('');
   const [formClientName, setFormClientName] = useState<string>('');
   const [formStatus, setFormStatus] = useState<'borrador' | 'enviado' | 'aprobado' | 'rechazado'>('borrador');
+  const [formProduccion, setFormProduccion] = useState<boolean>(false);
   const [formConceptos, setFormConceptos] = useState<Partial<PresupuestoConcepto>[]>([]);
   const [formIndirect, setFormIndirect] = useState<number>(10.00);
   const [formUtility, setFormUtility] = useState<number>(8.00);
@@ -196,6 +197,7 @@ export default function PresupuestosTab() {
           name: row.name,
           client_name: row.client_name,
           status: row.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
+          produccion: row.produccion ?? false,
           indirect_percentage: indPct,
           utility_percentage: utPct,
           created_at: row.created_at,
@@ -251,6 +253,7 @@ export default function PresupuestosTab() {
     setFormName('');
     setFormClientName('');
     setFormStatus('borrador');
+    setFormProduccion(false);
     setFormConceptos([]);
     setFormIndirect(10.00);
     setFormUtility(8.00);
@@ -268,6 +271,7 @@ export default function PresupuestosTab() {
       setFormName(details.name);
       setFormClientName(details.client_name);
       setFormStatus(details.status);
+      setFormProduccion(details.produccion ?? false);
       setFormConceptos(details.conceptos || []);
       setFormIndirect(details.indirect_percentage ?? 10.00);
       setFormUtility(details.utility_percentage ?? 8.00);
@@ -609,6 +613,7 @@ export default function PresupuestosTab() {
         name: formName.trim(),
         client_name: formClientName.trim(),
         status: formStatus,
+        produccion: formProduccion,
         ...(editingPresupuesto?.id ? { id: editingPresupuesto.id } : {})
       };
 
@@ -1430,7 +1435,6 @@ export default function PresupuestosTab() {
     return qty.toFixed(decimals);
   };
 
-  // Helper translated status colors
   const getStatusBadgeStyles = (status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado') => {
     switch (status) {
       case 'borrador':
@@ -1445,6 +1449,11 @@ export default function PresupuestosTab() {
         return 'bg-cream/10 text-cream-dim border border-cream/20';
     }
   };
+
+  const getProduccionBadgeStyles = (produccion: boolean) =>
+    produccion
+      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25'
+      : 'bg-dark-3/60 text-cream-muted border border-dark-4';
 
   // Filter budgets list based on query
   const filteredPresupuestos = presupuestos.filter(p => {
@@ -1529,6 +1538,7 @@ export default function PresupuestosTab() {
                   <th className="py-3 px-4 text-left font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Nombre del Presupuesto</th>
                   <th className="py-3 px-4 text-left font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Cliente</th>
                   <th className="py-3 px-4 text-center font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Estado</th>
+                  <th className="py-3 px-4 text-center font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Producción</th>
                   <th className="py-3 px-4 text-right font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Costo Directo</th>
                   <th className="py-3 px-4 text-right font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Precio de Venta</th>
                   <th className="py-3 px-4 text-center font-display font-black text-[10px] text-cream-dim uppercase tracking-wider">Acciones</th>
@@ -1551,6 +1561,11 @@ export default function PresupuestosTab() {
                     <td className="py-3.5 px-4 text-center select-none">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${getStatusBadgeStyles(budget.status)}`}>
                         {budget.status}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-center select-none">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${getProduccionBadgeStyles(budget.produccion ?? false)}`}>
+                        {budget.produccion ? 'Sí' : 'No'}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono text-cream-dim select-all">
@@ -1660,6 +1675,25 @@ export default function PresupuestosTab() {
                         <option value="aprobado">Aprobado</option>
                         <option value="rechazado">Rechazado</option>
                       </select>
+                    </div>
+
+                    {/* Produccion toggle */}
+                    <div className="space-y-1.5">
+                      <label className="text-[9.5px] text-cream-dim uppercase font-bold tracking-wider block select-none">Producción</label>
+                      <button
+                        type="button"
+                        onClick={() => setFormProduccion(prev => !prev)}
+                        className={`w-full p-2.5 flex items-center justify-between rounded-xl border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          formProduccion
+                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                            : 'bg-dark-1 border-dark-4 text-cream-muted'
+                        }`}
+                      >
+                        <span>{formProduccion ? 'En Producción' : 'Sin Producción'}</span>
+                        <span className={`inline-block w-4 h-4 rounded-full border-2 transition-colors ${
+                          formProduccion ? 'bg-amber-400 border-amber-400' : 'bg-dark-3 border-dark-4'
+                        }`} />
+                      </button>
                     </div>
                   </div>
                 </div>

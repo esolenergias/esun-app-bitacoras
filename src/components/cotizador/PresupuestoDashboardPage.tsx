@@ -314,6 +314,26 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
+  const handleToggleProduccion = async () => {
+    if (!budget) return;
+    setUpdatingStatus(true);
+    try {
+      const newValue = !(budget.produccion ?? false);
+      const { error: dbError } = await supabase
+        .from('presupuestos')
+        .update({ produccion: newValue })
+        .eq('id', budget.id);
+
+      if (dbError) throw dbError;
+      setBudget(prev => prev ? { ...prev, produccion: newValue } : null);
+    } catch (err: any) {
+      console.error('Error toggling produccion:', err);
+      alert('No se pudo actualizar el estado de producci\u00f3n.');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const [updatingMargins, setUpdatingMargins] = useState<boolean>(false);
 
   const handleUpdateBudgetMargins = async (indirectPct: number, utilityPct: number) => {
@@ -1274,6 +1294,11 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   };
 
+  const getProduccionBadgeStyles = (produccion: boolean) =>
+    produccion
+      ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+      : 'bg-dark-3/60 text-cream-muted border border-dark-4';
+
   // ----------------------------------------------------
   // CALCULATIONS / ANALYTICS
   // ----------------------------------------------------
@@ -1643,6 +1668,23 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
             </select>
             {updatingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin text-gold mr-1.5" />}
           </div>
+
+          {/* Produccion toggle */}
+          <button
+            onClick={handleToggleProduccion}
+            disabled={updatingStatus}
+            title={budget.produccion ? 'Quitar de Producci\u00f3n' : 'Marcar en Producci\u00f3n'}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 ${
+              budget.produccion
+                ? 'bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20'
+                : 'bg-dark-1 border-dark-4 text-cream-muted hover:border-cream/20 hover:text-cream'
+            }`}
+          >
+            <span className={`inline-block w-3 h-3 rounded-full border-2 transition-colors ${
+              budget.produccion ? 'bg-amber-400 border-amber-400' : 'bg-dark-3 border-dark-4'
+            }`} />
+            <span>Producción</span>
+          </button>
 
           <button
             onClick={() => window.close()}
