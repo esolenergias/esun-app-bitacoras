@@ -6,7 +6,7 @@ import androidx.room.Database
 import androidx.room.Delete
 import androidx.room.Entity
 import androidx.room.Insert
-import androidx.room.Migration
+import androidx.room.migration.Migration
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
@@ -37,7 +37,10 @@ data class BitacoraEntity(
     val isSynced: Boolean = false,
     // Campos añadidos en versión 10
     val safetyRemarks: String = "",
-    val machinery: String = ""
+    val machinery: String = "",
+    // Campos añadidos en versión 11
+    val concepto_id: String? = null,
+    val concepto_name: String? = null
 )
 
 @Entity(tableName = "obras")
@@ -150,6 +153,9 @@ interface BudgetItemDao {
     @Query("SELECT * FROM budget_items WHERE obraId = :obraId ORDER BY id ASC")
     fun getAllBudgetItems(obraId: String): Flow<List<BudgetItemEntity>>
 
+    @Query("SELECT * FROM budget_items")
+    suspend fun getAllBudgetItemsSync(): List<BudgetItemEntity>
+
     @Query("SELECT DISTINCT obraId FROM budget_items WHERE obraId != ''")
     fun getDistinctObrasFlow(): Flow<List<String>>
 
@@ -256,6 +262,13 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
 
 
 
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE bitacoras ADD COLUMN concepto_id TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE bitacoras ADD COLUMN concepto_name TEXT DEFAULT NULL")
+    }
+}
+
 // ==========================================
 // DATABASE CONTAINER
 // ==========================================
@@ -269,7 +282,7 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
         MatrixItemEntity::class,
         TaskEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -291,7 +304,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "esol_bitacoras_db"
                 )
-                .addMigrations(MIGRATION_9_10)
+                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_9_10, MIGRATION_10_11)
                 .build()
                 INSTANCE = instance
                 instance

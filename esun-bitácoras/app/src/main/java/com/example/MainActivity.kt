@@ -35,6 +35,7 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.data.repository.SyncRepository
 import com.example.ui.screens.*
+import com.example.ui.screens.ReportDetailScreen
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.BitacoraViewModel
 import com.example.ui.viewmodel.BitacoraViewModelFactory
@@ -154,12 +155,14 @@ fun CrashScreen(crashLog: String, onReset: () -> Unit) {
                         .padding(12.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    Text(
-                        text = crashLog,
-                        color = Color(0xFFF1F5F9),
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        fontSize = 10.sp
-                    )
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(
+                            text = crashLog,
+                            color = Color(0xFFF1F5F9),
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 10.sp
+                        )
+                    }
                 }
             }
             
@@ -298,6 +301,9 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                         },
                         onNavigateToObraDashboard = { projectName ->
                             navController.navigate("obra_dashboard/$projectName")
+                        },
+                        onNavigateToReportDetail = { logId ->
+                            navController.navigate("report_detail/$logId")
                         }
                     )
                 }
@@ -309,6 +315,9 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                         },
                         onNavigateToObraDashboard = { projectName ->
                             navController.navigate("obra_dashboard/$projectName")
+                        },
+                        onNavigateToReportDetail = { logId ->
+                            navController.navigate("report_detail/$logId")
                         }
                     )
                 }
@@ -322,7 +331,8 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                         projectName = projectName,
                         onNavigateBack = { navController.popBackStack() },
                         onNavigateToNewLog = { navController.navigate("new_bitacora/$projectName") },
-                        onNavigateToReportsList = { navController.navigate("reports_list/$projectName") }
+                        onNavigateToReportsList = { navController.navigate("reports_list/$projectName") },
+                        onNavigateToReportDetail = { logId -> navController.navigate("report_detail/$logId") }
                     )
                 }
                 composable(
@@ -333,7 +343,21 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                     ReportsListScreen(
                         viewModel = viewModel,
                         projectName = projectName,
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToReportDetail = { logId ->
+                            navController.navigate("report_detail/$logId")
+                        }
+                    )
+                }
+                composable(
+                    route = "report_detail/{logId}",
+                    arguments = listOf(navArgument("logId") { type = NavType.IntType })
+                ) { backStackEntry ->
+                    val logId = backStackEntry.arguments?.getInt("logId") ?: 0
+                    ReportDetailScreen(
+                        logId = logId,
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 composable("new_obra") {

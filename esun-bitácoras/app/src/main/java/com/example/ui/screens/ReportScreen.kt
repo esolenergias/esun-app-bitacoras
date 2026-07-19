@@ -52,41 +52,13 @@ fun ReportScreen(viewModel: BitacoraViewModel) {
     val bitacoras by viewModel.bitacorasList.collectAsState()
     val budgetItems by viewModel.budgetItems.collectAsState()
     val userName by viewModel.userName.collectAsState()
+    val projectsList by viewModel.projectsList.collectAsState()
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    var isGeneratingPdf by remember { mutableStateOf(false) }
-    // Lista de PDFs generados en esta sesión (nombre, fecha)
-    var generatedReports by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-    var pdfButtonText by remember { mutableStateOf("Generar Reporte PDF") }
-    var pdfButtonColor by remember { mutableStateOf(ConnectedBlue) }
-
-    // Aggregate physical progress across all budget items
-    val overallPhysicalProgress = if (budgetItems.isNotEmpty()) {
-        budgetItems.sumOf {
-            if (it.quantity > 0.0) (it.executedQuantity / it.quantity) * 100.0 else 0.0
-        } / budgetItems.size
-    } else {
-        65.0
-    }
-
-    // Aggregate financial figures across budget items
-    val totalProjectBudget = budgetItems.sumOf { it.quantity * it.unitPrice }
-    val totalCostExecuted = budgetItems.sumOf { it.executedQuantity * it.unitPrice }
-    val financialProgressPercent = if (totalProjectBudget > 0) {
-        (totalCostExecuted / totalProjectBudget) * 100.0
-    } else {
-        64.0
-    }
-
-    // Hora de última sincronización dinámica
-    val lastSyncTime = remember { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()) }
-
     val pulseAlpha = 0.8f
-
-    // Nombre del proyecto activo (de la primera bitácora, si existe)
-    val activeProjectName = bitacoras.firstOrNull()?.siteName ?: "ESun Bitácora"
+    val bitacorasByProject = bitacoras.groupBy { it.siteName.ifEmpty { "Proyecto Sin Nombre" } }
 
     Column(
         modifier = Modifier
@@ -117,7 +89,7 @@ fun ReportScreen(viewModel: BitacoraViewModel) {
                     )
                 }
                 Text(
-                    text = activeProjectName,
+                    text = "Control de Gestión",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = SlateDeep
@@ -149,444 +121,344 @@ fun ReportScreen(viewModel: BitacoraViewModel) {
         }
 
         HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
-
-        // --- SCROLLABLE BENTO CONTENT ---
+        // --- SCROLLABLE BENTO CONTENT ---
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Header titles & Generate PDF Button Row
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "CONTROL DE GESTIÓN",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        color = ConnectedBlue,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = "Reportes Financieros",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 28.sp,
-                        color = SlateDeep
+            if (projectsList.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Aún no hay obras registradas.", color = OnSurfaceVariant, fontSize = 14.sp)
+                }
+            } else {
+                projectsList.sortedBy { it.first }.forEach { (projectName, _) ->
+                    val projectBitacoras = bitacoras.filter { it.siteName.equals(projectName, ignoreCase = true) }
+                    val projectBudgetItems = budgetItems.filter { it.obraId == projectName || it.description.contains(projectName, true) }.ifEmpty { budgetItems }
+                    
+                    ProjectSummaryCard(
+                        projectName = projectName,
+                        bitacoras = projectBitacoras,
+                        budgetItems = projectBudgetItems,
+                        userName = userName,
+                        context = context,
+                        coroutineScope = coroutineScope,
+                        viewModel = viewModel
                     )
                 }
+            }
+            Spacer(modifier = Modifier.height(100.dp))
+        }
+    }
+}
 
-                // Premium Generate PDF Button
-                Button(
-                    onClick = {
-                        if (isGeneratingPdf) return@Button
-                        coroutineScope.launch {
-                            isGeneratingPdf = true
-                            pdfButtonText = "Generando PDF..."
-                            pdfButtonColor = SlateDeep
+@Composable
+fun ProjectSummaryCard(
+    projectName: String,
+    bitacoras: List<BitacoraEntity>,
+    budgetItems: List<BudgetItemEntity>,
+    userName: String,
+    context: android.content.Context,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    viewModel: BitacoraViewModel
+) {
+    var isGeneratingPdf by remember { mutableStateOf(false) }
+    var pdfButtonText by remember { mutableStateOf("Generar Reporte PDF") }
+    var pdfButtonColor by remember { mutableStateOf(ConnectedBlue) }
+    var generatedReports by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
 
-                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                            val fileName = "Reporte_ESun_${timestamp}.pdf"
-                            val displayDate = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+    // Aggregate physical progress
+    val overallPhysicalProgress = if (budgetItems.isNotEmpty()) {
+        budgetItems.sumOf {
+            if (it.quantity > 0.0) (it.executedQuantity / it.quantity) * 100.0 else 0.0
+        } / budgetItems.size
+    } else {
+        65.0
+    }
 
-                            val success = withContext(Dispatchers.IO) {
-                                generatePdfReport(
-                                    context = context,
-                                    fileName = fileName,
-                                    projectName = activeProjectName,
-                                    reporterName = userName,
-                                    bitacoras = bitacoras,
-                                    budgetItems = budgetItems,
-                                    totalBudget = totalProjectBudget,
-                                    totalExecuted = totalCostExecuted,
-                                    physicalProgress = overallPhysicalProgress
-                                )
-                            }
+    // Aggregate financial figures
+    val totalProjectBudget = budgetItems.sumOf { it.quantity * it.unitPrice }
+    val totalCostExecuted = budgetItems.sumOf { it.executedQuantity * it.unitPrice }
+    
+    val lastSyncTime = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()) }
 
-                            if (success) {
-                                generatedReports = listOf(fileName to displayDate) + generatedReports
-                                pdfButtonText = "Completado ✅"
-                                pdfButtonColor = SuccessGreen
-                                viewModel.simulatePushNotification(
-                                    title = "Reporte PDF Generado",
-                                    body = "El archivo '$fileName' fue guardado en Descargas/ESunBitacora.",
-                                    type = "SYNC"
-                                )
-                                Toast.makeText(context, "PDF guardado en Descargas/ESunBitacora", Toast.LENGTH_LONG).show()
-                            } else {
-                                pdfButtonText = "Error al generar"
-                                pdfButtonColor = WarningRed
-                                Toast.makeText(context, "Error al generar el PDF", Toast.LENGTH_SHORT).show()
-                            }
-                            isGeneratingPdf = false
-                            delay(3000)
-                            pdfButtonText = "Generar Reporte PDF"
-                            pdfButtonColor = ConnectedBlue
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
+        colors = CardDefaults.cardColors(containerColor = PureWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "OBRA",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = ConnectedBlue,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = projectName,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 22.sp,
+                    color = SlateDeep
+                )
+            }
+
+            // PDF Button
+            Button(
+                onClick = {
+                    if (isGeneratingPdf) return@Button
+                    coroutineScope.launch {
+                        isGeneratingPdf = true
+                        pdfButtonText = "Generando PDF..."
+                        pdfButtonColor = SlateDeep
+
+                        val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                        val fileName = "Reporte_${projectName.replace(" ", "_")}_${timestamp}.pdf"
+                        val displayDate = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+
+                        var safeUserName = userName
+                        if (safeUserName.contains("Menyfre", ignoreCase = true) || safeUserName.contains("Meny", ignoreCase = true)) {
+                            safeUserName = "Manuel Fregoso"
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = pdfButtonColor),
-                    shape = RoundedCornerShape(100.dp),
+
+                        val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            generatePdfReport(
+                                context = context,
+                                fileName = fileName,
+                                projectName = projectName,
+                                reporterName = safeUserName,
+                                bitacoras = bitacoras,
+                                budgetItems = budgetItems,
+                                totalBudget = totalProjectBudget,
+                                totalExecuted = totalCostExecuted,
+                                physicalProgress = overallPhysicalProgress
+                            )
+                        }
+
+                        if (success) {
+                            generatedReports = listOf(fileName to displayDate) + generatedReports
+                            pdfButtonText = "Completado ✓"
+                            pdfButtonColor = SuccessGreen
+                            viewModel.simulatePushNotification(
+                                title = "Reporte PDF Generado",
+                                body = "El archivo '$fileName' fue guardado en Descargas/ESunBitacora.",
+                                type = "SYNC"
+                            )
+                            android.widget.Toast.makeText(context, "PDF guardado en Descargas", android.widget.Toast.LENGTH_LONG).show()
+                        } else {
+                            pdfButtonText = "Error al generar"
+                            pdfButtonColor = WarningRed
+                            android.widget.Toast.makeText(context, "Error al generar el PDF", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        isGeneratingPdf = false
+                        kotlinx.coroutines.delay(3000)
+                        pdfButtonText = "Generar Reporte PDF"
+                        pdfButtonColor = ConnectedBlue
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = pdfButtonColor),
+                shape = RoundedCornerShape(100.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                enabled = !isGeneratingPdf
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (isGeneratingPdf) {
+                        CircularProgressIndicator(color = PureWhite, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = PureWhite, modifier = Modifier.size(18.dp))
+                    }
+                    Text(
+                        text = pdfButtonText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Black,
+                        color = PureWhite
+                    )
+                }
+            }
+
+
+            // Bar Chart — datos derivados de budgetItems reales
+            val chartItems = if (budgetItems.isNotEmpty()) {
+                budgetItems.take(5).map { item ->
+                    val budgetPct = if (item.totalBudget > 0) (item.quantity * item.unitPrice / totalProjectBudget.coerceAtLeast(1.0)).toFloat().coerceIn(0.1f, 1f) else 0.3f
+                    val realPct = if (item.quantity > 0) (item.executedQuantity / item.quantity).toFloat().coerceIn(0.05f, 1f) else 0.05f
+                    val shortLabel = item.code.take(6)
+                    MonthChartData(shortLabel, budgetPct, realPct)
+                }
+            } else {
+                listOf(
+                    MonthChartData("ENE", 0.85f, 0.78f),
+                    MonthChartData("FEB", 0.70f, 0.92f),
+                    MonthChartData("MAR", 0.95f, 0.80f),
+                    MonthChartData("ABR", 0.60f, 0.55f),
+                    MonthChartData("MAY", 0.88f, 1.00f)
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(androidx.compose.ui.graphics.Color(0xFFEFF6FF), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Analytics, contentDescription = null, tint = ConnectedBlue, modifier = Modifier.size(18.dp))
+                        }
+                        Text(
+                            text = "Presupuesto vs Gasto Real",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 15.sp,
+                            color = SlateDeep
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(100)).background(ConnectedBlue))
+                            Text("Pres.", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(100)).background(androidx.compose.ui.graphics.Color(0xFFCBD5E1)))
+                            Text("Real", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
+                        }
+                    }
+                }
+
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    enabled = !isGeneratingPdf
+                        .height(180.dp)
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    chartItems.forEach { item ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .height(130.dp)
+                                    .width(36.dp),
+                                verticalAlignment = Alignment.Bottom,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(item.budgetPercent)
+                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                        .background(ConnectedBlue)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(item.realPercent)
+                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                        .background(androidx.compose.ui.graphics.Color(0xFFCBD5E1))
+                                )
+                            }
+                            Text(text = item.label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
+            // Ledger Summary
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LedgerRow("Presupuesto Estimado:", "$${String.format("%,.2f", totalProjectBudget)} MXN", SlateDeep)
+                LedgerRow("Gasto Devengado:", "$${String.format("%,.2f", totalCostExecuted)} MXN", SuccessGreen)
+                val remanente = totalProjectBudget - totalCostExecuted
+                LedgerRow("Remanente Disponible:", "$${String.format("%,.2f", remanente)} MXN", if (remanente >= 0) ConnectedBlue else WarningRed)
+                LedgerRow("Avance Físico:", "${"%.1f".format(overallPhysicalProgress)}%", ConnectedBlue)
+                LedgerRow("Registros Diarios:", "${bitacoras.size} reportes", OnSurfaceVariant)
+            }
+            
+
+            HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
+
+            // Cuadrillas Live Telemetry Sidebar Feed
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (isGeneratingPdf) {
-                            CircularProgressIndicator(color = PureWhite, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = PureWhite, modifier = Modifier.size(18.dp))
-                        }
+                        Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFFEA580C), modifier = Modifier.size(20.dp))
                         Text(
-                            text = pdfButtonText,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Black,
-                            color = PureWhite
+                            text = "Cuadrillas",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 15.sp,
+                            color = SlateDeep
                         )
                     }
-                }
-            }
-
-            // --- 2. BENTO MAIN COLUMN (BUDGET vs REAL CHART) ---
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = PureWhite)
-            ) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(androidx.compose.ui.graphics.Color(0xFFEFF6FF), RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Analytics, contentDescription = null, tint = ConnectedBlue, modifier = Modifier.size(18.dp))
-                            }
-                            Text(
-                                text = "Presupuesto vs Gasto Real",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 15.sp,
-                                color = SlateDeep
-                            )
-                        }
-
-                        // Legends
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(100)).background(ConnectedBlue))
-                                Text("Presupuesto", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(100)).background(androidx.compose.ui.graphics.Color(0xFFCBD5E1)))
-                                Text("Real", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
-                            }
-                        }
-                    }
-
-                    // Bar Chart — datos derivados de budgetItems reales
-                    val chartItems = if (budgetItems.isNotEmpty()) {
-                        // Agrupa por primeros 3 chars del código o toma los primeros 5
-                        budgetItems.take(5).map { item ->
-                            val budgetPct = if (item.totalBudget > 0) (item.quantity * item.unitPrice / totalProjectBudget.coerceAtLeast(1.0)).toFloat().coerceIn(0.1f, 1f) else 0.3f
-                            val realPct = if (item.quantity > 0) (item.executedQuantity / item.quantity).toFloat().coerceIn(0.05f, 1f) else 0.05f
-                            val shortLabel = item.code.take(6)
-                            MonthChartData(shortLabel, budgetPct, realPct)
-                        }
-                    } else {
-                        listOf(
-                            MonthChartData("ENE", 0.85f, 0.78f),
-                            MonthChartData("FEB", 0.70f, 0.92f),
-                            MonthChartData("MAR", 0.95f, 0.80f),
-                            MonthChartData("ABR", 0.60f, 0.55f),
-                            MonthChartData("MAY", 0.88f, 1.00f)
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .padding(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        chartItems.forEach { item ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .height(130.dp)
-                                        .width(36.dp),
-                                    verticalAlignment = Alignment.Bottom,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight(item.budgetPercent)
-                                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                            .background(ConnectedBlue)
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight(item.realPercent)
-                                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                            .background(androidx.compose.ui.graphics.Color(0xFFE2E8F0))
-                                    )
-                                }
-                                Text(
-                                    text = item.label,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OnSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
-
-                    // Financial metrics grid
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val desvPct = if (totalProjectBudget > 0) ((totalCostExecuted - totalProjectBudget) / totalProjectBudget * 100) else 0.0
-                        Column {
-                            Text(text = "Desviación", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
-                            Text(
-                                text = "${if (desvPct >= 0) "+" else ""}${"%.1f".format(desvPct)}%",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (desvPct > 5) WarningRed else SuccessGreen
-                            )
-                        }
-                        Column {
-                            Text(text = "Presupuesto", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
-                            Text(text = "\$${String.format("%,.1f", totalProjectBudget / 1000)}k", fontSize = 16.sp, fontWeight = FontWeight.Black, color = SlateDeep)
-                        }
-                        Column {
-                            Text(text = "Sincro", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(text = lastSyncTime, fontSize = 16.sp, fontWeight = FontWeight.Black, color = SlateDeep)
-                                Icon(Icons.Default.Sync, contentDescription = null, tint = ConnectedBlue, modifier = Modifier.size(14.dp))
-                            }
-                        }
-                        Column {
-                            Text(text = "Avance", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OnSurfaceVariant)
-                            Text(text = "${"%.0f".format(overallPhysicalProgress)}%", fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (overallPhysicalProgress >= 80) SuccessGreen else ConnectedBlue)
-                        }
-                    }
-                }
-            }
-
-            // --- 3. PROJECT FINANCE CONSOLIDATED LEDGER METRICS ---
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = PureWhite)
-            ) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "RESUMEN DEL LIBRO CONTABLE",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OnSurfaceVariant,
-                        letterSpacing = 1.sp
-                    )
-
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LedgerRow("Presupuesto Total Estimado:", "\$${String.format("%,.2f", totalProjectBudget)} MXN", SlateDeep)
-                        LedgerRow("Gasto Total Devengado:", "\$${String.format("%,.2f", totalCostExecuted)} MXN", SuccessGreen)
-                        val remanente = totalProjectBudget - totalCostExecuted
-                        LedgerRow(
-                            "Remanente Disponible:",
-                            "\$${String.format("%,.2f", remanente)} MXN",
-                            if (remanente >= 0) ConnectedBlue else WarningRed
-                        )
-                        LedgerRow("Avance Físico:", "${"%.1f".format(overallPhysicalProgress)}%", ConnectedBlue)
-                        LedgerRow("Registros de Bitácora:", "${bitacoras.size} reportes", OnSurfaceVariant)
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Notice alert box
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .background(LightAmberBg, RoundedCornerShape(12.dp))
-                            .border(BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFFDE68A)), RoundedCornerShape(12.dp))
-                            .padding(12.dp)
+                            .background(androidx.compose.ui.graphics.Color(0xFFFFF7ED), RoundedCornerShape(100.dp))
+                            .border(BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFFFEDD5)), RoundedCornerShape(100.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.Top,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFFD97706), modifier = Modifier.size(16.dp))
-                            Text(
-                                text = "SISTEMA INFORMA: El avance físico es del ${"%.1f".format(overallPhysicalProgress)}%. El gasto devengado es de \$${String.format("%,.0f", totalCostExecuted)} MXN sobre un presupuesto total de \$${String.format("%,.0f", totalProjectBudget)} MXN.",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = androidx.compose.ui.graphics.Color(0xFF92400E),
-                                lineHeight = 15.sp
-                            )
-                        }
+                        Text(text = "LIVE", fontSize = 9.sp, fontWeight = FontWeight.Black, color = androidx.compose.ui.graphics.Color(0xFFEA580C))
                     }
                 }
-            }
 
-            // --- 4. CUADRILLAS LIVE TELEMETRY SIDEBAR FEED ---
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = PureWhite)
-            ) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFFEA580C), modifier = Modifier.size(20.dp))
-                            Text(
-                                text = "Cuadrillas",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 15.sp,
-                                color = SlateDeep
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .background(androidx.compose.ui.graphics.Color(0xFFFFF7ED), RoundedCornerShape(100.dp))
-                                .border(BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFFFEDD5)), RoundedCornerShape(100.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(text = "LIVE", fontSize = 9.sp, fontWeight = FontWeight.Black, color = androidx.compose.ui.graphics.Color(0xFFEA580C))
-                        }
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CuadrillaTelemetryCard(
-                            title = "Retraso en Instalación A-12",
-                            desc = "Falta de pernería estructural en sitio reportada.",
-                            time = "5 min",
-                            icon = Icons.Default.Warning,
-                            iconColor = androidx.compose.ui.graphics.Color(0xFFEA580C),
-                            bgColor = androidx.compose.ui.graphics.Color(0xFFFFF7ED)
-                        )
-                        CuadrillaTelemetryCard(
-                            title = "Check-in: Cuadrilla #02",
-                            desc = "Llegada a Zona Norte confirmada via GPS.",
-                            time = "12 min",
-                            icon = Icons.Default.CheckCircle,
-                            iconColor = SuccessGreen,
-                            bgColor = SuccessGreenBg
-                        )
-                        CuadrillaTelemetryCard(
-                            title = "Bitácora Firmada",
-                            desc = "Supervisor J. Pérez validó el avance jornada anterior.",
-                            time = "45 min",
-                            icon = Icons.Default.Description,
-                            iconColor = ConnectedBlue,
-                            bgColor = androidx.compose.ui.graphics.Color(0xFFEFF6FF)
-                        )
-                        CuadrillaTelemetryCard(
-                            title = "Alerta de Clima",
-                            desc = "Vientos > 40km/h detectados. Se recomienda precaución en izajes.",
-                            time = "1 hora",
-                            icon = Icons.Default.Air,
-                            iconColor = androidx.compose.ui.graphics.Color(0xFF3B82F6),
-                            bgColor = androidx.compose.ui.graphics.Color(0xFFEFF6FF)
-                        )
-                    }
-                }
-            }
-
-            // --- 5. HISTORIAL DE REPORTES GENERADOS ---
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = PureWhite)
-            ) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        text = "Historial de Reportes",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 16.sp,
-                        color = SlateDeep
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CuadrillaTelemetryCard(
+                        title = "Retraso reportado",
+                        desc = "Se registraron desviaciones menores en " + projectName + ".",
+                        time = "5 min",
+                        icon = Icons.Default.Warning,
+                        iconColor = androidx.compose.ui.graphics.Color(0xFFEA580C),
+                        bgColor = androidx.compose.ui.graphics.Color(0xFFFFF7ED)
                     )
-
-                    if (generatedReports.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = OnSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(40.dp))
-                                Text("Aún no se han generado reportes.", fontSize = 13.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Medium)
-                                Text("Usa el botón de arriba para crear uno.", fontSize = 11.sp, color = OnSurfaceVariant.copy(alpha = 0.7f))
-                            }
-                        }
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            generatedReports.forEachIndexed { index, (name, date) ->
-                                val reportId = "#R-${9000 + index}"
-                                ReportHistoryItem(
-                                    id = reportId,
-                                    type = "Reporte General",
-                                    date = date,
-                                    author = userName.ifEmpty { "Sistema" },
-                                    status = "DISPONIBLE",
-                                    onDownload = {
-                                        // Abrir el PDF guardado
-                                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                                            setDataAndType(
-                                                android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary:Download%2FESunBitacora%2F$name"),
-                                                "application/pdf"
-                                            )
-                                            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                        }
-                                        try { context.startActivity(intent) } catch (e: Exception) {
-                                            Toast.makeText(context, "Abre la carpeta Descargas/ESunBitacora", Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    CuadrillaTelemetryCard(
+                        title = "Bitácora Firmada",
+                        desc = "Supervisor validó el avance de la jornada anterior.",
+                        time = "45 min",
+                        icon = Icons.Default.Description,
+                        iconColor = SuccessGreen,
+                        bgColor = SuccessGreenBg
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(100.dp))
+            // Historial local
+            if (generatedReports.isNotEmpty()) {
+                HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
+                Text("Reportes Generados (Sesión)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
+                generatedReports.forEach { (name, _) ->
+                    Text(text = name, fontSize = 11.sp, color = ConnectedBlue)
+                }
+            }
         }
     }
 }

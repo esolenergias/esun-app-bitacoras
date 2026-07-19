@@ -1,0 +1,3 @@
+- [x] Add `onNavigateToReportDetail` to `BitacoraScreen` signature.
+- [x] Fix unresolved reference `refreshSyncStatus` in `BitacoraViewModel`.
+- [x] Verify build.

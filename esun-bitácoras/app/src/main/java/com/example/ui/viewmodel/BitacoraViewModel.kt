@@ -250,6 +250,47 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
         repository.addLog("Supabase Auth: Sesión cerrada.")
     }
 
+    fun updateUser(name: String, email: String) {
+        val registered = prefs.getStringSet("registered_users", emptySet())?.toMutableSet() ?: mutableSetOf()
+        val oldUserStr = registered.find { it.startsWith("${_userEmail.value}:") }
+        if (oldUserStr != null) {
+            val parts = oldUserStr.split(":")
+            if (parts.size >= 4) {
+                val password = parts[1]
+                val role = parts[3]
+                val newUserStr = "$email:$password:$name:$role"
+                registered.remove(oldUserStr)
+                registered.add(newUserStr)
+                prefs.edit().putStringSet("registered_users", registered)
+                     .putString("user_name", name)
+                     .putString("user_email", email)
+                     .apply()
+                _userName.value = name
+                _userEmail.value = email
+            }
+        }
+        
+        prefs.edit()
+            .putString("user_name", name)
+            .putString("user_email", email)
+            .apply()
+
+        _userName.value = name
+        _userEmail.value = email
+    }
+
+    fun getRegisteredUserByEmail(email: String): Pair<String, String>? {
+        val registered = prefs.getStringSet("registered_users", emptySet()) ?: emptySet()
+        val userStr = registered.find { it.startsWith("$email:") }
+        if (userStr != null) {
+            val parts = userStr.split(":")
+            if (parts.size >= 4) {
+                return Pair(parts[2], parts[3]) // Name, Role
+            }
+        }
+        return null
+    }
+
     // Streams from database
     val bitacorasList: StateFlow<List<BitacoraEntity>> = repository.getAllBitacoras()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -325,6 +366,12 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     private val _machinery = MutableStateFlow("")
     val machinery = _machinery.asStateFlow()
 
+    private val _conceptoId = MutableStateFlow<String?>(null)
+    val conceptoId = _conceptoId.asStateFlow()
+
+    private val _conceptoName = MutableStateFlow<String?>(null)
+    val conceptoName = _conceptoName.asStateFlow()
+
     // Real-time Push Notification Simulation Queue
     private val _pushNotifications = MutableStateFlow<List<PushNotification>>(emptyList())
     val pushNotifications: StateFlow<List<PushNotification>> = _pushNotifications.asStateFlow()
@@ -349,6 +396,10 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     fun setCapturedPhotoUri(uri: String?) { _capturedPhotoUri.value = uri }
     fun setSafetyRemarks(value: String) { _safetyRemarks.value = value }
     fun setMachinery(value: String) { _machinery.value = value }
+    fun setConcepto(id: String?, name: String?) {
+        _conceptoId.value = id
+        _conceptoName.value = name
+    }
 
     // --- Location Capturing ---
     @SuppressLint("MissingPermission")
@@ -397,6 +448,8 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
                 photoUri = _capturedPhotoUri.value,
                 safetyRemarks = _safetyRemarks.value,
                 machinery = _machinery.value,
+                concepto_id = _conceptoId.value,
+                concepto_name = _conceptoName.value,
                 isSynced = false // Force offline capture first!
             )
 
@@ -414,6 +467,8 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
             _capturedPhotoUri.value = null
             _safetyRemarks.value = ""
             _machinery.value = ""
+            _conceptoId.value = null
+            _conceptoName.value = null
             _physicalProgress.value = 0.0
 
             onSuccess()
@@ -549,6 +604,10 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
 
     fun toggleOnline() {
         repository.toggleOnlineStatus()
+    }
+
+    fun getBitacoraById(id: Int): BitacoraEntity? {
+        return bitacorasList.value.find { it.id == id }
     }
 
     fun toggleGoogleSheets() {

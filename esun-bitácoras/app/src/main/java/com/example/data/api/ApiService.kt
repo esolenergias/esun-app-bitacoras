@@ -131,10 +131,39 @@ data class SupabaseBitacoraUploadRequest(
     val latitude: Double,
     val longitude: Double,
     val photo_uri: String?,
+    val concepto_id: String? = null,
+    val concepto: String? = null,
     val timestamp: Long
 )
 
+data class SupabaseObraRequest(
+    val nombre: String,
+    val cliente: String,
+    val ubicacion: String,
+    val fecha_inicio: String,
+    val fecha_termino: String,
+    val residente: String,
+    val descripcion: String,
+    val monto_contrato: String,
+    val status: String
+)
+
 interface SupabaseApiService {
+    @GET("rest/v1/obras_app")
+    suspend fun getObras(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("select") select: String = "*"
+    ): Response<List<SupabaseObraRequest>>
+
+    @POST("rest/v1/obras_app")
+    suspend fun upsertObra(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates",
+        @Body request: SupabaseObraRequest
+    ): Response<Unit>
+
     @POST("rest/v1/registros_app")
     suspend fun uploadBitacora(
         @Header("apikey") apiKey: String,

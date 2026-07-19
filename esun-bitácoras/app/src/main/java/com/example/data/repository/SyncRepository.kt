@@ -29,6 +29,7 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import com.example.data.api.SupabaseApiService
 import com.example.data.api.SupabaseConceptResponse
 import com.example.data.api.SupabaseMatrixResponse
+import com.example.data.api.SupabaseObraRequest
 
 // Represents the overall synchronization status of different services
 data class SyncStatus(
@@ -332,8 +333,76 @@ class SyncRepository(private val context: Context) {
 
         return withContext(Dispatchers.IO) {
             _syncStatus.value = _syncStatus.value.copy(isSyncing = true)
-            addLog("Iniciando sincronización de bitácoras pendientes...")
-            delay(1500) // Simular latencia de red
+            addLog("Iniciando sincronización con Supabase...")
+            delay(1000)
+
+            val supabaseUrl = _syncStatus.value.supabaseUrl
+            val supabaseKey = _syncStatus.value.supabaseKey
+            var supabaseService: SupabaseApiService? = null
+
+            if (supabaseUrl.isNotEmpty() && supabaseKey.isNotEmpty()) {
+                try {
+                    val cleanUrl = if (supabaseUrl.endsWith("/")) supabaseUrl else "$supabaseUrl/"
+                    val retrofit = Retrofit.Builder()
+                        .baseUrl(cleanUrl)
+                        .addConverterFactory(MoshiConverterFactory.create(com.squareup.moshi.Moshi.Builder().add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()))
+                        .build()
+                    supabaseService = retrofit.create(SupabaseApiService::class.java)
+                } catch (e: Exception) {
+                    addLog("Error inicializando Supabase API: ${e.message}")
+                }
+            }
+
+            if (supabaseService != null) {
+                // SYNC OBRAS (PROYECTOS) PRIMERO
+                addLog("Verificando Obras locales para sincronizar...")
+                val todasObras = obraDao.getAllObras().first()
+                if (todasObras.isNotEmpty()) {
+                    val bearerToken = "Bearer $supabaseKey"
+                    var obrasSynced = 0
+                    for (obra in todasObras) {
+                        try {
+                            val req = SupabaseObraRequest(
+                                nombre = obra.nombre,
+                                cliente = obra.cliente,
+                                ubicacion = obra.ubicacion,
+                                fecha_inicio = obra.fechaInicio,
+                                fecha_termino = obra.fechaTermino,
+                                residente = obra.residente,
+                                descripcion = obra.descripcion,
+                                monto_contrato = obra.montoContrato,
+                                status = obra.status
+                            )
+                            val resp = supabaseService.upsertObra(apiKey = supabaseKey, authorization = bearerToken, request = req)
+                            if (resp.isSuccessful) obrasSynced++
+                        } catch (e: Exception) {
+                            // ignore individual fail
+                        }
+                    }
+                    addLog("Obras sincronizadas: $obrasSynced/${todasObras.size}")
+                    
+                    // Sincronizar eliminaciones: Si una obra fue eliminada en la web, eliminarla localmente
+                    try {
+                        val getResp = supabaseService.getObras(apiKey = supabaseKey, authorization = bearerToken)
+                        if (getResp.isSuccessful) {
+                            val remoteObras = getResp.body() ?: emptyList()
+                            val remoteObraNames = remoteObras.map { it.nombre }.toSet()
+                            var deletedCount = 0
+                            for (obra in todasObras) {
+                                if (!remoteObraNames.contains(obra.nombre)) {
+                                    obraDao.deleteObra(obra)
+                                    deletedCount++
+                                }
+                            }
+                            if (deletedCount > 0) {
+                                addLog("Se eliminaron $deletedCount proyectos locales que fueron borrados en la nube.")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        addLog("Error al verificar obras eliminadas: ${e.message}")
+                    }
+                }
+            }
 
             val pending = bitacoraDao.getUnsyncedBitacoras()
             if (pending.isEmpty()) {
@@ -370,20 +439,63 @@ class SyncRepository(private val context: Context) {
                     addLog("  -> Google Sheets: Omitido (No vinculado).")
                 }
 
-                // 4. Google Drive Photo Backup
+                // 4. Google Drive Photo Backup (Real upload via Apps Script)
+                var uploadedPhotoUrl: String? = null
                 if (log.photoUri != null) {
-                    if (_syncStatus.value.googleDriveConnected) {
-                        addLog("  -> Google Drive: Subiendo fotografía de avance de obra...")
-                        delay(700)
-                        
-                        // Generar estructura de carpetas: Esol energias/bitacoras/proyectos/<proyecto>/<dia_hora>
-                        val projectName = log.siteName.replace(" ", "_").replace("/", "-")
-                        val dateTime = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.getDefault()).format(java.util.Date())
-                        val drivePath = "Esol energias/bitacoras/proyectos/$projectName/$dateTime"
-                        
-                        addLog("  -> Google Drive: Fotografía guardada en la ruta '$drivePath'")
-                    } else {
-                        addLog("  -> Google Drive: Omitido (No vinculado).")
+                    addLog("  -> Google Drive: Subiendo fotografía de avance de obra...")
+                    try {
+                        val uri = Uri.parse(log.photoUri)
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        if (inputStream != null) {
+                            val bytes = inputStream.readBytes()
+                            inputStream.close()
+                            
+                            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                            val json = org.json.JSONObject()
+                            json.put("filename", "evidencia_${log.id}_${System.currentTimeMillis()}.jpg")
+                            json.put("mimeType", "image/jpeg")
+                            json.put("base64", base64)
+
+                            val url = java.net.URL("https://script.google.com/macros/s/AKfycbwm5qwhrgsD37Hd8tFTZkECfKv-rYUoF3omNjm_GX0hZKeDyxC5tQTdXTPLUWEUUT5s/exec")
+                            val connection = url.openConnection() as java.net.HttpURLConnection
+                            connection.requestMethod = "POST"
+                            connection.setRequestProperty("Content-Type", "application/json")
+                            connection.doOutput = true
+                            connection.connectTimeout = 45000
+                            connection.readTimeout = 45000
+                            
+                            connection.outputStream.use { os ->
+                                val input = json.toString().toByteArray(Charsets.UTF_8)
+                                os.write(input, 0, input.size)
+                            }
+
+                            var responseCode = connection.responseCode
+                            var redirectUrl = connection.getHeaderField("Location")
+                            var currentConn = connection
+                            
+                            // Seguir redirecciones 302 que suele usar Google Apps Script
+                            while (responseCode / 100 == 3 && redirectUrl != null) {
+                                currentConn = java.net.URL(redirectUrl).openConnection() as java.net.HttpURLConnection
+                                currentConn.requestMethod = "GET"
+                                responseCode = currentConn.responseCode
+                                redirectUrl = currentConn.getHeaderField("Location")
+                            }
+
+                            if (responseCode == 200) {
+                                val responseStr = currentConn.inputStream.bufferedReader().use { it.readText() }
+                                val responseJson = org.json.JSONObject(responseStr)
+                                if (responseJson.optBoolean("success", false)) {
+                                    uploadedPhotoUrl = responseJson.optString("url")
+                                    addLog("  -> Google Drive: ¡Éxito! Archivo guardado y enlazado.")
+                                } else {
+                                    addLog("  -> Google Drive: Servidor devolvió success=false.")
+                                }
+                            } else {
+                                addLog("  -> Google Drive: Falló con HTTP $responseCode")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        addLog("  -> Google Drive: Error al subir - ${e.message}")
                     }
                 }
 
@@ -396,19 +508,9 @@ class SyncRepository(private val context: Context) {
                     addLog("  -> Google Calendar: Omitido (No vinculado).")
                 }
 
-                // 6. Supabase Integration
-                val supabaseUrl = _syncStatus.value.supabaseUrl
-                val supabaseKey = _syncStatus.value.supabaseKey
-                
-                if (supabaseUrl.isNotEmpty() && supabaseKey.isNotEmpty()) {
+                if (supabaseService != null && supabaseUrl.isNotEmpty() && supabaseKey.isNotEmpty()) {
                     addLog("  -> Supabase: Guardando registro de trabajo/cambios en la nube...")
                     try {
-                        val cleanUrl = if (supabaseUrl.endsWith("/")) supabaseUrl else "$supabaseUrl/"
-                        val retrofit = Retrofit.Builder()
-                            .baseUrl(cleanUrl)
-                            .addConverterFactory(MoshiConverterFactory.create(com.squareup.moshi.Moshi.Builder().add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()))
-                            .build()
-                        val service = retrofit.create(SupabaseApiService::class.java)
                         val bearerToken = "Bearer $supabaseKey"
                         val request = com.example.data.api.SupabaseBitacoraUploadRequest(
                             site_name = log.siteName,
@@ -421,10 +523,12 @@ class SyncRepository(private val context: Context) {
                             budget_estimate = log.budgetEstimate,
                             latitude = log.latitude,
                             longitude = log.longitude,
-                            photo_uri = null, // La fotografía no se guarda en Supabase, se guarda en Google Drive
+                            photo_uri = uploadedPhotoUrl,
+                            concepto_id = log.concepto_id,
+                            concepto = log.concepto_name,
                             timestamp = System.currentTimeMillis()
                         )
-                        val response = service.uploadBitacora(apiKey = supabaseKey, authorization = bearerToken, request = request)
+                        val response = supabaseService.uploadBitacora(apiKey = supabaseKey, authorization = bearerToken, request = request)
                         if (response.isSuccessful) {
                             addLog("  -> Supabase: Guardado exitoso (ID local: ${log.id})")
                         } else {
@@ -522,19 +626,25 @@ class SyncRepository(private val context: Context) {
                     val filteredConcepts = allConcepts.filter { sc ->
                         presupuestos.any { it.id == sc.presupuesto_id }
                     }
-                    val budgetEntities = filteredConcepts.map { sc ->
-                        val obraName = presupuestos.find { it.id == sc.presupuesto_id }?.obra_name ?: sc.presupuesto_id ?: "Obra Desconocida"
-                        BudgetItemEntity(
-                            code = sc.code ?: sc.id ?: "DESCONOCIDO",
-                            description = sc.description ?: "",
-                            quantity = sc.quantity ?: 0.0,
-                            unit = sc.unit ?: "",
-                            unitPrice = sc.unit_price ?: 0.0,
-                            executedQuantity = sc.executed_quantity ?: 0.0,
-                            totalBudget = sc.total_budget ?: ((sc.quantity ?: 0.0) * (sc.unit_price ?: 0.0)),
-                            obraId = obraName
-                        )
-                    }
+                                          val oldBudgetItems = budgetItemDao.getAllBudgetItemsSync()
+                      
+                      val budgetEntities = filteredConcepts.map { sc ->
+                          val obraName = presupuestos.find { it.id == sc.presupuesto_id }?.obra_name ?: sc.presupuesto_id ?: "Obra Desconocida"
+                          val codeStr = sc.code ?: sc.id ?: "DESCONOCIDO"
+                          val oldItem = oldBudgetItems.find { it.code == codeStr && it.obraId == obraName }
+                          val finalExecuted = maxOf(sc.executed_quantity ?: 0.0, oldItem?.executedQuantity ?: 0.0)
+
+                          BudgetItemEntity(
+                              code = codeStr,
+                              description = sc.description ?: "",
+                              quantity = sc.quantity ?: 0.0,
+                              unit = sc.unit ?: "",
+                              unitPrice = sc.unit_price ?: 0.0,
+                              executedQuantity = finalExecuted,
+                              totalBudget = sc.total_budget ?: ((sc.quantity ?: 0.0) * (sc.unit_price ?: 0.0)),
+                              obraId = obraName
+                          )
+                      }
                     budgetItemDao.insertBudgetItems(budgetEntities)
                     
                     val filteredMatrices = allMatrices.filter { sm ->

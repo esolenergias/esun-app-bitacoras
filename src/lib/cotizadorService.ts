@@ -656,3 +656,65 @@ export async function getAllSavedGroups(): Promise<{ group: PresupuestoConcepto;
 
   return results;
 }
+
+// ==========================================
+// DUPLICATE PRESUPUESTO
+// ==========================================
+
+export async function duplicatePresupuesto(id: string): Promise<PresupuestoDetalle> {
+  const oldDetails = await getPresupuestoDetails(id);
+
+  // Generar nombre copia único
+  let newName = oldDetails.name + ' - Copia';
+  
+  // 1. Insertar el nuevo presupuesto
+  const { data: newBudget, error: budgetError } = await supabase
+    .from('presupuestos')
+    .insert({
+      name: newName,
+      client_name: oldDetails.client_name,
+      status: 'borrador',
+      produccion: false,
+      indirect_percentage: oldDetails.indirect_percentage,
+      utility_percentage: oldDetails.utility_percentage
+    })
+    .select()
+    .single();
+
+  if (budgetError) throw budgetError;
+
+  if (oldDetails.conceptos && oldDetails.conceptos.length > 0) {
+    // Generar nuevos UUIDs para todos los conceptos
+    const idMap = new Map<string, string>();
+    oldDetails.conceptos.forEach(c => {
+      idMap.set(c.id, crypto.randomUUID());
+    });
+
+    const newConcepts = oldDetails.conceptos.map(c => ({
+      id: idMap.get(c.id),
+      presupuesto_id: newBudget.id,
+      matriz_id: c.matriz_id || null,
+      quantity: c.quantity || 0,
+      description: c.description || '',
+      unit: c.unit || '',
+      cost_price: c.cost_price || 0,
+      indirect_percentage: c.indirect_percentage || 0,
+      utility_percentage: c.utility_percentage || 0,
+      order_index: c.order_index,
+      parent_id: c.parent_id ? idMap.get(c.parent_id) : null,
+      type: c.type || 'concept'
+    }));
+
+    const { error: insertError } = await supabase
+      .from('presupuesto_conceptos')
+      .insert(newConcepts);
+
+    if (insertError) {
+      // Revertir en caso de error
+      await supabase.from('presupuestos').delete().eq('id', newBudget.id);
+      throw insertError;
+    }
+  }
+
+  return getPresupuestoDetails(newBudget.id);
+}

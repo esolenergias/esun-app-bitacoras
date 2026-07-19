@@ -107,6 +107,15 @@ fun GeneralSettingsTab(viewModel: BitacoraViewModel) {
                     letterSpacing = 1.sp
                 )
                 
+                var isEditingProfile by remember { mutableStateOf(false) }
+                var editName by remember { mutableStateOf(userName) }
+                var editEmail by remember { mutableStateOf(userEmail) }
+
+                LaunchedEffect(userName, userEmail) {
+                    editName = userName
+                    editEmail = userEmail
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -126,18 +135,71 @@ fun GeneralSettingsTab(viewModel: BitacoraViewModel) {
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = userName,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 16.sp,
-                            color = SlateDeep
-                        )
-                        Text(
-                            text = userEmail,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 12.sp,
-                            color = OnSurfaceVariant
-                        )
+                        if (isEditingProfile) {
+                            OutlinedTextField(
+                                value = editName,
+                                onValueChange = { editName = it },
+                                label = { Text("Nombre") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = ConnectedBlue,
+                                    unfocusedBorderColor = SubtleOutline,
+                                    focusedContainerColor = PureWhite,
+                                    unfocusedContainerColor = LightGrayBg,
+                                    focusedTextColor = SlateDeep,
+                                    unfocusedTextColor = SlateDeep
+                                )
+                            )
+                            OutlinedTextField(
+                                value = editEmail,
+                                onValueChange = { editEmail = it },
+                                label = { Text("Correo Electrónico") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = ConnectedBlue,
+                                    unfocusedBorderColor = SubtleOutline,
+                                    focusedContainerColor = PureWhite,
+                                    unfocusedContainerColor = LightGrayBg,
+                                    focusedTextColor = SlateDeep,
+                                    unfocusedTextColor = SlateDeep
+                                )
+                            )
+                            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { isEditingProfile = false }) {
+                                    Text("Cancelar")
+                                }
+                                Button(onClick = {
+                                    viewModel.updateUser(editName, editEmail)
+                                    isEditingProfile = false
+                                }) {
+                                    Text("Guardar")
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = userName,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp,
+                                color = SlateDeep
+                            )
+                            Text(
+                                text = userEmail,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp,
+                                color = OnSurfaceVariant
+                            )
+                            Text(
+                                text = "Editar perfil",
+                                fontSize = 12.sp,
+                                color = ConnectedBlue,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .padding(top = 4.dp)
+                                    .clickable { isEditingProfile = true }
+                            )
+                        }
                     }
                 }
 
@@ -282,52 +344,7 @@ fun GeneralSettingsTab(viewModel: BitacoraViewModel) {
         }
 
         if (userRole != "Trabajador") {
-            // Platform Integrations Center
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = PureWhite)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "INTEGRACIÓN EN LA NUBE",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OnSurfaceVariant,
-                        letterSpacing = 1.sp
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        IntegrationItemSettings(
-                            label = "Sheets (Excel)",
-                            isConnected = syncStatus.googleSheetsConnected,
-                            icon = Icons.Default.TableChart,
-                            color = SuccessGreen,
-                            modifier = Modifier.weight(1f),
-                            onToggle = { viewModel.toggleGoogleSheets() }
-                        )
-                        IntegrationItemSettings(
-                            label = "Drive (Fotos)",
-                            isConnected = syncStatus.googleDriveConnected,
-                            icon = Icons.Default.CloudQueue,
-                            color = ConnectedBlue,
-                            modifier = Modifier.weight(1f),
-                            onToggle = { viewModel.toggleGoogleDrive() }
-                        )
-                        IntegrationItemSettings(
-                            label = "Calendar (Hit)",
-                            isConnected = syncStatus.googleCalendarConnected,
-                            icon = Icons.Default.CalendarMonth,
-                            color = EsolOrange,
-                            modifier = Modifier.weight(1f),
-                            onToggle = { viewModel.toggleGoogleCalendar() }
-                        )
-                    }
-                }
-            }
+
         }
 
         // Real-time Console Log Terminal Card

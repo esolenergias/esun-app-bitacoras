@@ -80,7 +80,7 @@ fun CrewScreen(viewModel: BitacoraViewModel) {
                     OutlinedTextField(
                         value = newMemberName,
                         onValueChange = { newMemberName = it },
-                        placeholder = { Text("Nombre Completo", color = OnSurfaceVariant, fontSize = 13.sp) },
+                        placeholder = { Text("Nombre Completo o Correo", color = OnSurfaceVariant, fontSize = 13.sp) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ConnectedBlue,
                             unfocusedBorderColor = SubtleOutline,
@@ -141,7 +141,16 @@ fun CrewScreen(viewModel: BitacoraViewModel) {
                     IconButton(
                         onClick = {
                             if (newMemberName.isNotBlank()) {
-                                viewModel.addNewCrewMember(newMemberName, newMemberRole)
+                                if (newMemberName.contains("@")) {
+                                    val existingUser = viewModel.getRegisteredUserByEmail(newMemberName.trim())
+                                    if (existingUser != null) {
+                                        viewModel.addNewCrewMember(existingUser.first, existingUser.second)
+                                    } else {
+                                        viewModel.addNewCrewMember(newMemberName.trim(), newMemberRole)
+                                    }
+                                } else {
+                                    viewModel.addNewCrewMember(newMemberName.trim(), newMemberRole)
+                                }
                                 newMemberName = ""
                             }
                         },

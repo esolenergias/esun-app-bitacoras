@@ -46,7 +46,8 @@ fun ObraDashboardScreen(
     projectName: String,
     onNavigateBack: () -> Unit,
     onNavigateToNewLog: () -> Unit,
-    onNavigateToReportsList: () -> Unit
+    onNavigateToReportsList: () -> Unit,
+    onNavigateToReportDetail: (Int) -> Unit
 ) {
     val bitacoras by viewModel.bitacorasList.collectAsState()
     val budgetItems by viewModel.budgetItems.collectAsState()
@@ -131,13 +132,14 @@ fun ObraDashboardScreen(
     LaunchedEffect(projectName) {
         viewModel.selectedObraId.value = projectName
     }
-    var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = if (userRole == "Trabajador") {
-        listOf("Resumen")
+        listOf("Resumen", "Datos de obra")
     } else {
-        listOf("Resumen", "Costos")
+        listOf("Resumen", "Costos", "Datos de obra")
     }
 
+
+    var selectedTabIndex by remember { mutableStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -190,8 +192,8 @@ fun ObraDashboardScreen(
         HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
 
         Box(modifier = Modifier.weight(1f)) {
-            when (selectedTabIndex) {
-                0 -> {
+            when (tabs[selectedTabIndex]) {
+                "Resumen" -> {
         // --- SCROLLABLE BOARD ---
         Column(
             modifier = Modifier
@@ -271,152 +273,6 @@ fun ObraDashboardScreen(
                 }
             }
 
-            // --- 3. DATOS DE OBRA CARD ---
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(24.dp)),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = LightGrayBg)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "DATOS DE OBRA",
-                                fontWeight = FontWeight.Black,
-                                fontSize = 11.sp,
-                                color = OnSurfaceVariant,
-                                letterSpacing = 0.5.sp
-                            )
-                            if (isDatosObraExpanded && canModifyBudget) {
-                                IconButton(
-                                    onClick = { isEditingDatosObra = !isEditingDatosObra },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (isEditingDatosObra) Icons.Default.Check else Icons.Default.Edit,
-                                        contentDescription = "Editar",
-                                        tint = ConnectedBlue,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                        IconButton(
-                            onClick = { isDatosObraExpanded = !isDatosObraExpanded },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isDatosObraExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, 
-                                contentDescription = "Expandir/Contraer", 
-                                tint = ConnectedBlue, 
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    if (isDatosObraExpanded) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(PureWhite, RoundedCornerShape(16.dp))
-                                .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp))
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            if (!isEditingDatosObra) {
-                                ObraDetailRow(label = "Cliente", value = obraCliente)
-                                ObraDetailRow(label = "Ubicación", value = obraUbicacion)
-                                ObraDetailRow(label = "Inicio", value = obraInicio)
-                                ObraDetailRow(label = "Término Estimado", value = obraTermino)
-                                ObraDetailRow(label = "Residente", value = obraResidente)
-                            } else {
-                                OutlinedTextField(
-                                    value = obraCliente,
-                                    onValueChange = { obraCliente = it },
-                                    label = { Text("Cliente") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = ConnectedBlue,
-                                        unfocusedBorderColor = SubtleOutline,
-                                        focusedLabelColor = ConnectedBlue,
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black
-                                    )
-                                )
-                                OutlinedTextField(
-                                    value = obraUbicacion,
-                                    onValueChange = { obraUbicacion = it },
-                                    label = { Text("Ubicación") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = ConnectedBlue,
-                                        unfocusedBorderColor = SubtleOutline,
-                                        focusedLabelColor = ConnectedBlue,
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black
-                                    )
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(
-                                        value = obraInicio,
-                                        onValueChange = { obraInicio = it },
-                                        label = { Text("Inicio") },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = ConnectedBlue,
-                                            unfocusedBorderColor = SubtleOutline,
-                                            focusedLabelColor = ConnectedBlue,
-                                            focusedTextColor = Color.Black,
-                                            unfocusedTextColor = Color.Black
-                                        )
-                                    )
-                                    OutlinedTextField(
-                                        value = obraTermino,
-                                        onValueChange = { obraTermino = it },
-                                        label = { Text("Término Estimado") },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true,
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = ConnectedBlue,
-                                            unfocusedBorderColor = SubtleOutline,
-                                            focusedLabelColor = ConnectedBlue,
-                                            focusedTextColor = Color.Black,
-                                            unfocusedTextColor = Color.Black
-                                        )
-                                    )
-                                }
-                                OutlinedTextField(
-                                    value = obraResidente,
-                                    onValueChange = { obraResidente = it },
-                                    label = { Text("Residente") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = ConnectedBlue,
-                                        unfocusedBorderColor = SubtleOutline,
-                                        focusedLabelColor = ConnectedBlue,
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
 
             // --- 4. TAREAS ---
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -609,6 +465,7 @@ fun ObraDashboardScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .clickable { onNavigateToReportDetail(bitacora.id) }
                                         .padding(vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -651,8 +508,139 @@ fun ObraDashboardScreen(
         }
 
                 } // End of selectedTabIndex == 0
-                1 -> {
+                "Costos" -> {
                     BudgetScreen(viewModel = viewModel)
+                }
+                "Datos de obra" -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
+                            colors = CardDefaults.cardColors(containerColor = PureWhite)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "DATOS GENERALES DE LA OBRA",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 13.sp,
+                                        color = SlateDeep,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    if (canModifyBudget) {
+                                        IconButton(
+                                            onClick = { isEditingDatosObra = !isEditingDatosObra },
+                                            modifier = Modifier.size(32.dp).background(if (isEditingDatosObra) Color(0xFFEFF6FF) else Color.Transparent, RoundedCornerShape(8.dp))
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isEditingDatosObra) Icons.Default.Check else Icons.Default.Edit,
+                                                contentDescription = "Editar",
+                                                tint = ConnectedBlue,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (!isEditingDatosObra) {
+                                    ObraDetailRow(label = "Cliente", value = obraCliente)
+                                    ObraDetailRow(label = "Ubicación", value = obraUbicacion)
+                                    ObraDetailRow(label = "Inicio", value = obraInicio)
+                                    ObraDetailRow(label = "Término Estimado", value = obraTermino)
+                                    ObraDetailRow(label = "Residente Técnico", value = obraResidente)
+                                } else {
+                                    OutlinedTextField(
+                                        value = obraCliente,
+                                        onValueChange = { obraCliente = it },
+                                        label = { Text("Cliente") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = ConnectedBlue,
+                                            unfocusedBorderColor = SubtleOutline,
+                                            focusedLabelColor = ConnectedBlue,
+                                            focusedTextColor = Color.Black,
+                                            unfocusedTextColor = Color.Black
+                                        )
+                                    )
+                                    OutlinedTextField(
+                                        value = obraUbicacion,
+                                        onValueChange = { obraUbicacion = it },
+                                        label = { Text("Ubicación") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = ConnectedBlue,
+                                            unfocusedBorderColor = SubtleOutline,
+                                            focusedLabelColor = ConnectedBlue,
+                                            focusedTextColor = Color.Black,
+                                            unfocusedTextColor = Color.Black
+                                        )
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedTextField(
+                                            value = obraInicio,
+                                            onValueChange = { obraInicio = it },
+                                            label = { Text("Inicio") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = ConnectedBlue,
+                                                unfocusedBorderColor = SubtleOutline,
+                                                focusedLabelColor = ConnectedBlue,
+                                                focusedTextColor = Color.Black,
+                                                unfocusedTextColor = Color.Black
+                                            )
+                                        )
+                                        OutlinedTextField(
+                                            value = obraTermino,
+                                            onValueChange = { obraTermino = it },
+                                            label = { Text("Término Estimado") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = ConnectedBlue,
+                                                unfocusedBorderColor = SubtleOutline,
+                                                focusedLabelColor = ConnectedBlue,
+                                                focusedTextColor = Color.Black,
+                                                unfocusedTextColor = Color.Black
+                                            )
+                                        )
+                                    }
+                                    OutlinedTextField(
+                                        value = obraResidente,
+                                        onValueChange = { obraResidente = it },
+                                        label = { Text("Residente Técnico") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = ConnectedBlue,
+                                            unfocusedBorderColor = SubtleOutline,
+                                            focusedLabelColor = ConnectedBlue,
+                                            focusedTextColor = Color.Black,
+                                            unfocusedTextColor = Color.Black
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             } // End of when
         } // End of Box

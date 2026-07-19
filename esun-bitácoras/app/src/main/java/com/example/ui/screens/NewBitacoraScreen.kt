@@ -63,6 +63,8 @@ fun NewBitacoraScreen(
     val supervisorName by viewModel.supervisorName.collectAsState()
     val weather by viewModel.weather.collectAsState()
     val capturedPhotoUri by viewModel.capturedPhotoUri.collectAsState()
+    val budgetItems by viewModel.budgetItems.collectAsState()
+    val selectedConceptoName by viewModel.conceptoName.collectAsState()
     
     // Auto-bind site/project name
     LaunchedEffect(projectName) {
@@ -77,6 +79,7 @@ fun NewBitacoraScreen(
     var expMachinery by remember { mutableStateOf(false) }
     var expActivities by remember { mutableStateOf(true) }
     var expIncidents by remember { mutableStateOf(false) }
+    var expConceptos by remember { mutableStateOf(false) }
     
     // State variables for the advanced form
     var internalCrew by remember { mutableStateOf("12") }
@@ -276,6 +279,57 @@ fun NewBitacoraScreen(
                 )
             }
 
+            // --- CONCEPTOS ---
+            ExpandableFormSection(
+                title = "Concepto Vinculado",
+                icon = Icons.Default.List,
+                isExpanded = expConceptos,
+                onToggle = { expConceptos = !expConceptos }
+            ) {
+                var isDropdownExpanded by remember { mutableStateOf(false) }
+                
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedConceptoName ?: "",
+                        onValueChange = { viewModel.setConcepto(null, it) },
+                        label = { Text("Concepto Asociado (Escribe o Selecciona)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            if (budgetItems.isNotEmpty()) {
+                                IconButton(onClick = { isDropdownExpanded = !isDropdownExpanded }) {
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Seleccionar")
+                                }
+                            }
+                        },
+                        colors = outlinedTextFieldColors()
+                    )
+                    
+                    DropdownMenu(
+                        expanded = isDropdownExpanded,
+                        onDismissRequest = { isDropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        budgetItems.forEach { item ->
+                            DropdownMenuItem(
+                                text = { Text(item.description, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                                onClick = {
+                                    viewModel.setConcepto(item.id.toString(), item.description)
+                                    isDropdownExpanded = false
+                                }
+                            )
+                        }
+                        Divider(color = SubtleOutline)
+                        DropdownMenuItem(
+                            text = { Text("+ Generar uno nuevo...", fontWeight = FontWeight.Bold, color = ConnectedBlue) },
+                            onClick = {
+                                viewModel.setConcepto(null, "")
+                                isDropdownExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
             // --- 4. ACTIVIDADES Y AVANCE ---
             ExpandableFormSection(
                 title = "Actividades y Avance Físico",
@@ -467,8 +521,7 @@ fun NewBitacoraScreen(
 
                         // Pasar todos los campos al ViewModel
                         viewModel.setSiteName(projectName)
-                        val formattedDescription = "Reportado por: $userName\nSupervisor a cargo: $supervisorName\n\n$activitiesText"
-                        viewModel.setDescription(formattedDescription)
+                        viewModel.setDescription(activitiesText)
                         val totalCrew = (internalCrew.toIntOrNull() ?: 0) + (subCrew.toIntOrNull() ?: 0)
                         viewModel.setCrewCount(totalCrew)
                         viewModel.setPhysicalProgress(progressVal.toDouble())

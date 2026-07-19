@@ -47,7 +47,8 @@ fun DashboardScreen(
     viewModel: BitacoraViewModel,
     onNavigateToNewLog: (String) -> Unit,
     onNavigateToNewObra: () -> Unit,
-    onNavigateToObraDashboard: (String) -> Unit
+    onNavigateToObraDashboard: (String) -> Unit,
+    onNavigateToReportDetail: (Int) -> Unit
 ) {
     val bitacoras by viewModel.bitacorasList.collectAsState()
     val syncStatus by viewModel.syncStatus.collectAsState()
@@ -145,13 +146,15 @@ fun DashboardScreen(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp),
+                        .size(40.dp)
+                        .background(Color(0xFFEFF6FF), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        painter = painterResource(id = com.example.R.drawable.logo_esunbitacora),
+                    Icon(
+                        imageVector = Icons.Default.WbSunny,
                         contentDescription = "ESun Logo",
-                        modifier = Modifier.fillMaxSize()
+                        tint = SolarAmber,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 Column {
@@ -454,7 +457,7 @@ fun DashboardScreen(
                         bitacoras.take(5).forEach { log ->
                             BeautifulBitacoraCard(
                                 log = log,
-                                onCardClick = { onNavigateToObraDashboard(log.siteName) }
+                                onCardClick = { onNavigateToReportDetail(log.id) }
                             )
                         }
                     }

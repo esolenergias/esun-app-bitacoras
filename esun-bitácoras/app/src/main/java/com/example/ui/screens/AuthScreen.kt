@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -62,6 +63,9 @@ fun AuthScreen(viewModel: BitacoraViewModel) {
     var passwordInput by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf("Trabajador") } // "Master", "Supervisor", "Trabajador"
     var showPassword by remember { mutableStateOf(false) }
+    
+    // Auth error modal
+    var authErrorDialog by remember { mutableStateOf<String?>(null) }
 
     // Dialog state for Google Sign In Setup
     var showGoogleDialog by remember { mutableStateOf(false) }
@@ -96,12 +100,21 @@ fun AuthScreen(viewModel: BitacoraViewModel) {
         ) {
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Logo Header
-            Image(
-                painter = painterResource(id = R.drawable.logo_esunbitacora),
-                contentDescription = "Logo Esun Bitacora",
-                modifier = Modifier.size(80.dp)
-            )
+            // Logo Header (Temporalmente con un ícono nativo para evitar el crasheo de la imagen)
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .background(PureWhite, RoundedCornerShape(20.dp))
+                    .border(BorderStroke(2.dp, ConnectedBlue), RoundedCornerShape(20.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Build,
+                    contentDescription = "Logo Esun Bitacora",
+                    modifier = Modifier.size(40.dp),
+                    tint = ConnectedBlue
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -350,7 +363,11 @@ fun AuthScreen(viewModel: BitacoraViewModel) {
                     }
 
                     Button(
-                        onClick = { launchGoogleSignIn(context, coroutineScope, viewModel) },
+                        onClick = { 
+                            launchGoogleSignIn(context, coroutineScope, viewModel) { error ->
+                                authErrorDialog = error
+                            } 
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -429,32 +446,36 @@ fun AuthScreen(viewModel: BitacoraViewModel) {
                         // Package Name
                         Column {
                             Text("Nombre del Paquete (Package Name):", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
-                            Text(
-                                text = context.packageName,
-                                fontSize = 11.sp,
-                                color = ConnectedBlue,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier
-                                    .background(PureWhite, RoundedCornerShape(4.dp))
-                                    .padding(6.dp)
-                                    .fillMaxWidth()
-                            )
+                            SelectionContainer {
+                                Text(
+                                    text = context.packageName,
+                                    fontSize = 11.sp,
+                                    color = ConnectedBlue,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .background(PureWhite, RoundedCornerShape(4.dp))
+                                        .padding(6.dp)
+                                        .fillMaxWidth()
+                                )
+                            }
                         }
 
                         // Calculated SHA-1
                         val calculatedSha1 = remember { getAppSignatureSHA1(context) }
                         Column {
                             Text("Firma SHA-1 de esta App instalada:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
-                            Text(
-                                text = calculatedSha1,
-                                fontSize = 11.sp,
-                                color = ConnectedBlue,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier
-                                    .background(PureWhite, RoundedCornerShape(4.dp))
-                                    .padding(6.dp)
-                                    .fillMaxWidth()
-                            )
+                            SelectionContainer {
+                                Text(
+                                    text = calculatedSha1,
+                                    fontSize = 11.sp,
+                                    color = ConnectedBlue,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .background(PureWhite, RoundedCornerShape(4.dp))
+                                        .padding(6.dp)
+                                        .fillMaxWidth()
+                                )
+                            }
                         }
 
                         // Web Client ID
@@ -494,6 +515,28 @@ fun AuthScreen(viewModel: BitacoraViewModel) {
 
             Spacer(modifier = Modifier.height(20.dp))
         }
+
+        // Error Dialog
+        authErrorDialog?.let { errText ->
+            AlertDialog(
+                onDismissRequest = { authErrorDialog = null },
+                title = { 
+                    Text("Error detallado", fontWeight = FontWeight.Bold, color = SlateDeep) 
+                },
+                text = {
+                    SelectionContainer {
+                        Text(text = errText, fontSize = 13.sp, color = OnSurfaceVariant)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { authErrorDialog = null }) {
+                        Text("Cerrar", color = ConnectedBlue)
+                    }
+                },
+                containerColor = PureWhite,
+                shape = RoundedCornerShape(16.dp)
+            )
+        }
     }
 }
 @Composable
@@ -521,7 +564,12 @@ fun lightTextFieldColors() = OutlinedTextFieldDefaults.colors(
 )
 
 
-fun launchGoogleSignIn(context: android.content.Context, coroutineScope: kotlinx.coroutines.CoroutineScope, viewModel: BitacoraViewModel) {
+fun launchGoogleSignIn(
+    context: android.content.Context, 
+    coroutineScope: kotlinx.coroutines.CoroutineScope, 
+    viewModel: BitacoraViewModel,
+    onError: (String) -> Unit
+) {
     val clientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
     if (clientId.isBlank() || clientId.contains("mock-client-id")) {
         Toast.makeText(
@@ -562,16 +610,11 @@ fun launchGoogleSignIn(context: android.content.Context, coroutineScope: kotlinx
             }
         } catch (e: Exception) {
             Log.e("AuthScreen", "Google Sign In Error", e)
-            val errMsg = e.message ?: ""
-            if (errMsg.contains("DEVELOPER_ERROR") || errMsg.contains("16") || e is androidx.credentials.exceptions.GetCredentialException) {
-                Toast.makeText(
-                    context, 
-                    "Error de configuración (DEVELOPER_ERROR): Asegúrate de registrar el SHA-1 (34:25:1B:1F:CB:71:94:AF:4F:B4:B8:25:F0:E3:0F:6F:69:53:18:CE) y el paquete (com.aistudio.esunbitacora.vypnzx) en tu consola de Google Cloud.", 
-                    Toast.LENGTH_LONG
-                ).show()
-            } else {
-                Toast.makeText(context, "Error al iniciar sesión: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-            }
+            val rawError = e.localizedMessage ?: e.toString()
+            val errorType = e.javaClass.simpleName
+            
+            // Invoke the callback with the raw error so it displays in the alert dialog
+            onError("ERROR ($errorType):\n\n$rawError")
         }
     }
 }

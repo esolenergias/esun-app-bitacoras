@@ -247,7 +247,7 @@ Monto: <monto total aproximado en MXN, ej. $4,800 o vacío>`,
 
 
 const initialUsers: User[] = [
-  { id: 'usr-1', name: 'Manuel Menyfre', email: 'menyfre@gmail.com', role: 'master', verified: true, avatar: '👑' },
+  { id: 'usr-1', name: 'Manuel Fregoso', email: 'menyfre@gmail.com', role: 'master', verified: true, avatar: '👑' },
   { id: 'usr-2', name: 'Ana Martínez (Ventas)', email: 'admin.esol@gmail.com', role: 'admin', verified: true, avatar: '💼' },
   { id: 'usr-3', name: 'Carlos Delgado (Cliente B2B)', email: 'cliente.esol@gmail.com', role: 'user', verified: true, avatar: '☀️' },
   { id: 'usr-4', name: 'Alfonso Gómez (Lead)', email: 'alfonso@gmail.com', role: 'user', verified: true, avatar: '☀️' }
@@ -548,7 +548,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (profile && !error) {
             const user: User = {
               id: profile.id,
-              name: profile.name || session.user.email?.split('@')[0] || 'Cliente',
+              name: (session.user.email === 'menyfre@gmail.com') ? 'Manuel Fregoso' : (profile.name || session.user.email?.split('@')[0] || 'Cliente'),
               email: profile.email || session.user.email || '',
               role: profile.role as UserRole,
               avatar: profile.avatar || '☀️',
@@ -567,7 +567,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
             const fallbackUser: User = {
               id: session.user.id,
-              name: email.split('@')[0],
+              name: email === 'menyfre@gmail.com' ? 'Manuel Fregoso' : email.split('@')[0],
               email,
               role,
               avatar: role === 'master' ? '👑' : role === 'admin' ? '💼' : '☀️',

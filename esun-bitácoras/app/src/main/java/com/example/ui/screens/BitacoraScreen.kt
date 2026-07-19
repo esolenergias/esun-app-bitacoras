@@ -29,7 +29,8 @@ import com.example.ui.viewmodel.BitacoraViewModel
 fun BitacoraScreen(
     viewModel: BitacoraViewModel,
     onNavigateToNewObra: () -> Unit,
-    onNavigateToObraDashboard: (String) -> Unit
+    onNavigateToObraDashboard: (String) -> Unit,
+    onNavigateToReportDetail: (Int) -> Unit
 ) {
     val scrollState = rememberScrollState()
     val userRole by viewModel.userRole.collectAsState()

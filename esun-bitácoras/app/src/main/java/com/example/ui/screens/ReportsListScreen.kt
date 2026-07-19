@@ -33,13 +33,23 @@ import androidx.compose.ui.unit.sp
 import com.example.data.database.BitacoraEntity
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.BitacoraViewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import android.net.Uri
+import android.content.Intent
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Close
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsListScreen(
     viewModel: BitacoraViewModel,
     projectName: String,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToReportDetail: (Int) -> Unit
 ) {
     val context = LocalContext.current
     val userRole by viewModel.userRole.collectAsState()
@@ -61,6 +71,21 @@ fun ReportsListScreen(
     var editDescription by remember { mutableStateOf("") }
     var editPhysicalProgress by remember { mutableStateOf("") }
     var editFinancialProgress by remember { mutableStateOf("") }
+    var editPhotoUri by remember { mutableStateOf<String?>(null) }
+    
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {
+                // Ignore if it doesn't support persistable permissions
+            }
+            editPhotoUri = uri.toString()
+            Toast.makeText(context, "Imagen actualizada", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // Delete state
     var bitacoraToDelete by remember { mutableStateOf<BitacoraEntity?>(null) }
@@ -165,6 +190,7 @@ fun ReportsListScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp)
+                                .clickable { onNavigateToReportDetail(bitacora.id) }
                                 .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(12.dp)),
                             colors = CardDefaults.cardColors(containerColor = PureWhite)
                         ) {
@@ -213,6 +239,7 @@ fun ReportsListScreen(
                                                     editDescription = bitacora.description
                                                     editPhysicalProgress = bitacora.physicalProgress.toString()
                                                     editFinancialProgress = bitacora.financialProgress.toString()
+                                                    editPhotoUri = bitacora.photoUri
                                                     showEditDialog = true
                                                 },
                                                 modifier = Modifier.size(28.dp)
@@ -401,6 +428,42 @@ fun ReportsListScreen(
                         minLines = 3,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ConnectedBlue, unfocusedBorderColor = SubtleOutline)
                     )
+
+                    Text("Evidencia Fotográfica", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SlateDeep)
+                    if (editPhotoUri != null) {
+                        Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp))) {
+                            AsyncImage(
+                                model = editPhotoUri,
+                                contentDescription = "Evidencia fotográfica",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                            Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                IconButton(
+                                    onClick = { galleryLauncher.launch(arrayOf("image/*")) },
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(20.dp)).size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Cambiar", tint = PureWhite, modifier = Modifier.size(18.dp))
+                                }
+                                IconButton(
+                                    onClick = { editPhotoUri = null },
+                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(20.dp)).size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Quitar", tint = PureWhite, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = { galleryLauncher.launch(arrayOf("image/*")) },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = LightGrayBg, contentColor = SlateDeep)
+                        ) {
+                            Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Agregar Imagen", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -413,10 +476,12 @@ fun ReportsListScreen(
                                 crewCount = editCrewCount.toIntOrNull() ?: original.crewCount,
                                 description = editDescription,
                                 physicalProgress = editPhysicalProgress.toDoubleOrNull() ?: original.physicalProgress,
-                                financialProgress = editFinancialProgress.toDoubleOrNull() ?: original.financialProgress
+                                financialProgress = editFinancialProgress.toDoubleOrNull() ?: original.financialProgress,
+                                photoUri = editPhotoUri,
+                                isSynced = false
                             )
                             viewModel.updateBitacora(updated)
-                            Toast.makeText(context, "Reporte editado con éxito en Supabase.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Reporte editado y programado para sincronización.", Toast.LENGTH_SHORT).show()
                         }
                         showEditDialog = false
                         bitacoraToEdit = null

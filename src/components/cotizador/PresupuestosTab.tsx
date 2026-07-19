@@ -17,7 +17,8 @@ import {
   getInsumos,
   saveInsumo,
   saveMatriz,
-  mapConceptoFromDb
+  mapConceptoFromDb,
+  duplicatePresupuesto
 } from '../../lib/cotizadorService';
 import type { PresupuestoDetalle } from '../../lib/cotizadorService';
 import type { Presupuesto, PresupuestoConcepto, Matriz, Insumo, InsumoType, InsumoSubcategory } from '../../types/cotizador';
@@ -658,6 +659,21 @@ export default function PresupuestosTab() {
       console.error('Error deleting budget:', err);
       alert('Error al intentar eliminar el presupuesto.');
       handleCloseDeleteConfirm();
+    }
+  };
+
+  const handleDuplicatePresupuesto = async (id: string, name: string) => {
+    if (!confirm(`¿Estás seguro de que deseas duplicar el presupuesto "${name}"?`)) return;
+    try {
+      setLoading(true);
+      await duplicatePresupuesto(id);
+      await fetchBudgets();
+      alert('Presupuesto duplicado exitosamente.');
+    } catch (err: any) {
+      console.error('Error duplicando presupuesto:', err);
+      alert('Error al duplicar el presupuesto.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1592,6 +1608,13 @@ export default function PresupuestosTab() {
                           <Download className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          onClick={() => handleDuplicatePresupuesto(budget.id, budget.name)}
+                          className="p-1.5 border border-dark-4 bg-dark-1 hover:border-gold/30 hover:bg-dark-3 rounded-lg text-cream-muted hover:text-gold transition-all cursor-pointer"
+                          title="Duplicar presupuesto"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => handleOpenDeleteConfirm(budget)}
                           className="p-1.5 border border-red-500/10 bg-dark-1 hover:border-red-500/30 hover:bg-red-500/5 rounded-lg text-cream-muted hover:text-red-400 transition-all cursor-pointer"
                           title="Eliminar presupuesto"
@@ -1674,6 +1697,7 @@ export default function PresupuestosTab() {
                         <option value="enviado">Enviado</option>
                         <option value="aprobado">Aprobado</option>
                         <option value="rechazado">Rechazado</option>
+                        <option value="terminado">Terminado</option>
                       </select>
                     </div>
 
