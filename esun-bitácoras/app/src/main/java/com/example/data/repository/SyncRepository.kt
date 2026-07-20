@@ -265,8 +265,36 @@ class SyncRepository(private val context: Context) {
 
     suspend fun updateBudgetItemProgress(id: Int, newExecutedQty: Double) {
         withContext(Dispatchers.IO) {
-            // Fetch and update
-            // (We could fetch the list and find the item)
+            val items = budgetItemDao.getAllBudgetItemsSync()
+            val item = items.find { it.id == id }
+            if (item != null) {
+                budgetItemDao.updateBudgetItem(item.copy(executedQuantity = newExecutedQty))
+                
+                // Supabase Upload
+                if (_syncStatus.value.isOnline && item.supabaseId.isNotEmpty()) {
+                    val url = _syncStatus.value.supabaseUrl
+                    val key = _syncStatus.value.supabaseKey
+                    if (url.isNotEmpty() && key.isNotEmpty()) {
+                        try {
+                            val cleanUrl = if (url.endsWith("/")) url else "$url/"
+                            val retrofit = Retrofit.Builder()
+                                .baseUrl(cleanUrl)
+                                .addConverterFactory(MoshiConverterFactory.create(com.squareup.moshi.Moshi.Builder().add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()))
+                                .build()
+                            val service = retrofit.create(SupabaseApiService::class.java)
+                            service.updateConceptoExecuted(
+                                apiKey = key,
+                                authorization = "Bearer $key",
+                                idQuery = "eq.${item.supabaseId}",
+                                updates = mapOf("executed_quantity" to newExecutedQty)
+                            )
+                            addLog("Supabase Sync: Avance de concepto subido correctamente.")
+                        } catch (e: Exception) {
+                            addLog("Error al subir avance de concepto: ${e.message}")
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -387,6 +415,8 @@ class SyncRepository(private val context: Context) {
                         if (getResp.isSuccessful) {
                             val remoteObras = getResp.body() ?: emptyList()
                             val remoteObraNames = remoteObras.map { it.nombre }.toSet()
+                            val localObraNames = todasObras.map { it.nombre }.toSet()
+                            
                             var deletedCount = 0
                             for (obra in todasObras) {
                                 if (!remoteObraNames.contains(obra.nombre)) {
@@ -394,12 +424,29 @@ class SyncRepository(private val context: Context) {
                                     deletedCount++
                                 }
                             }
-                            if (deletedCount > 0) {
-                                addLog("Se eliminaron $deletedCount proyectos locales que fueron borrados en la nube.")
+                            if (deletedCount > 0) addLog("Se eliminaron $deletedCount proyectos locales borrados en la nube.")
+
+                            var addedCount = 0
+                            for (rObra in remoteObras) {
+                                if (!localObraNames.contains(rObra.nombre)) {
+                                    obraDao.insertObra(ObraEntity(
+                                        nombre = rObra.nombre,
+                                        cliente = rObra.cliente,
+                                        ubicacion = rObra.ubicacion,
+                                        fechaInicio = rObra.fecha_inicio,
+                                        fechaTermino = rObra.fecha_termino,
+                                        residente = rObra.residente,
+                                        descripcion = rObra.descripcion,
+                                        montoContrato = rObra.monto_contrato,
+                                        status = rObra.status
+                                    ))
+                                    addedCount++
+                                }
                             }
+                            if (addedCount > 0) addLog("Se descargaron $addedCount proyectos nuevos desde Supabase.")
                         }
                     } catch (e: Exception) {
-                        addLog("Error al verificar obras eliminadas: ${e.message}")
+                        addLog("Error al sincronizar obras con Supabase: ${e.message}")
                     }
                 }
             }
@@ -441,61 +488,73 @@ class SyncRepository(private val context: Context) {
 
                 // 4. Google Drive Photo Backup (Real upload via Apps Script)
                 var uploadedPhotoUrl: String? = null
-                if (log.photoUri != null) {
-                    addLog("  -> Google Drive: Subiendo fotografía de avance de obra...")
-                    try {
-                        val uri = Uri.parse(log.photoUri)
-                        val inputStream = context.contentResolver.openInputStream(uri)
-                        if (inputStream != null) {
-                            val bytes = inputStream.readBytes()
-                            inputStream.close()
-                            
-                            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                            val json = org.json.JSONObject()
-                            json.put("filename", "evidencia_${log.id}_${System.currentTimeMillis()}.jpg")
-                            json.put("mimeType", "image/jpeg")
-                            json.put("base64", base64)
+                if (!log.photoUri.isNullOrEmpty()) {
+                    addLog("  -> Google Drive: Subiendo fotografías de avance de obra...")
+                    val uris = log.photoUri.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    val uploadedUrls = mutableListOf<String>()
+                    
+                    for ((index, uriString) in uris.withIndex()) {
+                        try {
+                            val uri = Uri.parse(uriString)
+                            val inputStream = context.contentResolver.openInputStream(uri)
+                            if (inputStream != null) {
+                                val bytes = inputStream.readBytes()
+                                inputStream.close()
+                                
+                                val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                                val json = org.json.JSONObject()
+                                json.put("filename", "evidencia_${log.id}_${System.currentTimeMillis()}_${index}.jpg")
+                                json.put("mimeType", "image/jpeg")
+                                json.put("base64", base64)
 
-                            val url = java.net.URL("https://script.google.com/macros/s/AKfycbwm5qwhrgsD37Hd8tFTZkECfKv-rYUoF3omNjm_GX0hZKeDyxC5tQTdXTPLUWEUUT5s/exec")
-                            val connection = url.openConnection() as java.net.HttpURLConnection
-                            connection.requestMethod = "POST"
-                            connection.setRequestProperty("Content-Type", "application/json")
-                            connection.doOutput = true
-                            connection.connectTimeout = 45000
-                            connection.readTimeout = 45000
-                            
-                            connection.outputStream.use { os ->
-                                val input = json.toString().toByteArray(Charsets.UTF_8)
-                                os.write(input, 0, input.size)
-                            }
-
-                            var responseCode = connection.responseCode
-                            var redirectUrl = connection.getHeaderField("Location")
-                            var currentConn = connection
-                            
-                            // Seguir redirecciones 302 que suele usar Google Apps Script
-                            while (responseCode / 100 == 3 && redirectUrl != null) {
-                                currentConn = java.net.URL(redirectUrl).openConnection() as java.net.HttpURLConnection
-                                currentConn.requestMethod = "GET"
-                                responseCode = currentConn.responseCode
-                                redirectUrl = currentConn.getHeaderField("Location")
-                            }
-
-                            if (responseCode == 200) {
-                                val responseStr = currentConn.inputStream.bufferedReader().use { it.readText() }
-                                val responseJson = org.json.JSONObject(responseStr)
-                                if (responseJson.optBoolean("success", false)) {
-                                    uploadedPhotoUrl = responseJson.optString("url")
-                                    addLog("  -> Google Drive: ¡Éxito! Archivo guardado y enlazado.")
-                                } else {
-                                    addLog("  -> Google Drive: Servidor devolvió success=false.")
+                                val url = java.net.URL("https://script.google.com/macros/s/AKfycbwm5qwhrgsD37Hd8tFTZkECfKv-rYUoF3omNjm_GX0hZKeDyxC5tQTdXTPLUWEUUT5s/exec")
+                                val connection = url.openConnection() as java.net.HttpURLConnection
+                                connection.requestMethod = "POST"
+                                connection.setRequestProperty("Content-Type", "application/json")
+                                connection.doOutput = true
+                                connection.connectTimeout = 45000
+                                connection.readTimeout = 45000
+                                
+                                connection.outputStream.use { os ->
+                                    val input = json.toString().toByteArray(Charsets.UTF_8)
+                                    os.write(input, 0, input.size)
                                 }
-                            } else {
-                                addLog("  -> Google Drive: Falló con HTTP $responseCode")
+
+                                var responseCode = connection.responseCode
+                                var redirectUrl = connection.getHeaderField("Location")
+                                var currentConn = connection
+                                
+                                // Seguir redirecciones 302 que suele usar Google Apps Script
+                                while (responseCode / 100 == 3 && redirectUrl != null) {
+                                    currentConn = java.net.URL(redirectUrl).openConnection() as java.net.HttpURLConnection
+                                    currentConn.requestMethod = "GET"
+                                    responseCode = currentConn.responseCode
+                                    redirectUrl = currentConn.getHeaderField("Location")
+                                }
+
+                                if (responseCode == 200) {
+                                    val responseStr = currentConn.inputStream.bufferedReader().use { it.readText() }
+                                    val responseJson = org.json.JSONObject(responseStr)
+                                    if (responseJson.optBoolean("success", false)) {
+                                        val urlStr = responseJson.optString("url")
+                                        if (urlStr.isNotEmpty()) {
+                                            uploadedUrls.add(urlStr)
+                                            addLog("  -> Google Drive: ¡Éxito! Imagen ${index + 1} enlazada.")
+                                        }
+                                    } else {
+                                        addLog("  -> Google Drive: Servidor devolvió success=false para img ${index + 1}.")
+                                    }
+                                } else {
+                                    addLog("  -> Google Drive: Falló con HTTP $responseCode en img ${index + 1}")
+                                }
                             }
+                        } catch (e: Exception) {
+                            addLog("  -> Google Drive: Error al subir img ${index + 1} - ${e.message}")
                         }
-                    } catch (e: Exception) {
-                        addLog("  -> Google Drive: Error al subir - ${e.message}")
+                    }
+                    
+                    if (uploadedUrls.isNotEmpty()) {
+                        uploadedPhotoUrl = uploadedUrls.joinToString(",")
                     }
                 }
 
@@ -524,7 +583,6 @@ class SyncRepository(private val context: Context) {
                             latitude = log.latitude,
                             longitude = log.longitude,
                             photo_uri = uploadedPhotoUrl,
-                            concepto_id = log.concepto_id,
                             concepto = log.concepto_name,
                             timestamp = System.currentTimeMillis()
                         )

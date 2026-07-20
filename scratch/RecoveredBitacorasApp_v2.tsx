@@ -2,16 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../context/supabase';
 import { RefreshCw, Search, Calendar, MapPin, HardHat, TrendingUp, DollarSign, Cloud, Users, CheckCircle, Clock, Plus, X, Edit2, Trash2, ArrowLeft, Image as ImageIcon, ChevronDown, ChevronUp, ExternalLink, FileText, Download } from 'lucide-react';
 
-import type { Bitacora, ObraApp } from './esun/types';
-import { generateObraReport } from './esun/pdfGenerator';
+interface Bitacora {
+  id: string;
+  site_name: string;
+  date: string;
+  weather: string;
+  crew_count: number;
+  description: string;
+  physical_progress: number;
+  financial_progress: number;
+  budget_estimate: number;
+  created_at: string;
+}
+
+interface ObraApp {
+  nombre: string;
+  cliente: string;
+  ubicacion: string;
+  status: string;
+  created_at: string;
+}
 
 export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { reporterName?: string }) {
   const [bitacoras, setBitacoras] = useState<Bitacora[]>([]);
   const [obras, setObras] = useState<ObraApp[]>([]);
-  const [conceptosObra, setConceptosObra] = useState<any[]>([]);
-  const [selectedConceptoValue, setSelectedConceptoValue] = useState<string>('');
-  const [isNewConceptoMode, setIsNewConceptoMode] = useState(false);
-
   const [showObraModal, setShowObraModal] = useState(false);
   const [editingObraData, setEditingObraData] = useState<ObraApp | null>(null);
   
@@ -63,6 +77,523 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
     return url;
   };
 
+  // ============================================================
+  // GENERADOR DE REPORTE PDF (diseño report_mockup premium)
+  // ============================================================
+  const generateObraReport = (obra: ObraApp, includeFinancial: boolean = true) => {
+
+
+
+
+    const totalBudget = obraBitacoras.reduce((s, b) => s + (b.budget_estimate || 0), 0);
+    const totalExecuted = obraBitacoras.reduce((s, b) => s + (b.financial_progress || 0), 0);
+    const avgProgress = obraBitacoras.length
+      ? obraBitacoras.reduce((s, b) => s + (b.physical_progress || 0), 0) / obraBitacoras.length
+      : 0;
+    const folio = `ESOL-BIT-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, '0')}`;
+    const fechaEmision = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+
+    const weatherIcon = (w: string) => {
+      const lw = w.toLowerCase();
+      if (lw.includes('sol') || lw.includes('despej') || lw.includes('clear')) return '☀️';
+      if (lw.includes('nub') || lw.includes('cloud') || lw.includes('parcial')) return '⛅';
+      if (lw.includes('lluv') || lw.includes('rain')) return '🌧️';
+      return '🌤️';
+    };
+
+    // Resolve Drive image to printable URL
+    const resolveImg = (uri: string): string => {
+      if (!uri) return '';
+      const patterns = [
+        /\/file\/d\/([a-zA-Z0-9_-]+)/,
+        /[?&]id=([a-zA-Z0-9_-]+)/,
+        /\/open\?id=([a-zA-Z0-9_-]+)/
+      ];
+      for (const p of patterns) {
+        const m = uri.match(p);
+        if (m && m[1]) return `https://lh3.googleusercontent.com/d/${m[1]}=w800`;
+      }
+      return uri;
+    };
+
+    const dayRows = dates.map(date => {
+      const items = byDate[date];
+      const parsedDate = new Date(date + 'T12:00:00');
+      const dayLabel = parsedDate.toLocaleDateString('es-MX', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+
+      const eventCards = items.map(bit => {
+        const imgUrl = bit.photo_uri ? resolveImg(bit.photo_uri) : '';
+        const photoHtml = imgUrl ? `
+          <div class="photo-grid">
+            <div class="photo-box">
+              <img src="${imgUrl}" alt="Evidencia de obra"
+                style="width:100%;height:100%;object-fit:cover;"
+                onerror="this.parentElement.innerHTML='<div class=photo-placeholder>Imagen no disponible</div>';"
+              />
+            </div>
+          </div>` : '';
+        return `
+        <div class="report-item">
+          <div class="report-top">
+            <div class="report-time">
+              ${bit.date} <span>• ${bit.site_name}</span>
+            </div>
+            <div class="meta-badges">
+              <div class="badge">${weatherIcon(bit.weather)} ${bit.weather}</div>
+              <div class="badge">👷 Cuadrilla: ${bit.crew_count} pax</div>
+              ${bit.physical_progress ? `<div class="badge">Avance: ${bit.physical_progress}%</div>` : ''}
+            </div>
+          </div>
+          ${bit.concepto ? `<div class="concept-ref">${bit.concepto}</div>` : ''}
+          <div class="report-desc">${bit.description.replace(/\n/g, '<br>')}</div>
+          ${photoHtml}
+        </div>`;
+      }).join('');
+
+      return `
+        <div class="day-container">
+          <div class="day-header">
+            <span class="day-title">${dayLabel}</span>
+            <span class="day-badge">${items.length} EVENTO${items.length !== 1 ? 'S' : ''}</span>
+          </div>
+          ${eventCards}
+        </div>`;
+    }).join('');
+
+    const financialSection = includeFinancial ? `
+      <h2 class="section-title">Control de Gestión</h2>
+      <div class="finance-grid">
+        <div class="finance-card">
+          <div class="f-label">Avance Físico Prom.</div>
+          <div class="f-value">${avgProgress.toFixed(1)}%</div>
+        </div>
+        <div class="finance-card">
+          <div class="f-label">Presupuesto Estimado</div>
+          <div class="f-value">$${totalBudget.toLocaleString('es-MX')}</div>
+        </div>
+        <div class="finance-card success">
+          <div class="f-label">Gasto Devengado</div>
+          <div class="f-value">$${totalExecuted.toLocaleString('es-MX')}</div>
+        </div>
+        <div class="finance-card warning">
+          <div class="f-label">Remanente Total</div>
+          <div class="f-value">$${(totalBudget - totalExecuted).toLocaleString('es-MX')}</div>
+        </div>
+      </div>` : '';
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte Bitácora – ${obra.nombre}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Josefin+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-1:#F8F7F2;--bg-2:#EFEFE8;--bg-3:#E5E4DB;
+      --border-1:#D5D4C7;--border-2:#C4C3B4;
+      --text-1:#141410;--text-2:#3A3A32;--text-3:#6A6A5E;
+      --gold:#C49825;--gold-light:#D4AE3A;--gold-dim:#8B6C1A;
+      --gold-muted:rgba(196,152,37,0.12);
+      --success:#10B981;--danger:#EF4444;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+    body{background:#333;display:flex;flex-direction:column;align-items:center;padding:2rem;
+      color:var(--text-1);font-family:'Josefin Sans',sans-serif;font-size:11px;line-height:1.5;}
+    h1,h2,h3,h4{font-family:'Cinzel',serif;}
+    .page{width:215.9mm;min-height:279.4mm;background:var(--bg-1);margin-bottom:2rem;
+      box-shadow:0 20px 25px -5px rgba(0,0,0,.1);display:flex;flex-direction:column;page-break-after:always;}
+    .page-content{padding:15mm 20mm;flex:1;}
+    @page{size:letter;margin:0;}
+    @media print{body{background:none;padding:0;}.page{box-shadow:none;margin:0;}.no-print{display:none!important;}}
+    .header{display:flex;justify-content:space-between;align-items:center;
+      padding-bottom:4mm;border-bottom:1px solid var(--border-2);margin-bottom:6mm;}
+    .logo-container{width:130px;}
+    .logo-container img{width:100%;height:auto;object-fit:contain;}
+    .report-meta{text-align:right;}
+    .report-meta h1{font-size:20px;color:var(--text-1);font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+    .report-meta .meta-subtitle{font-size:10px;color:var(--gold);font-weight:600;text-transform:uppercase;
+      letter-spacing:2px;margin-bottom:4px;display:block;}
+    .report-meta p{font-size:10px;color:var(--text-2);margin-bottom:1px;}
+    .reporter-badge{display:inline-block;background:var(--gold-muted);border:1px solid rgba(196,152,37,0.3);
+      border-radius:4px;padding:3px 8px;font-size:9px;color:var(--gold-dim);font-weight:700;margin-top:4px;letter-spacing:.5px;}
+    .project-card{background:var(--bg-2);border:1px solid var(--border-1);border-radius:8px;
+      padding:12px 16px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;
+      margin-bottom:8mm;box-shadow:inset 0 1px 0 rgba(255,255,255,0.4);}
+    .info-group{display:flex;flex-direction:column;}
+    .info-label{font-size:8px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:2px;}
+    .info-value{font-size:12px;font-weight:600;color:var(--text-1);}
+    .section-title{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--text-1);
+      margin-bottom:4mm;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:1px;}
+    .section-title::after{content:'';flex:1;height:1px;background:linear-gradient(to right,var(--gold),transparent);}
+    .finance-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8mm;}
+    .finance-card{background:white;border:1px solid var(--border-1);border-radius:6px;padding:10px 12px;
+      position:relative;overflow:hidden;}
+    .finance-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--gold);}
+    .finance-card.success::before{background:var(--success);}
+    .finance-card.warning::before{background:var(--gold-light);}
+    .f-label{font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;letter-spacing:.5px;}
+    .f-value{font-family:'Cinzel',serif;font-size:16px;font-weight:700;color:var(--text-1);margin-top:4px;}
+    .day-container{margin-bottom:8mm;}
+    .day-header{background:var(--text-1);color:var(--bg-1);padding:6px 12px;border-radius:4px;
+      display:flex;justify-content:space-between;align-items:center;margin-bottom:4mm;}
+    .day-title{font-family:'Cinzel',serif;font-size:12px;font-weight:600;letter-spacing:1px;}
+    .day-badge{background:var(--gold);color:var(--text-1);font-weight:700;font-size:9px;
+      padding:2px 8px;border-radius:12px;text-transform:uppercase;letter-spacing:.5px;}
+    .report-item{background:white;border:1px solid var(--border-1);border-radius:6px;
+      padding:12px;margin-bottom:12px;}
+    .report-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;
+      padding-bottom:6px;border-bottom:1px dashed var(--border-2);}
+    .report-time{font-size:12px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:6px;}
+    .report-time span{color:var(--gold-dim);font-size:11px;}
+    .meta-badges{display:flex;gap:8px;flex-wrap:wrap;}
+    .badge{background:var(--bg-2);border:1px solid var(--border-1);color:var(--text-2);
+      font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;}
+    .concept-ref{display:inline-block;background:var(--gold-muted);color:var(--gold-dim);
+      padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:8px;letter-spacing:.5px;}
+    .report-desc{font-size:11px;color:var(--text-2);line-height:1.6;margin-bottom:10px;}
+    .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;}
+    .photo-box{width:100%;height:110px;background:var(--bg-3);border:1px solid var(--border-1);
+      border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+    .photo-placeholder{font-size:9px;color:var(--text-3);text-align:center;font-style:italic;padding:8px;}
+    .signatures-section{margin-top:auto;padding-top:10mm;page-break-inside:avoid;}
+    .signatures-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:30px;}
+    .signature-box{text-align:center;}
+    .sig-line{height:1px;background:var(--text-1);margin-bottom:6px;}
+    .sig-name{font-family:'Cinzel',serif;font-weight:700;font-size:11px;color:var(--text-1);}
+    .sig-role{font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;}
+    .footer{margin-top:10mm;border-top:1px solid var(--border-2);padding-top:4mm;
+      display:flex;justify-content:space-between;font-size:8px;color:var(--text-3);
+      font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+    .footer .brand{color:var(--gold-dim);}
+    .print-btn{position:fixed;bottom:2rem;right:2rem;background:var(--gold);color:#fff;
+      border:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700;
+      cursor:pointer;font-family:'Josefin Sans',sans-serif;box-shadow:0 4px 15px rgba(0,0,0,.3);z-index:999;}
+    .print-btn:hover{background:var(--gold-light);}
+  </style>
+</head>
+<body>
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <div class="page">
+    <div class="page-content">
+      <header class="header">
+        <div class="logo-container">
+          <img src="https://esolenergias.com/img/logo_esol_b.png" alt="ESOL Energías"
+            onerror="this.style.display='none'">
+        </div>
+        <div class="report-meta">
+          <span class="meta-subtitle">Reporte Oficial</span>
+          <h1>Bitácora de Obra</h1>
+          <p><strong>FOLIO:</strong> ${folio}</p>
+          <p><strong>FECHA DE EMISIÓN:</strong> ${fechaEmision}</p>
+          <div class="reporter-badge">REPORTADO POR: ${reporterName.toUpperCase()}</div>
+        </div>
+      </header>
+      <div class="project-card">
+        <div class="info-group">
+          <span class="info-label">Nombre del Proyecto</span>
+          <span class="info-value">${obra.nombre}</span>
+        </div>
+        <div class="info-group">
+          <span class="info-label">Ubicación</span>
+          <span class="info-value">${obra.ubicacion || 'No especificada'}</span>
+        </div>
+        <div class="info-group">
+          <span class="info-label">Cliente</span>
+          <span class="info-value">${obra.cliente || 'ESOL Energías'}</span>
+        </div>
+        <div class="info-group">
+          <span class="info-label">Estado Actual</span>
+          <span class="info-value" style="color:var(--success)">${obra.status}</span>
+        </div>
+      </div>
+      ${financialSection}
+      <h2 class="section-title">Registros Operativos</h2>
+      ${dates.length === 0
+        ? '<p style="color:var(--text-3);font-size:12px;">No hay registros de bitácora para esta obra.</p>'
+        : dayRows
+      }
+      <div class="signatures-section">
+        <h2 class="section-title">Validación Técnica y Aprobación</h2>
+        <div class="signatures-grid">
+          <div class="signature-box">
+            <div class="sig-line"></div>
+            <div class="sig-name">${reporterName.toUpperCase()}</div>
+            <div class="sig-role">RESIDENTE DE OBRA ESOL (ELABORÓ)</div>
+          </div>
+          <div class="signature-box">
+            <div class="sig-line"></div>
+            <div class="sig-name">SUPERVISIÓN / CLIENTE</div>
+            <div class="sig-role">REVISÓ</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <div><span class="brand">ESOL ENERGÍAS</span> | SISTEMA DE BITÁCORA ELECTRÓNICA</div>
+        <div>GENERADO: ${fechaEmision}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
+  };
+    const obraBitacoras = bitacoras.filter(b => b.site_name === obra.nombre);
+    
+    // Agrupar bitacoras por fecha
+    const byDate: Record<string, Bitacora[]> = {};
+    obraBitacoras.forEach(b => {
+      if (!byDate[b.date]) byDate[b.date] = [];
+      byDate[b.date].push(b);
+    });
+    const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+    const totalBudget = obraBitacoras.reduce((s, b) => s + (b.budget_estimate || 0), 0);
+    const totalExecuted = obraBitacoras.reduce((s, b) => s + (b.financial_progress || 0), 0);
+    const avgProgress = obraBitacoras.length
+      ? obraBitacoras.reduce((s, b) => s + (b.physical_progress || 0), 0) / obraBitacoras.length
+      : 0;
+    const folio = `ESOL-BIT-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, '0')}`;
+    const fechaEmision = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+
+    const weatherIcon = (w: string) => {
+      const lw = w.toLowerCase();
+      if (lw.includes('sol') || lw.includes('despej') || lw.includes('clear')) return '☀️';
+      if (lw.includes('nub') || lw.includes('cloud') || lw.includes('parcial')) return '⛅';
+      if (lw.includes('lluv') || lw.includes('rain')) return '🌧️';
+      return '🌤️';
+    };
+
+    const dayRows = dates.map(date => {
+      const items = byDate[date];
+      const parsedDate = new Date(date + 'T12:00:00');
+      const dayLabel = parsedDate.toLocaleDateString('es-MX', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+
+      const eventCards = items.map(bit => `
+        <div class="report-item">
+          <div class="report-top">
+            <div class="report-time">
+              ${bit.date} <span>• ${bit.site_name}</span>
+            </div>
+            <div class="meta-badges">
+              <div class="badge">${weatherIcon(bit.weather)} ${bit.weather}</div>
+              <div class="badge">👷 Cuadrilla: ${bit.crew_count} pax</div>
+              ${bit.physical_progress ? `<div class="badge">Avance: ${bit.physical_progress}%</div>` : ''}
+            </div>
+          </div>
+          ${bit.concepto ? `<div class="concept-ref">${bit.concepto}</div>` : ''}
+          <div class="report-desc">${bit.description.replace(/\n/g, '<br>')}</div>
+          ${bit.photo_uri ? `
+          <div class="photo-grid">
+            <div class="photo-box">
+              <img src="${bit.photo_uri.includes('drive.google.com') ? bit.photo_uri : bit.photo_uri}" 
+                alt="Evidencia" 
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+              />
+              <div class="photo-placeholder" style="display:none;">Imagen adjunta</div>
+            </div>
+          </div>` : ''}
+        </div>
+      `).join('');
+
+      return `
+        <div class="day-container">
+          <div class="day-header">
+            <span class="day-title">${dayLabel}</span>
+            <span class="day-badge">${items.length} EVENTO${items.length !== 1 ? 'S' : ''}</span>
+          </div>
+          ${eventCards}
+        </div>
+      `;
+    }).join('');
+
+    const financialSection = includeFinancial ? `
+      <h2 class="section-title">Control de Gestión</h2>
+      <div class="finance-grid">
+        <div class="finance-card">
+          <div class="f-label">Avance Físico Prom.</div>
+          <div class="f-value">${avgProgress.toFixed(1)}%</div>
+        </div>
+        <div class="finance-card">
+          <div class="f-label">Presupuesto Estimado</div>
+          <div class="f-value">$${totalBudget.toLocaleString('es-MX')}</div>
+        </div>
+        <div class="finance-card success">
+          <div class="f-label">Gasto Devengado</div>
+          <div class="f-value">$${totalExecuted.toLocaleString('es-MX')}</div>
+        </div>
+        <div class="finance-card warning">
+          <div class="f-label">Remanente Total</div>
+          <div class="f-value">$${(totalBudget - totalExecuted).toLocaleString('es-MX')}</div>
+        </div>
+      </div>
+    ` : '';
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte Bitácora – ${obra.nombre}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Josefin+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-1: #F8F7F2; --bg-2: #EFEFE8; --bg-3: #E5E4DB;
+      --border-1: #D5D4C7; --border-2: #C4C3B4;
+      --text-1: #141410; --text-2: #3A3A32; --text-3: #6A6A5E;
+      --gold: #C49825; --gold-light: #D4AE3A; --gold-dim: #8B6C1A;
+      --gold-muted: rgba(196,152,37,0.12);
+      --success: #10B981; --danger: #EF4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #333; display: flex; flex-direction: column; align-items: center; padding: 2rem;
+      color: var(--text-1); font-family: 'Josefin Sans', sans-serif; font-size: 11px; line-height: 1.5; }
+    h1,h2,h3,h4,.font-display { font-family: 'Cinzel', serif; }
+    .page { width: 215.9mm; min-height: 279.4mm; background: var(--bg-1); margin-bottom: 2rem;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); position: relative; page-break-after: always;
+      display: flex; flex-direction: column; }
+    .page-content { padding: 15mm 20mm; flex: 1; }
+    @page { size: letter; margin: 0; }
+    @media print { body { background: none; padding: 0; } .page { box-shadow: none; margin: 0; } .no-print { display: none !important; } }
+    .header { display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 4mm; border-bottom: 1px solid var(--border-2); margin-bottom: 6mm; }
+    .logo-container { width: 130px; }
+    .logo-container img { width: 100%; height: auto; object-fit: contain; }
+    .report-meta { text-align: right; }
+    .report-meta h1 { font-size: 20px; color: var(--text-1); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .report-meta .meta-subtitle { font-size: 10px; color: var(--gold); font-weight: 600; text-transform: uppercase;
+      letter-spacing: 2px; margin-bottom: 4px; display: block; }
+    .report-meta p { font-size: 10px; color: var(--text-2); margin-bottom: 1px; }
+    .project-card { background: var(--bg-2); border: 1px solid var(--border-1); border-radius: 8px;
+      padding: 12px 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+      margin-bottom: 8mm; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4); }
+    .info-group { display: flex; flex-direction: column; }
+    .info-label { font-size: 8px; color: var(--text-3); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 2px; }
+    .info-value { font-size: 12px; font-weight: 600; color: var(--text-1); }
+    .section-title { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--text-1);
+      margin-bottom: 4mm; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, var(--gold), transparent); }
+    .finance-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 8mm; }
+    .finance-card { background: white; border: 1px solid var(--border-1); border-radius: 6px; padding: 10px 12px;
+      position: relative; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.02); }
+    .finance-card::before { content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 3px; background: var(--gold); }
+    .finance-card.success::before { background: var(--success); }
+    .finance-card.warning::before { background: var(--gold-light); }
+    .f-label { font-size: 8px; color: var(--text-3); text-transform: uppercase; font-weight: 700; letter-spacing: .5px; }
+    .f-value { font-family: 'Cinzel', serif; font-size: 16px; font-weight: 700; color: var(--text-1); margin-top: 4px; }
+    .day-container { margin-bottom: 8mm; }
+    .day-header { background: var(--text-1); color: var(--bg-1); padding: 6px 12px; border-radius: 4px;
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 4mm; }
+    .day-title { font-family: 'Cinzel', serif; font-size: 12px; font-weight: 600; letter-spacing: 1px; }
+    .day-badge { background: var(--gold); color: var(--text-1); font-weight: 700; font-size: 9px;
+      padding: 2px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: .5px; }
+    .report-item { background: white; border: 1px solid var(--border-1); border-radius: 6px;
+      padding: 12px; margin-bottom: 12px; position: relative; }
+    .report-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+      padding-bottom: 6px; border-bottom: 1px dashed var(--border-2); }
+    .report-time { font-size: 12px; font-weight: 700; color: var(--text-1); display: flex; align-items: center; gap: 6px; }
+    .report-time span { color: var(--gold-dim); font-size: 11px; }
+    .meta-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge { background: var(--bg-2); border: 1px solid var(--border-1); color: var(--text-2);
+      font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .concept-ref { display: inline-block; background: var(--gold-muted); color: var(--gold-dim);
+      padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; margin-bottom: 8px; letter-spacing: .5px; }
+    .report-desc { font-size: 11px; color: var(--text-2); line-height: 1.6; margin-bottom: 10px; }
+    .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .photo-box { width: 100%; height: 100px; background: var(--bg-3); border: 1px solid var(--border-1);
+      border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-placeholder { font-size: 9px; color: var(--text-3); text-align: center; font-style: italic; }
+    .signatures-section { margin-top: auto; padding-top: 10mm; page-break-inside: avoid; }
+    .signatures-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; }
+    .signature-box { text-align: center; }
+    .sig-line { height: 1px; background: var(--text-1); margin-bottom: 6px; }
+    .sig-name { font-family: 'Cinzel', serif; font-weight: 700; font-size: 11px; color: var(--text-1); }
+    .sig-role { font-size: 9px; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; }
+    .footer { margin-top: 10mm; border-top: 1px solid var(--border-2); padding-top: 4mm;
+      display: flex; justify-content: space-between; font-size: 8px; color: var(--text-3);
+      font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .footer .brand { color: var(--gold-dim); }
+    .print-btn { position: fixed; bottom: 2rem; right: 2rem; background: var(--gold); color: #fff;
+      border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700;
+      cursor: pointer; font-family: 'Josefin Sans', sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,.3); z-index: 999; }
+    .print-btn:hover { background: var(--gold-light); }
+  </style>
+</head>
+<body>
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <div class="page">
+    <div class="page-content">
+      <header class="header">
+        <div class="logo-container">
+          <img src="https://esolenergias.com/img/logo_esol_b.png" alt="ESOL Energías"
+            onerror="this.style.display='none'">
+        </div>
+        <div class="report-meta">
+          <span class="meta-subtitle">Reporte Oficial</span>
+          <h1>Bitácora de Obra</h1>
+          <p><strong>FOLIO:</strong> ${folio}</p>
+          <p><strong>FECHA DE EMISIÓN:</strong> ${fechaEmision}</p>
+        </div>
+      </header>
+      <div class="project-card">
+        <div class="info-group">
+          <span class="info-label">Nombre del Proyecto</span>
+          <span class="info-value">${obra.nombre}</span>
+        </div>
+        <div class="info-group">
+          <span class="info-label">Ubicación</span>
+          <span class="info-value">${obra.ubicacion || 'No especificada'}</span>
+        </div>
+        <div class="info-group">
+          <span class="info-label">Cliente</span>
+          <span class="info-value">${obra.cliente || 'ESOL Energías'}</span>
+        </div>
+        <div class="info-group">
+          <span class="info-label">Estado Actual</span>
+          <span class="info-value" style="color: var(--success)">${obra.status}</span>
+        </div>
+      </div>
+      ${financialSection}
+      <h2 class="section-title">Registros Operativos</h2>
+      ${dates.length === 0
+        ? '<p style="color:var(--text-3);font-size:12px;">No hay registros de bitácora para esta obra.</p>'
+        : dayRows
+      }
+      <div class="signatures-section">
+        <h2 class="section-title">Validación Técnica y Aprobación</h2>
+        <div class="signatures-grid">
+          <div class="signature-box">
+            <div class="sig-line"></div>
+            <div class="sig-name">RESIDENTE DE OBRA ESOL</div>
+            <div class="sig-role">ELABORÓ</div>
+          </div>
+          <div class="signature-box">
+            <div class="sig-line"></div>
+            <div class="sig-name">SUPERVISIÓN / CLIENTE</div>
+            <div class="sig-role">REVISÓ</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <div><span class="brand">ESOL ENERGÍAS</span> | SISTEMA DE BITÁCORA ELECTRÓNICA</div>
+        <div>GENERADO: ${fechaEmision}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('¿Estás seguro de que deseas eliminar este registro?')) return;
     try {
@@ -74,24 +605,6 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
       alert('Hubo un error al eliminar el registro.');
     }
   };
-
-  const handleDeleteObra = async (obra: ObraApp) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar la obra "${obra.nombre}"?`)) return;
-    try {
-      if (obra.id) {
-        const { error } = await supabase.from('obras_app').delete().eq('id', obra.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('obras_app').delete().eq('nombre', obra.nombre);
-        if (error) throw error;
-      }
-      fetchBitacoras();
-    } catch (error) {
-      console.error('Error deleting obra:', error);
-      alert('Hubo un error al eliminar la obra.');
-    }
-  };
-
 
   const openNewModal = () => {
     setEditingBitacora(null);
@@ -185,31 +698,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
     }
   };
 
-  const handleObraSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingObraData) return;
-    setIsSubmitting(true);
-    const formData = new FormData(e.currentTarget);
-    const updates = {
-      nombre: editingObraData.nombre,
-      cliente: formData.get('cliente') as string,
-      ubicacion: formData.get('ubicacion') as string,
-      status: formData.get('status') as string,
-    };
-
-    try {
-      const { error } = await supabase.from('obras_app').upsert([updates], { onConflict: 'nombre' });
-      if (error) throw error;
-      
-      setShowObraModal(false);
-      fetchBitacoras();
-    } catch (err) {
-      console.error(err);
-    }
-    setIsSubmitting(false);
-  };
-
-  const fetchConceptos = async (obraId?: any) => {
+  const fetchConceptos = async (obraId?: string) => {
     if (!obraId) {
       setConceptosObra([]);
       return;
@@ -246,11 +735,11 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
           nombre: p.obra_name,
           cliente: p.cliente || '',
           ubicacion: p.ubicacion || '',
-          residente: p.residente || '',
-          status: p.produccion ? 'produccion' : (p.status || 'aprobado'),
+          status: p.status || 'aprobado',
           created_at: p.created_at
         }));
         
+        // Combine and deduplicate by nombre
         const existingNames = new Set(combinedObras.map(o => o.nombre));
         for (const p of presObras) {
           if (!existingNames.has(p.nombre)) {
@@ -262,33 +751,8 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
 
       setObras(combinedObras);
 
-      if (bitacorasRes.error) {
-        console.error('Error fetching bitacoras:', bitacorasRes.error);
-      } else {
-        const rawData = bitacorasRes.data || [];
-        const dedupMap = new Map<string, any>();
-        for (const bit of rawData) {
-          const lat = parseFloat(bit.latitude);
-          const lng = parseFloat(bit.longitude);
-          const isFromAndroid = !isNaN(lat) && !isNaN(lng) && lat !== 0; // Android reports have valid coordinates
-          
-          const key = isFromAndroid ? `${bit.site_name}_${bit.date}_${lat}_${lng}_${bit.concepto || 'none'}` : bit.id;
-          
-          if (!dedupMap.has(key)) {
-            dedupMap.set(key, bit);
-          } else {
-            const existing = dedupMap.get(key);
-            // Use timestamp (Android) or created_at (Web) to determine newest
-            const existingTime = existing.timestamp || new Date(existing.created_at || 0).getTime();
-            const newTime = bit.timestamp || new Date(bit.created_at || 0).getTime();
-            
-            if (newTime > existingTime) {
-              dedupMap.set(key, bit);
-            }
-          }
-        }
-        setBitacoras(Array.from(dedupMap.values()));
-      }
+      if (bitacorasRes.error) console.error('Error fetching bitacoras:', bitacorasRes.error);
+      else setBitacoras(bitacorasRes.data || []);
     } catch (e) {
       console.error(e);
     }
@@ -318,11 +782,13 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
     o.status.toLowerCase() === 'terminado'
   );
 
+  // Render Obra Detail View
   if (selectedObraDetail) {
     const detailBitacoras = bitacoras.filter(b => b.site_name === selectedObraDetail.nombre);
     
     return (
       <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+        {/* Detail Header */}
         <div className="bg-dark-2 p-6 rounded-2xl border border-dark-4 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <button 
@@ -353,7 +819,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
           </div>
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => generateObraReport(selectedObraDetail, bitacoras, reporterName)}
+              onClick={() => generateObraReport(selectedObraDetail)}
               className="flex items-center gap-2 px-5 py-3 bg-dark-3 hover:bg-gold/20 border border-gold/30 hover:border-gold text-gold font-black rounded-xl transition-all shadow-lg"
             >
               <FileText className="w-5 h-5" />
@@ -369,6 +835,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
           </div>
         </div>
 
+        {/* Detail Logs - List View */}
         <div className="space-y-4">
           {detailBitacoras.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-cream-dim bg-dark-2 rounded-2xl border border-dark-4 border-dashed">
@@ -378,12 +845,13 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
             </div>
           ) : (
             [...detailBitacoras]
-              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Chronological (oldest to newest)
               .map((bitacora) => {
                 const isExpanded = expandedLogId === bitacora.id;
                 
                 return (
                   <div key={bitacora.id} className="bg-dark-2 border border-dark-4 rounded-2xl transition-all shadow-lg overflow-hidden group">
+                    {/* Compact Row */}
                     <div 
                       onClick={() => setExpandedLogId(isExpanded ? null : bitacora.id)}
                       className="p-5 flex items-center justify-between cursor-pointer hover:bg-dark-3/50 transition-colors"
@@ -419,9 +887,11 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                       </div>
                     </div>
 
+                    {/* Expanded Content */}
                     {isExpanded && (
                       <div className="p-5 pt-0 border-t border-dark-4/50 bg-dark-2/50 mt-2 animate-[fadeIn_0.2s_ease-out]">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-5">
+                          {/* Left Column: Info */}
                           <div className="space-y-6">
                             <div>
                               <h4 className="text-xs font-black text-cream-dim uppercase tracking-widest mb-2">Descripción de Actividades</h4>
@@ -469,40 +939,34 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                             )}
                           </div>
 
+                          {/* Right Column: Image */}
                           <div>
                             <h4 className="text-xs font-black text-cream-dim uppercase tracking-widest mb-2">Evidencia Fotográfica</h4>
-                            <div className="rounded-xl overflow-hidden border border-dark-4 bg-dark-3 min-h-[250px] p-2">
+                            <div className="rounded-xl overflow-hidden border border-dark-4 bg-dark-3 h-[250px] flex items-center justify-center relative group/img">
                               {bitacora.photo_uri ? (
-                                <div className={`grid gap-2 ${bitacora.photo_uri.split(',').length > 1 ? 'grid-cols-2' : 'grid-cols-1'} h-full`}>
-                                  {bitacora.photo_uri.split(',').map((uri, idx) => {
-                                    uri = uri.trim();
-                                    if(!uri) return null;
-                                    return (
-                                      <div key={idx} className="relative group/img h-[250px] rounded-lg overflow-hidden border border-dark-4">
-                                        <img 
-                                          src={getDriveImageUrl(uri)} 
-                                          alt={`Evidencia ${idx + 1}`} 
-                                          className="w-full h-full object-cover"
-                                          onError={(e) => {
-                                            (e.target as HTMLImageElement).src = uri;
-                                          }}
-                                        />
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                                          <a 
-                                            href={uri} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="px-4 py-2 bg-gold text-dark-1 font-bold rounded-lg flex items-center gap-2 hover:bg-gold-dim transition-colors"
-                                          >
-                                            <ExternalLink className="w-4 h-4" /> Abrir Original
-                                          </a>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                                <>
+                                  <img 
+                                    src={getDriveImageUrl(bitacora.photo_uri)} 
+                                    alt="Evidencia" 
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      // Fallback if thumbnail fails
+                                      (e.target as HTMLImageElement).src = bitacora.photo_uri;
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                    <a 
+                                      href={bitacora.photo_uri} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="px-4 py-2 bg-gold text-dark-1 font-bold rounded-lg flex items-center gap-2 hover:bg-gold-dim transition-colors"
+                                    >
+                                      <ExternalLink className="w-4 h-4" /> Abrir Original
+                                    </a>
+                                  </div>
+                                </>
                               ) : (
-                                <div className="text-center p-12 opacity-50 flex flex-col items-center justify-center h-full">
+                                <div className="text-center p-6 opacity-50">
                                   <ImageIcon className="w-12 h-12 text-cream-dim mx-auto mb-2" />
                                   <p className="text-sm text-cream-dim font-bold">Sin imagen adjunta</p>
                                 </div>
@@ -518,6 +982,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
           )}
         </div>
 
+        {/* REUSE MODAL */}
         {showNewModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
@@ -552,7 +1017,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                     <input required name="crew_count" type="number" min="0" defaultValue={editingBitacora?.crew_count || ''} placeholder="Ej. 5" className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-2.5 text-sm text-cream focus:border-gold outline-none transition-colors" />
                   </div>
                   <div className="md:col-span-2">
-
+                    <label className="block text-xs font-bold text-cream-muted mb-1.5 uppercase">Descripción de Actividades</label>
                     <textarea required name="description" rows={4} defaultValue={editingBitacora?.description || ''} placeholder="Describe los avances del día..." className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors resize-none"></textarea>
                   </div>
                   
@@ -626,6 +1091,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
 
   return (
     <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+      {/* Header & Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-dark-2 p-6 rounded-2xl border border-dark-4 shadow-xl">
         <div>
           <h2 className="text-2xl font-black text-cream flex items-center gap-2">
@@ -746,29 +1212,21 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
 
                 {bitacora.photo_uri && (
                   <div className="mb-4 rounded-xl overflow-hidden border border-dark-4 bg-dark-3 h-32 flex items-center justify-center relative group/img">
-                    {(() => {
-                      const uris = bitacora.photo_uri!.split(',').map(u => u.trim()).filter(Boolean);
-                      const firstUri = uris[0];
-                      if (!firstUri) return null;
-                      
-                      return (
-                        <>
-                          <img 
-                            src={getDriveImageUrl(firstUri)} 
-                            alt="Evidencia" 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = firstUri;
-                            }}
-                          />
-                          {uris.length > 1 && (
-                            <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded-md text-[10px] font-bold text-white border border-white/20">
-                              + {uris.length - 1} foto{uris.length > 2 ? 's' : ''}
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
+                    {bitacora.photo_uri.startsWith('http') || bitacora.photo_uri.startsWith('data:image') ? (
+                      <img 
+                        src={getDriveImageUrl(bitacora.photo_uri)} 
+                        alt="Evidencia" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = bitacora.photo_uri!;
+                        }}
+                      />
+                    ) : (
+                      <div className="text-center p-4">
+                        <ImageIcon className="w-6 h-6 text-cream-dim mx-auto mb-1" />
+                        <span className="text-[10px] text-cream-dim">Imagen adjunta (Drive)</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -830,22 +1288,12 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                       <p className="text-xs font-black uppercase tracking-widest text-blue-400 mt-1">{obra.status}</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setEditingObraData(obra); setShowObraModal(true); }}
-                      className="p-2 bg-dark-3 hover:bg-blue-500/20 hover:text-blue-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-blue-500/30"
-                      title="Editar Obra"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteObra(obra); }}
-                      className="p-2 bg-dark-3 hover:bg-red-500/20 hover:text-red-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-red-500/30"
-                      title="Eliminar Obra"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setEditingObraData(obra); setShowObraModal(true); }}
+                    className="p-2 bg-dark-3 hover:bg-blue-500/20 hover:text-blue-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-blue-500/30"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
                 </div>
                 {obra.ubicacion && (
                   <p className="text-sm text-cream-muted flex items-start gap-2 mb-2">
@@ -865,7 +1313,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                     <span className="font-bold text-cream">{bitacoras.filter(b => b.site_name === obra.nombre).length}</span>
                   </div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); generateObraReport(obra, bitacoras, reporterName); }}
+                    onClick={(e) => { e.stopPropagation(); generateObraReport(obra); }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-dim text-dark-1 font-black text-xs rounded-xl transition-all shadow-md hover:shadow-gold/30 hover:scale-[1.02] active:scale-95"
                   >
                     <FileText className="w-4 h-4 stroke-[2.5]" />
@@ -1049,4 +1497,3 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
     </div>
   );
 }
-

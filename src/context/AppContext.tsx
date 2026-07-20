@@ -93,6 +93,7 @@ export interface SEOData {
 interface AppContextType {
   // Auth
   currentUser: User | null;
+  updateCurrentUser: (updatedFields: Partial<User>) => Promise<void>;
   verificationPendingEmail: string | null;
   verificationCodeSent: string | null;
   isPortalOpen: boolean;
@@ -1049,6 +1050,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('esol_current_user');
   };
 
+  const updateCurrentUser = async (updatedFields: Partial<User>) => {
+    if (!currentUser) return;
+    
+    const updatedUser = { ...currentUser, ...updatedFields };
+    setCurrentUser(updatedUser);
+    localStorage.setItem('esol_current_user', JSON.stringify(updatedUser));
+    
+    // Update in Supabase
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          name: updatedFields.name !== undefined ? updatedFields.name : currentUser.name,
+          avatar: updatedFields.avatar !== undefined ? updatedFields.avatar : currentUser.avatar
+        })
+        .eq('id', currentUser.id);
+        
+      if (error) {
+        console.error("Failed to update user profile in Supabase:", error.message);
+      }
+    } catch (err) {
+      console.error("Error updating user profile:", err);
+    }
+  };
+
   const quickAccessLogin = (role: UserRole) => {
     let name = 'Cliente Demo';
     let email = 'cliente.demo@gmail.com';
@@ -1230,6 +1256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         currentUser,
+        updateCurrentUser,
         verificationPendingEmail,
         verificationCodeSent,
         isPortalOpen,

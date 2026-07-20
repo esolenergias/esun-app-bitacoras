@@ -66,7 +66,8 @@ data class BudgetItemEntity(
     val unitPrice: Double,
     val executedQuantity: Double,
     val obraId: String = "",
-    val totalBudget: Double
+    val totalBudget: Double,
+    val supabaseId: String = ""
 )
 
 @Entity(tableName = "crew_members")

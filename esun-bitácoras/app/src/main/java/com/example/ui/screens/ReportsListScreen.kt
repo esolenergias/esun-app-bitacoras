@@ -71,19 +71,21 @@ fun ReportsListScreen(
     var editDescription by remember { mutableStateOf("") }
     var editPhysicalProgress by remember { mutableStateOf("") }
     var editFinancialProgress by remember { mutableStateOf("") }
-    var editPhotoUri by remember { mutableStateOf<String?>(null) }
+    var editPhotoUris by remember { mutableStateOf<List<String>>(emptyList()) }
     
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (e: Exception) {
-                // Ignore if it doesn't support persistable permissions
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            uris.forEach { uri ->
+                try {
+                    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (e: Exception) {
+                    // Ignore if it doesn't support persistable permissions
+                }
+                editPhotoUris = editPhotoUris + uri.toString()
             }
-            editPhotoUri = uri.toString()
-            Toast.makeText(context, "Imagen actualizada", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "${uris.size} imágenes adjuntadas", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -239,7 +241,7 @@ fun ReportsListScreen(
                                                     editDescription = bitacora.description
                                                     editPhysicalProgress = bitacora.physicalProgress.toString()
                                                     editFinancialProgress = bitacora.financialProgress.toString()
-                                                    editPhotoUri = bitacora.photoUri
+                                                    editPhotoUris = if (bitacora.photoUri.isNullOrEmpty()) emptyList() else bitacora.photoUri.split(",")
                                                     showEditDialog = true
                                                 },
                                                 modifier = Modifier.size(28.dp)
@@ -430,39 +432,40 @@ fun ReportsListScreen(
                     )
 
                     Text("Evidencia Fotográfica", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SlateDeep)
-                    if (editPhotoUri != null) {
-                        Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp))) {
-                            AsyncImage(
-                                model = editPhotoUri,
-                                contentDescription = "Evidencia fotográfica",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                            Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                IconButton(
-                                    onClick = { galleryLauncher.launch(arrayOf("image/*")) },
-                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(20.dp)).size(36.dp)
-                                ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Cambiar", tint = PureWhite, modifier = Modifier.size(18.dp))
-                                }
-                                IconButton(
-                                    onClick = { editPhotoUri = null },
-                                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(20.dp)).size(36.dp)
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Quitar", tint = PureWhite, modifier = Modifier.size(18.dp))
+                    if (editPhotoUris.isNotEmpty()) {
+                        androidx.compose.foundation.lazy.LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(editPhotoUris.size) { index ->
+                                val uri = editPhotoUris[index]
+                                Box(modifier = Modifier.height(120.dp).width(160.dp).clip(RoundedCornerShape(8.dp))) {
+                                    AsyncImage(
+                                        model = uri,
+                                        contentDescription = "Evidencia fotográfica",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    IconButton(
+                                        onClick = { editPhotoUris = editPhotoUris - uri },
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+                                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+                                            .size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Quitar", tint = PureWhite, modifier = Modifier.size(14.dp))
+                                    }
                                 }
                             }
                         }
-                    } else {
-                        Button(
-                            onClick = { galleryLauncher.launch(arrayOf("image/*")) },
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = LightGrayBg, contentColor = SlateDeep)
-                        ) {
-                            Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Agregar Imagen", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
+                    }
+                    Button(
+                        onClick = { galleryLauncher.launch("image/*") },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = LightGrayBg, contentColor = SlateDeep)
+                    ) {
+                        Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (editPhotoUris.isEmpty()) "Agregar Imagen" else "Agregar Más Imágenes", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             },
@@ -477,7 +480,7 @@ fun ReportsListScreen(
                                 description = editDescription,
                                 physicalProgress = editPhysicalProgress.toDoubleOrNull() ?: original.physicalProgress,
                                 financialProgress = editFinancialProgress.toDoubleOrNull() ?: original.financialProgress,
-                                photoUri = editPhotoUri,
+                                photoUri = editPhotoUris.joinToString(","),
                                 isSynced = false
                             )
                             viewModel.updateBitacora(updated)

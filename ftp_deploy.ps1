@@ -79,6 +79,9 @@ if ($Full) {
     MakeDir "$ftpHost/assets"
     UploadFile "$localDist\index.html"      "$ftpHost/index.html"
     UploadFile "$localDist\.htaccess"       "$ftpHost/.htaccess"
+    if (Test-Path "$localDist\proxy.php") {
+        UploadFile "$localDist\proxy.php"   "$ftpHost/proxy.php"
+    }
     UploadFile $jsFile.FullName             "$ftpHost/assets/$($jsFile.Name)"
     UploadFile $cssFile.FullName            "$ftpHost/assets/$($cssFile.Name)"
 

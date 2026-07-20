@@ -48,6 +48,7 @@ export function Portal() {
     closePortal,
     users,
     updateUserRole,
+    updateCurrentUser,
     logout,
     products,
     addProduct,
@@ -78,6 +79,11 @@ export function Portal() {
 
   // Collapsed sidebar state (for mobile responsiveness)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Profile Edit Modal State
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [editProfileName, setEditProfileName] = useState('');
+  const [editProfileAvatar, setEditProfileAvatar] = useState('');
 
   // Load esun quotes to feed general dashboard statistics
   const [esunQuotes, setEsunQuotes] = useState<any[]>([]);
@@ -356,19 +362,29 @@ export function Portal() {
             {/* 3. SIDEBAR NAVIGATION */}
             <div className={`w-full md:w-64 bg-dark-2 border-b md:border-b-0 md:border-r border-dark-4 p-4 flex flex-col justify-between select-none transition-all duration-300 ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'}`}>
               <div className="space-y-4">
-                
                 {/* Profile Card */}
-                <div className={`p-3 bg-dark-1/80 border border-dark-4 rounded-2xl flex items-center gap-3 overflow-hidden ${sidebarCollapsed ? 'justify-center p-2' : ''}`}>
+                <div 
+                  onClick={() => {
+                    setEditProfileName(currentUser.name);
+                    setEditProfileAvatar(currentUser.avatar);
+                    setIsProfileModalOpen(true);
+                  }}
+                  className={`p-3 bg-dark-1/80 border border-dark-4 rounded-2xl flex items-center gap-3 overflow-hidden cursor-pointer hover:bg-dark-3 hover:border-gold/50 transition-colors ${sidebarCollapsed ? 'justify-center p-2' : ''}`}
+                  title="Editar Perfil"
+                >
                   <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/35 text-gold flex items-center justify-center font-display text-lg flex-shrink-0">
                     {currentUser.avatar && currentUser.avatar.startsWith('http') ? (
                       <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover rounded-xl" />
                     ) : (
-                      <span>{currentUser.avatar || '👤'}</span>
+                      <span>{currentUser.avatar || '⚡'}</span>
                     )}
                   </div>
                   {!sidebarCollapsed && (
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-cream truncate">{currentUser.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-center">
+                        <p className="text-xs font-black text-cream truncate">{currentUser.name}</p>
+                        <Edit className="w-3 h-3 text-gold/50" />
+                      </div>
                       <p className="text-[9.5px] text-cream-dim truncate font-mono">{currentUser.email}</p>
                     </div>
                   )}
@@ -1121,6 +1137,65 @@ export function Portal() {
                               </tr>
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PROFILE EDIT MODAL */}
+                  {isProfileModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+                      <div className="bg-dark-2 border border-dark-4 rounded-2xl max-w-sm w-full p-6 space-y-6 shadow-2xl relative">
+                        <div className="flex justify-between items-center border-b border-dark-4 pb-3">
+                          <h4 className="font-display font-black text-sm text-cream uppercase tracking-wider">Editar Perfil</h4>
+                          <button onClick={() => setIsProfileModalOpen(false)} className="text-cream-dim hover:text-gold transition-colors">
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-black text-cream-muted uppercase tracking-wider mb-2">Nombre Completo</label>
+                            <input 
+                              type="text" 
+                              value={editProfileName}
+                              onChange={(e) => setEditProfileName(e.target.value)}
+                              className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-2.5 text-sm text-cream placeholder:text-cream-muted focus:outline-none focus:border-gold transition-colors"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-black text-cream-muted uppercase tracking-wider mb-2">Avatar (Emoji o URL)</label>
+                            <input 
+                              type="text" 
+                              value={editProfileAvatar}
+                              onChange={(e) => setEditProfileAvatar(e.target.value)}
+                              placeholder="☀️ o https://..."
+                              className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-2.5 text-sm text-cream placeholder:text-cream-muted focus:outline-none focus:border-gold transition-colors"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-black text-cream-muted uppercase tracking-wider mb-2">Correo (Solo lectura)</label>
+                            <input 
+                              type="text" 
+                              value={currentUser.email}
+                              disabled
+                              className="w-full bg-dark-4/50 border border-dark-4 rounded-xl px-4 py-2.5 text-sm text-cream-dim cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <button 
+                            onClick={async () => {
+                              await updateCurrentUser({ name: editProfileName, avatar: editProfileAvatar });
+                              setIsProfileModalOpen(false);
+                            }}
+                            className="w-full bg-gold hover:bg-gold-light text-dark-1 font-black text-sm uppercase tracking-wider py-3 rounded-xl transition-all shadow-[0_0_15px_rgba(196,152,37,0.3)] hover:shadow-[0_0_25px_rgba(196,152,37,0.5)]"
+                          >
+                            Guardar Cambios
+                          </button>
                         </div>
                       </div>
                     </div>

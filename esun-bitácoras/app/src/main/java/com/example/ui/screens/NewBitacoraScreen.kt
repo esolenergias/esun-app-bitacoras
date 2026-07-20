@@ -5,6 +5,12 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import java.util.Calendar
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.onFocusChanged
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -60,9 +66,11 @@ fun NewBitacoraScreen(
     
     // Core states from ViewModel
     val userName by viewModel.userName.collectAsState()
+    val userRole by viewModel.userRole.collectAsState()
+    var selectedCustomDate by remember { mutableStateOf<String?>(null) }
     val supervisorName by viewModel.supervisorName.collectAsState()
     val weather by viewModel.weather.collectAsState()
-    val capturedPhotoUri by viewModel.capturedPhotoUri.collectAsState()
+    val capturedPhotoUris by viewModel.capturedPhotoUris.collectAsState()
     val budgetItems by viewModel.budgetItems.collectAsState()
     val selectedConceptoName by viewModel.conceptoName.collectAsState()
     
@@ -109,11 +117,13 @@ fun NewBitacoraScreen(
 
     // Launcher de galería
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            viewModel.setCapturedPhotoUri(uri.toString())
-            Toast.makeText(context, "Imagen de galería adjuntada", Toast.LENGTH_SHORT).show()
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            uris.forEach { uri ->
+                viewModel.addCapturedPhotoUri(uri.toString())
+            }
+            Toast.makeText(context, "${uris.size} imágenes adjuntadas", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -122,7 +132,7 @@ fun NewBitacoraScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && photoUri != null) {
-            viewModel.setCapturedPhotoUri(photoUri.toString())
+            viewModel.addCapturedPhotoUri(photoUri.toString())
             Toast.makeText(context, "¡Foto capturada y guardada!", Toast.LENGTH_SHORT).show()
         } else if (!success) {
             Toast.makeText(context, "Captura cancelada", Toast.LENGTH_SHORT).show()
@@ -215,6 +225,25 @@ fun NewBitacoraScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Quién Reporta", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
                             Text(userName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
+                            if (userRole.equals("Master", ignoreCase = true)) {
+                                Text(
+                                    text = if (selectedCustomDate != null) "Fecha: $selectedCustomDate" else "Ajustar Fecha/Hora",
+                                    fontSize = 11.sp,
+                                    color = ConnectedBlue,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clickable {
+                                            val c = Calendar.getInstance()
+                                            DatePickerDialog(context, { _, y, m, d ->
+                                                TimePickerDialog(context, { _, h, min ->
+                                                    val formattedDate = String.format("%04d-%02d-%02d %02d:%02d", y, m + 1, d, h, min)
+                                                    selectedCustomDate = formattedDate
+                                                    viewModel.setCustomReportDate(formattedDate)
+                                                }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true).show()
+                                            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+                                        }
+                                )
+                            }
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Supervisor a Cargo", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
@@ -291,14 +320,17 @@ fun NewBitacoraScreen(
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = selectedConceptoName ?: "",
-                        onValueChange = { viewModel.setConcepto(null, it) },
+                        onValueChange = { 
+                            viewModel.setConcepto(null, it)
+                            isDropdownExpanded = true 
+                        },
                         label = { Text("Concepto Asociado (Escribe o Selecciona)") },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { if (it.isFocused) isDropdownExpanded = true },
                         trailingIcon = {
-                            if (budgetItems.isNotEmpty()) {
-                                IconButton(onClick = { isDropdownExpanded = !isDropdownExpanded }) {
-                                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Seleccionar")
-                                }
+                            IconButton(onClick = { isDropdownExpanded = !isDropdownExpanded }) {
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Seleccionar")
                             }
                         },
                         colors = outlinedTextFieldColors()
@@ -320,7 +352,7 @@ fun NewBitacoraScreen(
                         }
                         Divider(color = SubtleOutline)
                         DropdownMenuItem(
-                            text = { Text("+ Generar uno nuevo...", fontWeight = FontWeight.Bold, color = ConnectedBlue) },
+                            text = { Text("+ Nuevo Concepto", fontWeight = FontWeight.Bold, color = ConnectedBlue) },
                             onClick = {
                                 viewModel.setConcepto(null, "")
                                 isDropdownExpanded = false
@@ -449,37 +481,44 @@ fun NewBitacoraScreen(
                         }
                     }
 
-                    // Previsualizar la imagen capturada o de galería
-                    if (capturedPhotoUri != null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(12.dp))
+                    // Previsualizar las imágenes capturadas
+                    if (capturedPhotoUris.isNotEmpty()) {
+                        androidx.compose.foundation.lazy.LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            AsyncImage(
-                                model = capturedPhotoUri,
-                                contentDescription = "Evidencia fotográfica",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
+                            items(capturedPhotoUris.size) { index ->
+                                val uri = capturedPhotoUris[index]
+                                Box(
+                                    modifier = Modifier
+                                        .size(140.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(12.dp))
+                                ) {
+                                    AsyncImage(
+                                        model = uri,
+                                        contentDescription = "Evidencia fotográfica",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
 
-                            // Clean Remove Button
-                            IconButton(
-                                onClick = { viewModel.setCapturedPhotoUri(null) },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
-                                    .size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Quitar foto",
-                                    tint = PureWhite,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                    // Clean Remove Button
+                                    IconButton(
+                                        onClick = { viewModel.removeCapturedPhotoUri(uri) },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(4.dp)
+                                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+                                            .size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Quitar foto",
+                                            tint = PureWhite,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     } else {

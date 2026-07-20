@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Obra Premium - ESOL</title>
+    <!-- Fuentes oficiales de ESOL -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Josefin+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Paleta eSol (Adaptada para impresión clara) */
+            --bg-1: #F8F7F2;
+            --bg-2: #EFEFE8;
+            --bg-3: #E5E4DB;
+            --border-1: #D5D4C7;
+            --border-2: #C4C3B4;
+            
+            --text-1: #141410;
+            --text-2: #3A3A32;
+            --text-3: #6A6A5E;
+
+            --gold: #C49825;
+            --gold-light: #D4AE3A;
+            --gold-dim: #8B6C1A;
+            --gold-muted: rgba(196, 152, 37, 0.12);
+
+            --success: #10B981;
+            --danger: #EF4444;
+            --info: #3B82F6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            background-color: #333; /* Fondo oscuro para contrastar en pantalla */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            color: var(--text-1);
+            font-family: "Josefin Sans", sans-serif;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        /* Tipografías */
+        h1, h2, h3, h4, .font-display {
+            font-family: "Cinzel", serif;
+        }
+
+        /* Configuración de Página - Tamaño Carta */
+        .page {
+            width: 215.9mm;
+            min-height: 279.4mm;
+            background: var(--bg-1);
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            position: relative;
+            page-break-after: always;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-content {
+            padding: 15mm 20mm;
+            flex: 1;
+        }
+
+        @page {
+            size: letter;
+            margin: 0;
+        }
+
+        @media print {
+            body { background: none; padding: 0; }
+            .page { box-shadow: none; margin: 0; page-break-after: always; }
+        }
+
+        /* ================= HEADER PREMIUM ================= */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 4mm;
+            border-bottom: 1px solid var(--border-2);
+            margin-bottom: 6mm;
+        }
+
+        .logo-container {
+            width: 140px;
+        }
+        
+        .logo-container img {
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));
+        }
+
+        .report-meta {
+            text-align: right;
+        }
+
+        .report-meta h1 {
+            font-size: 22px;
+            color: var(--text-1);
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .report-meta .meta-subtitle {
+            font-size: 10px;
+            color: var(--gold);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .report-meta p {
+            font-size: 10px;
+            color: var(--text-2);
+            margin-bottom: 1px;
+        }
+
+        /* ================= PROYECTO INFO (Glassmorphism) ================= */
+        .project-card {
+            background: var(--bg-2);
+            border: 1px solid var(--border-1);
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 8mm;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+        }
+
+        .info-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 8px;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .info-value {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-1);
+        }
+
+        /* ================= RESUMEN FINANCIERO ================= */
+        .section-title {
+            font-family: "Cinzel", serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-1);
+            margin-bottom: 4mm;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, var(--gold), transparent);
+        }
+
+        .finance-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 8mm;
+        }
+
+        .finance-card {
+            background: white;
+            border: 1px solid var(--border-1);
+            border-radius: 6px;
+            padding: 10px 12px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        
+        .finance-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; bottom: 0; width: 3px;
+            background: var(--gold);
+        }
+        
+        .finance-card.success::before { background: var(--success); }
+        .finance-card.warning::before { background: var(--gold-light); }
+
+        .f-label {
+            font-size: 8px;
+            color: var(--text-3);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .f-value {
+            font-family: "Cinzel", serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-1);
+            margin-top: 4px;
+        }
+
+        /* ================= REPORTES AGRUPADOS POR DÍA ================= */
+        .day-container {
+            margin-bottom: 8mm;
+        }
+
+        .day-header {
+            background: var(--text-1);
+            color: var(--bg-1);
+            padding: 6px 12px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4mm;
+        }
+
+        .day-title {
+            font-family: "Cinzel", serif;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .day-badge {
+            background: var(--gold);
+            color: var(--text-1);
+            font-weight: 700;
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ================= REPORTE DIARIO ================= */
+        .report-item {
+            background: white;
+            border: 1px solid var(--border-1);
+            border-left: 1px solid var(--border-1);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .report-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed var(--border-2);
+        }
+
+        .report-time {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-1);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .report-time span {
+            color: var(--gold-dim);
+            font-size: 11px;
+        }
+
+        .meta-badges {
+            display: flex;
+            gap: 8px;
+        }
+        .badge {
+            background: var(--bg-2);
+            border: 1px solid var(--border-1);
+            color: var(--text-2);
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .concept-ref {
+            display: inline-block;
+            background: var(--gold-muted);
+            color: var(--gold-dim);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .report-desc {
+            font-size: 11px;
+            color: var(--text-2);
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        /* ================= GALERÍA DE IMÁGENES ================= */
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .photo-box {
+            width: 100%;
+            height: 100px;
+            background: var(--bg-3);
+            border: 1px solid var(--border-1);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .photo-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: grayscale(20%) contrast(1.1);
+        }
+
+        .photo-placeholder {
+            font-size: 9px;
+            color: var(--text-3);
+            text-align: center;
+            font-style: italic;
+        }
+
+        /* ================= PIE DE PÁGINA Y FIRMAS ================= */
+        .signatures-section {
+            margin-top: auto;
+            padding-top: 10mm;
+            page-break-inside: avoid;
+        }
+
+        .signatures-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+        }
+
+        .signature-box {
+            text-align: center;
+        }
+
+        .sig-line {
+            height: 1px;
+            background: var(--text-1);
+            margin-bottom: 6px;
+        }
+
+        .sig-name {
+            font-family: "Cinzel", serif;
+            font-weight: 700;
+            font-size: 11px;
+            color: var(--text-1);
+        }
+
+        .sig-role {
+            font-size: 9px;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .footer {
+            margin-top: 15mm;
+            border-top: 1px solid var(--border-2);
+            padding-top: 4mm;
+            display: flex;
+            justify-content: space-between;
+            font-size: 8px;
+            color: var(--text-3);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .footer .brand { color: var(--gold-dim); }
+
+    </style>
+</head>
+<body>
+
+    <!-- ================= HOJA 1 ================= -->
+    <div class="page">
+        <div class="page-content">
+            
+            <!-- ENCABEZADO -->
+            <header class="header">
+                <div class="logo-container">
+                    <!-- Usando el logo negro/dorado oficial de la carpeta public -->
+                    <img src="file:///C:/Users/mafre/Esolenergias/public/Logo_esol_b.png" alt="ESOL Energías">
+                </div>
+                <div class="report-meta">
+                    <span class="meta-subtitle">Reporte Oficial</span>
+                    <h1>Bitácora de Obra</h1>
+                    <p><strong>FOLIO:</strong> ESOL-BIT-2026-0492</p>
+                    <p><strong>FECHA DE EMISIÓN:</strong> 18 DE JULIO, 2026</p>
+                </div>
+            </header>
+
+            <!-- INFORMACIÓN DEL PROYECTO -->
+            <div class="project-card">
+                <div class="info-group">
+                    <span class="info-label">Nombre del Proyecto</span>
+                    <span class="info-value">Subestación Eléctrica Zona Norte Fase 2</span>
+                </div>
+                <div class="info-group">
+                    <span class="info-label">Ubicación</span>
+                    <span class="info-value">Parque Industrial, Nave 4, Monterrey N.L.</span>
+                </div>
+                <div class="info-group">
+                    <span class="info-label">Responsable Técnico</span>
+                    <span class="info-value">Ing. Carlos Rodríguez (Residente)</span>
+                </div>
+                <div class="info-group">
+                    <span class="info-label">Estado Actual</span>
+                    <span class="info-value" style="color: var(--success);">En Producción</span>
+                </div>
+            </div>
+
+            <!-- CONTROL FINANCIERO (OPCIONAL) -->
+            <h2 class="section-title">Control de Gestión</h2>
+            <div class="finance-grid">
+                <div class="finance-card">
+                    <div class="f-label">Avance Físico</div>
+                    <div class="f-value">68.5%</div>
+                </div>
+                <div class="finance-card">
+                    <div class="f-label">Presupuesto Aprob.</div>
+                    <div class="f-value">$1,245,000</div>
+                </div>
+                <div class="finance-card success">
+                    <div class="f-label">Gasto Devengado</div>
+                    <div class="f-value">$852,100</div>
+                </div>
+                <div class="finance-card warning">
+                    <div class="f-label">Remanente Total</div>
+                    <div class="f-value">$392,900</div>
+                </div>
+            </div>
+
+            <!-- BITÁCORA DIARIA -->
+            <h2 class="section-title">Registros Operativos</h2>
+            
+            <div class="day-container">
+                <!-- CABECERA DEL DÍA -->
+                <div class="day-header">
+                    <span class="day-title">MIÉRCOLES, 15 DE JULIO DE 2026</span>
+                    <span class="day-badge">4 EVENTOS</span>
+                </div>
+
+                <!-- EVENTO 1 -->
+                <div class="report-item">
+                    <div class="report-top">
+                        <div class="report-time">
+                            08:30 AM <span>• Inicio de Jornada y Maniobras</span>
+                        </div>
+                        <div class="meta-badges">
+                            <div class="badge">🌤️ Despejado</div>
+                            <div class="badge">👷 Cuadrilla: 6 pax</div>
+                        </div>
+                    </div>
+                    
+                    <div class="concept-ref">PRE-01.04 • Instalación de Tableros de Control</div>
+                    
+                    <div class="report-desc">
+                        Se inició la jornada con la recepción de materiales. Se procedió a descargar e instalar los 3 tableros principales de control en el cuarto de máquinas utilizando grúa titan. No se presentaron incidentes de seguridad y el equipo procedió con el anclaje base.
+                    </div>
+                    
+                    <div class="photo-grid">
+                        <div class="photo-box">
+                            <span class="photo-placeholder">IMG_Maniobra1.jpg</span>
+                        </div>
+                        <div class="photo-box">
+                            <span class="photo-placeholder">IMG_TableroBase.jpg</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EVENTO 2 -->
+                <div class="report-item">
+                    <div class="report-top">
+                        <div class="report-time">
+                            12:15 PM <span>• Canalizaciones Subterráneas</span>
+                        </div>
+                        <div class="meta-badges">
+                            <div class="badge">☀️ Soleado</div>
+                            <div class="badge">👷 Cuadrilla: 8 pax</div>
+                        </div>
+                    </div>
+                    <div class="concept-ref">EXC-02.01 • Excavación en terreno mixto</div>
+                    <div class="report-desc">
+                        Avance de 80 metros lineales en canalización subterránea de PVC pesado. Se detuvo temporalmente por encuentro de roca sólida en la trinchera 2. Se reportó a gerencia y se solicitó equipo mayor (martillo hidráulico) para el día siguiente.
+                    </div>
+                    <div class="photo-grid">
+                        <div class="photo-box">
+                            <span class="photo-placeholder">Zanja_Roca.jpg</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FOOTER PAG 1 -->
+            <div class="footer">
+                <div><span class="brand">ESOL ENERGÍAS</span> | SISTEMA DE BITÁCORA ELECTRÓNICA</div>
+                <div>PÁGINA 1 / 2</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= HOJA 2 ================= -->
+    <div class="page">
+        <div class="page-content">
+            
+            <div class="day-container">
+                <!-- CABECERA DEL DÍA -->
+                <div class="day-header">
+                    <span class="day-title">JUEVES, 16 DE JULIO DE 2026</span>
+                    <span class="day-badge">2 EVENTOS</span>
+                </div>
+
+                <!-- EVENTO 3 -->
+                <div class="report-item">
+                    <div class="report-top">
+                        <div class="report-time">
+                            10:00 AM <span>• Ruptura de Roca</span>
+                        </div>
+                        <div class="meta-badges">
+                            <div class="badge">☁️ Nublado</div>
+                            <div class="badge">👷 Cuadrilla: 5 pax</div>
+                        </div>
+                    </div>
+                    <div class="concept-ref">EXC-02.02 • Equipo Menor</div>
+                    <div class="report-desc">
+                        Llegó el equipo menor (martillo hidráulico). Se procedió a romper la roca en el eje C-4. El avance fue más lento de lo esperado debido a la dureza del material, pero se logró liberar la ruta para la canalización principal.
+                    </div>
+                    <div class="photo-grid">
+                        <div class="photo-box">
+                            <span class="photo-placeholder">Martillo.jpg</span>
+                        </div>
+                        <div class="photo-box">
+                            <span class="photo-placeholder">Ruta_Liberada.jpg</span>
+                        </div>
+                        <div class="photo-box">
+                            <span class="photo-placeholder">Limpieza.jpg</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FIRMAS -->
+            <div class="signatures-section">
+                <h2 class="section-title">Validación Técnica y Aprobación</h2>
+                <div class="signatures-grid">
+                    <div class="signature-box">
+                        <div class="sig-line"></div>
+                        <div class="sig-name">ING. CARLOS RODRÍGUEZ</div>
+                        <div class="sig-role">RESIDENTE DE OBRA ESOL (ELABORÓ)</div>
+                    </div>
+                    <div class="signature-box">
+                        <div class="sig-line"></div>
+                        <div class="sig-name">ARQ. MIGUEL ÁNGEL</div>
+                        <div class="sig-role">SUPERVISIÓN / CLIENTE (REVISÓ)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FOOTER PAG 2 -->
+            <div class="footer" style="margin-top: auto;">
+                <div><span class="brand">ESOL ENERGÍAS</span> | SISTEMA DE BITÁCORA ELECTRÓNICA</div>
+                <div>PÁGINA 2 / 2</div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

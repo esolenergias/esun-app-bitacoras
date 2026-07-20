@@ -357,8 +357,8 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     private val _budgetEstimate = MutableStateFlow(0.0)
     val budgetEstimate = _budgetEstimate.asStateFlow()
 
-    private val _capturedPhotoUri = MutableStateFlow<String?>(null)
-    val capturedPhotoUri = _capturedPhotoUri.asStateFlow()
+    private val _capturedPhotoUris = MutableStateFlow<List<String>>(emptyList())
+    val capturedPhotoUris = _capturedPhotoUris.asStateFlow()
 
     private val _safetyRemarks = MutableStateFlow("")
     val safetyRemarks = _safetyRemarks.asStateFlow()
@@ -375,6 +375,9 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     // Real-time Push Notification Simulation Queue
     private val _pushNotifications = MutableStateFlow<List<PushNotification>>(emptyList())
     val pushNotifications: StateFlow<List<PushNotification>> = _pushNotifications.asStateFlow()
+
+    private val _customReportDate = MutableStateFlow<String?>(null)
+    val customReportDate = _customReportDate.asStateFlow()
 
     init {
         // Mock a couple of real-time push notifications regarding crews to show active telemetry
@@ -393,9 +396,12 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     fun setPhysicalProgress(value: Double) { _physicalProgress.value = value }
     fun setFinancialProgress(value: Double) { _financialProgress.value = value }
     fun setBudgetEstimate(value: Double) { _budgetEstimate.value = value }
-    fun setCapturedPhotoUri(uri: String?) { _capturedPhotoUri.value = uri }
+    fun addCapturedPhotoUri(uri: String) { _capturedPhotoUris.value = _capturedPhotoUris.value + uri }
+    fun removeCapturedPhotoUri(uri: String) { _capturedPhotoUris.value = _capturedPhotoUris.value - uri }
+    fun clearCapturedPhotoUris() { _capturedPhotoUris.value = emptyList() }
     fun setSafetyRemarks(value: String) { _safetyRemarks.value = value }
     fun setMachinery(value: String) { _machinery.value = value }
+    fun setCustomReportDate(date: String?) { _customReportDate.value = date }
     fun setConcepto(id: String?, name: String?) {
         _conceptoId.value = id
         _conceptoName.value = name
@@ -430,7 +436,9 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     // --- Save Report Action ---
     fun submitDailyLog(onSuccess: () -> Unit) {
         viewModelScope.launch {
-            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val dateStr = _customReportDate.value ?: SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+            _customReportDate.value = null
+            
             val lat = _currentLocation.value?.latitude ?: 29.0892 // Fallback coordinates Hermosillo
             val lng = _currentLocation.value?.longitude ?: -110.9613
 
@@ -445,7 +453,7 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
                 budgetEstimate = _budgetEstimate.value,
                 latitude = lat,
                 longitude = lng,
-                photoUri = _capturedPhotoUri.value,
+                photoUri = _capturedPhotoUris.value.joinToString(","),
                 safetyRemarks = _safetyRemarks.value,
                 machinery = _machinery.value,
                 concepto_id = _conceptoId.value,
@@ -464,7 +472,7 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
 
             // Reset form fields
             _description.value = ""
-            _capturedPhotoUri.value = null
+            _capturedPhotoUris.value = emptyList()
             _safetyRemarks.value = ""
             _machinery.value = ""
             _conceptoId.value = null

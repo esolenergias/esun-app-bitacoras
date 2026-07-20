@@ -131,7 +131,6 @@ data class SupabaseBitacoraUploadRequest(
     val latitude: Double,
     val longitude: Double,
     val photo_uri: String?,
-    val concepto_id: String? = null,
     val concepto: String? = null,
     val timestamp: Long
 )
@@ -169,6 +168,14 @@ interface SupabaseApiService {
         @Header("apikey") apiKey: String,
         @Header("Authorization") authorization: String,
         @Body request: SupabaseBitacoraUploadRequest
+    ): Response<Unit>
+
+    @retrofit2.http.PATCH("rest/v1/presupuesto_conceptos")
+    suspend fun updateConceptoExecuted(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("id") idQuery: String,
+        @Body updates: Map<String, Double>
     ): Response<Unit>
 
     @GET("rest/v1/conceptos_bitacora")
