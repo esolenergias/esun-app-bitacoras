@@ -1095,10 +1095,10 @@ export default function PresupuestosTab() {
         items.forEach(row => {
           rowsHtml += `
             <tr style="page-break-inside: avoid;">
-              <td class="font-mono font-bold" style="color: #C49825; text-align: left; padding: 4px 10px;">${row.insumo.code}</td>
+              <td class="font-mono font-bold" style="color: #C49825; text-align: left; padding: 4px 10px; font-size: 9px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${row.insumo.code}</td>
               <td style="color: #1e293b; text-align: left; padding: 4px 10px;">${row.insumo.description}</td>
-              <td class="text-center font-mono" style="color: #64748b; padding: 4px 10px;">${row.insumo.unit}</td>
-              <td class="text-right font-mono" style="padding: 4px 10px;">${formatQty(row.totalQuantity, row.insumo.unit, 2)}</td>
+              <td class="text-center font-mono" style="color: #64748b; padding: 4px 10px; text-align: center;">${row.insumo.unit}</td>
+              <td class="text-center font-mono" style="padding: 4px 10px; text-align: center;">${formatQty(row.totalQuantity, row.insumo.unit, 2)}</td>
               <td class="text-right font-mono" style="color: #64748b; padding: 4px 10px;">${formatCurrencyMXN(row.insumo.cost)}</td>
               <td class="text-right font-mono font-bold" style="color: #1e293b; padding: 4px 10px;">${formatCurrencyMXN(row.totalCost)}</td>
             </tr>`;
@@ -1129,12 +1129,12 @@ export default function PresupuestosTab() {
       innerHtml += `<table style="width: 100%; border-collapse: collapse; margin-top: 0px; table-layout: fixed;">
           <thead>
             <tr>
-              <th style="width: 15%; text-align: center; vertical-align: middle;">Código</th>
-              <th style="width: 45%; text-align: center; vertical-align: middle;">Descripción</th>
-              <th style="width: 10%; text-align: center; vertical-align: middle;">Unidad</th>
-              <th style="width: 10%; text-align: center; vertical-align: middle;">Cantidad</th>
-              <th style="width: 10%; text-align: center; vertical-align: middle;">Costo Unit.</th>
-              <th style="width: 10%; text-align: center; vertical-align: middle;">Importe</th>
+              <th style="width: 12%; text-align: center; vertical-align: middle;">Código</th>
+              <th style="width: 42%; text-align: center; vertical-align: middle;">Descripción</th>
+              <th style="width: 7%; text-align: center; vertical-align: middle;">Unidad</th>
+              <th style="width: 9%; text-align: center; vertical-align: middle;">Cantidad</th>
+              <th style="width: 15%; text-align: center; vertical-align: middle;">Costo Unit.</th>
+              <th style="width: 15%; text-align: center; vertical-align: middle;">Importe</th>
             </tr>
           </thead>
           <tbody>
