@@ -41,6 +41,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.text.style.TextAlign
+import com.example.ui.theme.SolarAmber
+
 import coil.compose.AsyncImage
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.BitacoraViewModel
@@ -73,6 +79,8 @@ fun NewBitacoraScreen(
     val capturedPhotoUris by viewModel.capturedPhotoUris.collectAsState()
     val budgetItems by viewModel.budgetItems.collectAsState()
     val selectedConceptoName by viewModel.conceptoName.collectAsState()
+    val isAiModelLoaded by viewModel.isAiModelLoaded.collectAsState()
+    val isAiProcessing by viewModel.isAiProcessing.collectAsState()
     
     // Auto-bind site/project name
     LaunchedEffect(projectName) {
@@ -378,6 +386,35 @@ fun NewBitacoraScreen(
                         minLines = 3,
                         colors = outlinedTextFieldColors()
                     )
+                    
+                    if (isAiModelLoaded) {
+                        Button(
+                            onClick = { 
+                                if (activitiesText.isNotEmpty()) {
+                                    viewModel.improveTextWithAi(activitiesText) { improved, err ->
+                                        if (improved != null) {
+                                            activitiesText = improved
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = SolarAmber),
+                            enabled = !isAiProcessing && activitiesText.isNotEmpty()
+                        ) {
+                            if (isAiProcessing) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Mejorando redacción con Gemma...", fontWeight = FontWeight.Bold, color = Color.White)
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = "IA", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("✨ Redactar con IA", fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                    } else {
+                        Text("Ve a Configuración para cargar Gemma y usar IA Local.", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                    }
                     Column {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Avance Diario Estimado", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = SlateDeep)

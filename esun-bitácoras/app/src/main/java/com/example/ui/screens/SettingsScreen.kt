@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +21,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.CircularProgressIndicator
+
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.BitacoraViewModel
 
@@ -347,7 +355,65 @@ fun GeneralSettingsTab(viewModel: BitacoraViewModel) {
 
         }
 
+        
+        // INTELIGENCIA ARTIFICIAL (GEMMA)
+        val isAiModelLoaded by viewModel.isAiModelLoaded.collectAsState()
+        val isAiProcessing by viewModel.isAiProcessing.collectAsState()
+        var aiStatusMessage by remember { mutableStateOf("") }
+        val launcher = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                viewModel.loadAiModel(uri) { success, msg ->
+                    aiStatusMessage = msg
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = PureWhite)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = "AI", tint = SolarAmber)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Inteligencia Artificial (Gemma)", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = SlateDeep)
+                }
+                
+                SelectionContainer {
+                    Column {
+                        Text(
+                            text = "Estado: " + if (isAiModelLoaded) "Modelo Cargado y Listo" else "No cargado",
+                            fontSize = 13.sp,
+                            color = if (isAiModelLoaded) Color(0xFF10B981) else Color.Gray,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        if (aiStatusMessage.isNotEmpty()) {
+                            Text(text = aiStatusMessage, fontSize = 12.sp, color = Color.Gray)
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = { launcher.launch(arrayOf("*/*")) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isAiModelLoaded) Color.Gray else SolarAmber),
+                    enabled = !isAiProcessing
+                ) {
+                    if (isAiProcessing) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = PureWhite, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Cargando modelo...", fontWeight = FontWeight.Bold)
+                    } else {
+                        Text(if (isAiModelLoaded) "Cambiar Modelo" else "Cargar Archivo de Modelo", fontWeight = FontWeight.Bold, color = PureWhite)
+                    }
+                }
+            }
+        }
+
         // Real-time Console Log Terminal Card
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()

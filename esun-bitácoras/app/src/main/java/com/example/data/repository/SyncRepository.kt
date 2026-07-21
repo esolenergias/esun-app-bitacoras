@@ -58,6 +58,8 @@ class SyncRepository(private val context: Context) {
     private val matrixItemDao = db.matrixItemDao()
     private val taskDao = db.taskDao()
 
+    private val syncMutex = kotlinx.coroutines.sync.Mutex()
+
     private val _syncStatus = MutableStateFlow(SyncStatus(
         supabaseUrl = BuildConfig.SUPABASE_URL,
         supabaseKey = BuildConfig.SUPABASE_ANON_KEY
@@ -354,14 +356,19 @@ class SyncRepository(private val context: Context) {
 
     // --- Main Sync Engine ---
     suspend fun syncPendingBitacoras(): Boolean {
-        if (!_syncStatus.value.isOnline) {
-            addLog("Error: No hay conexión a internet para sincronizar.")
+        if (!syncMutex.tryLock()) {
+            addLog("Sincronización ya en curso. Omitiendo intento duplicado.")
             return false
         }
+        try {
+            if (!_syncStatus.value.isOnline) {
+                addLog("Error: No hay conexión a internet para sincronizar.")
+                return false
+            }
 
-        return withContext(Dispatchers.IO) {
-            _syncStatus.value = _syncStatus.value.copy(isSyncing = true)
-            addLog("Iniciando sincronización con Supabase...")
+            return withContext(Dispatchers.IO) {
+                _syncStatus.value = _syncStatus.value.copy(isSyncing = true)
+                addLog("Iniciando sincronización con Supabase...")
             delay(1000)
 
             val supabaseUrl = _syncStatus.value.supabaseUrl
@@ -451,15 +458,62 @@ class SyncRepository(private val context: Context) {
                 }
             }
 
+            // Fetch remote logs first for self-healing and bidirectional download
+            var remoteLogs: List<com.example.data.api.SupabaseBitacoraResponse> = emptyList()
+            var fetchSuccessful = false
+            if (supabaseService != null) {
+                try {
+                    val bearerToken = "Bearer $supabaseKey"
+                    val getResp = supabaseService.getBitacoras(apiKey = supabaseKey, authorization = bearerToken)
+                    if (getResp.isSuccessful) {
+                        remoteLogs = getResp.body() ?: emptyList()
+                        fetchSuccessful = true
+                        
+                        // SELF-HEALING: Map old local logs with no supabaseId or force upload if missing in remote
+                        val localLogs = bitacoraDao.getAllBitacoras().first()
+                        var healedCount = 0
+                        var markedToUploadCount = 0
+                        for (localLog in localLogs) {
+                            if (localLog.isSynced && localLog.supabaseId.isNullOrEmpty()) {
+                                val rMatch = remoteLogs.firstOrNull { 
+                                    it.site_name == localLog.siteName && 
+                                    it.date == localLog.date &&
+                                    (it.description == localLog.description || it.crew_count == localLog.crewCount)
+                                }
+                                if (rMatch != null) {
+                                    bitacoraDao.markAsSyncedWithSupabaseId(localLog.id, rMatch.id)
+                                    healedCount++
+                                } else {
+                                    // Not in remote, must be re-uploaded
+                                    val unSyncedLog = localLog.copy(isSynced = false)
+                                    bitacoraDao.updateBitacora(unSyncedLog)
+                                    markedToUploadCount++
+                                }
+                            }
+                        }
+                        if (healedCount > 0) addLog("Se auto-asociaron $healedCount reportes locales antiguos con la nube.")
+                        if (markedToUploadCount > 0) addLog("Se programaron $markedToUploadCount reportes antiguos no subidos para re-subir.")
+                    }
+                } catch (e: Exception) {
+                    addLog("Advertencia de autocuración: No se pudieron descargar registros para cotejar: ${e.message}")
+                }
+            }
+
             val pending = bitacoraDao.getUnsyncedBitacoras()
             if (pending.isEmpty()) {
-                addLog("No hay reportes de bitácora pendientes de sincronización.")
-                _syncStatus.value = _syncStatus.value.copy(isSyncing = false)
-                return@withContext true
+                addLog("No hay nuevos reportes de bitácora pendientes de sincronización.")
+                // Even if nothing to upload, we might still have downloads/deletions if we successfully fetched remote logs
+                if (fetchSuccessful && supabaseService != null) {
+                    addLog("Procediendo a verificar descargas y eliminaciones...")
+                } else {
+                    _syncStatus.value = _syncStatus.value.copy(isSyncing = false)
+                    return@withContext true
+                }
             }
 
             var successCount = 0
             for (log in pending) {
+                var uploadSuccess = false
                 addLog("Procesando reporte #${log.id} (${log.siteName})...")
                 delay(800)
 
@@ -588,19 +642,121 @@ class SyncRepository(private val context: Context) {
                         )
                         val response = supabaseService.uploadBitacora(apiKey = supabaseKey, authorization = bearerToken, request = request)
                         if (response.isSuccessful) {
-                            addLog("  -> Supabase: Guardado exitoso (ID local: ${log.id})")
+                            val inserted = response.body()?.firstOrNull()
+                            if (inserted != null) {
+                                addLog("  -> Supabase: Guardado exitoso (ID local: ${log.id}, UUID remoto: ${inserted.id})")
+                                bitacoraDao.markAsSyncedWithSupabaseId(log.id, inserted.id)
+                                uploadSuccess = true
+                            } else {
+                                addLog("  -> Supabase: Guardado exitoso pero no retornó representación.")
+                                bitacoraDao.markAsSynced(log.id)
+                                uploadSuccess = true
+                            }
                         } else {
                             addLog("  -> Supabase: Error al guardar - HTTP ${response.code()}")
                         }
                     } catch (e: Exception) {
                          addLog("  -> Supabase: Error de conexión - ${e.message}")
                     }
+                } else {
+                    uploadSuccess = true
+                    bitacoraDao.markAsSynced(log.id)
                 }
 
-                // Mark as synced in local Room db
-                bitacoraDao.markAsSynced(log.id)
-                successCount++
-                addLog("Reporte #${log.id} completamente sincronizado en todos los sistemas activos.")
+                if (uploadSuccess) {
+                    successCount++
+                    addLog("Reporte #${log.id} completamente sincronizado en todos los sistemas activos.")
+                } else {
+                    addLog("Reporte #${log.id} NO se pudo sincronizar. Se reintentará en el próximo ciclo.")
+                }
+            }
+
+            // 2. DOWNLOAD REMOTE BITACORAS (BIDIRECTIONAL SYNC)
+            if (supabaseService != null && fetchSuccessful) {
+                addLog("Procesando actualizaciones y eliminaciones desde la nube...")
+                try {
+                    val remoteIds = remoteLogs.map { it.id }.toSet()
+                        
+                        // Sincronizar eliminaciones: Si el reporte ya fue sincronizado y no existe en la nube, eliminarlo localmente
+                        val localLogs = bitacoraDao.getAllBitacoras().first()
+                        var localDeleted = 0
+                        for (localLog in localLogs) {
+                            if (localLog.isSynced && !localLog.supabaseId.isNullOrEmpty()) {
+                                if (!remoteIds.contains(localLog.supabaseId)) {
+                                    bitacoraDao.deleteBitacora(localLog)
+                                    localDeleted++
+                                }
+                            }
+                        }
+                        if (localDeleted > 0) addLog("Se eliminaron $localDeleted reportes locales borrados en la nube.")
+
+                        // Sincronizar inserciones y actualizaciones desde la nube
+                        var remoteAdded = 0
+                        var remoteUpdated = 0
+                        for (rLog in remoteLogs) {
+                            val localMatch = localLogs.firstOrNull { it.supabaseId == rLog.id }
+                            if (localMatch != null) {
+                                // Si existe localmente y no tiene cambios pendientes de subir, actualizamos con lo de la web
+                                if (localMatch.isSynced) {
+                                    if (localMatch.description != rLog.description ||
+                                        localMatch.weather != rLog.weather ||
+                                        localMatch.crewCount != rLog.crew_count ||
+                                        localMatch.physicalProgress != rLog.physical_progress ||
+                                        localMatch.concepto_name != rLog.concepto
+                                    ) {
+                                        val updatedLog = localMatch.copy(
+                                            description = rLog.description,
+                                            weather = rLog.weather,
+                                            crewCount = rLog.crew_count,
+                                            physicalProgress = rLog.physical_progress,
+                                            concepto_name = rLog.concepto,
+                                            photoUri = rLog.photo_uri
+                                        )
+                                        bitacoraDao.updateBitacora(updatedLog)
+                                        remoteUpdated++
+                                    }
+                                }
+                            } else {
+                                // No existe localmente con este supabaseId.
+                                // ¿Existe por casualidad un reporte local con la misma obra y fecha que no tiene supabaseId?
+                                val localMatchByAttrs = localLogs.firstOrNull { 
+                                    it.supabaseId.isNullOrEmpty() && 
+                                    it.siteName == rLog.site_name && 
+                                    it.date == rLog.date &&
+                                    (it.description == rLog.description || it.crewCount == rLog.crew_count)
+                                }
+                                
+                                if (localMatchByAttrs != null) {
+                                    bitacoraDao.markAsSyncedWithSupabaseId(localMatchByAttrs.id, rLog.id)
+                                    remoteUpdated++
+                                } else {
+                                    // Es un reporte completamente nuevo creado en la web, lo insertamos
+                                    val newLocalLog = BitacoraEntity(
+                                        siteName = rLog.site_name,
+                                        date = rLog.date,
+                                        weather = rLog.weather,
+                                        crewCount = rLog.crew_count,
+                                        description = rLog.description,
+                                        physicalProgress = rLog.physical_progress,
+                                        financialProgress = rLog.financial_progress,
+                                        budgetEstimate = rLog.budget_estimate,
+                                        latitude = rLog.latitude,
+                                        longitude = rLog.longitude,
+                                        photoUri = rLog.photo_uri,
+                                        isSynced = true,
+                                        concepto_name = rLog.concepto,
+                                        supabaseId = rLog.id
+                                    )
+                                    bitacoraDao.insertBitacora(newLocalLog)
+                                    remoteAdded++
+                                }
+                            }
+                        }
+                        if (remoteAdded > 0) addLog("Se descargaron $remoteAdded reportes nuevos desde Supabase.")
+                        if (remoteUpdated > 0) addLog("Se actualizaron $remoteUpdated reportes locales con cambios de la nube.")
+                } catch (e: Exception) {
+                    addLog("Error al descargar reportes de Supabase: ${e.message}")
+                }
             }
 
             val timestamp = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
@@ -611,6 +767,9 @@ class SyncRepository(private val context: Context) {
             )
             addLog("Sincronización completada. Se sincronizaron $successCount reportes.")
             true
+        }
+        } finally {
+            syncMutex.unlock()
         }
     }
 

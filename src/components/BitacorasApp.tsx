@@ -268,17 +268,12 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
         const rawData = bitacorasRes.data || [];
         const dedupMap = new Map<string, any>();
         for (const bit of rawData) {
-          const lat = parseFloat(bit.latitude);
-          const lng = parseFloat(bit.longitude);
-          const isFromAndroid = !isNaN(lat) && !isNaN(lng) && lat !== 0; // Android reports have valid coordinates
-          
-          const key = isFromAndroid ? `${bit.site_name}_${bit.date}_${lat}_${lng}_${bit.concepto || 'none'}` : bit.id;
+          const key = bit.id; // Unique Supabase ID
           
           if (!dedupMap.has(key)) {
             dedupMap.set(key, bit);
           } else {
             const existing = dedupMap.get(key);
-            // Use timestamp (Android) or created_at (Web) to determine newest
             const existingTime = existing.timestamp || new Date(existing.created_at || 0).getTime();
             const newTime = bit.timestamp || new Date(bit.created_at || 0).getTime();
             

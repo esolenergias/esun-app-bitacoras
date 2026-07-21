@@ -32,6 +32,64 @@ import java.util.Locale
 
 class BitacoraViewModel(private val repository: SyncRepository, private val context: Context) : ViewModel() {
 
+    private val aiManager = com.example.data.repository.AiManager.getInstance(context)
+    
+    private val _isAiModelLoaded = MutableStateFlow(false)
+    val isAiModelLoaded = _isAiModelLoaded.asStateFlow()
+
+    private val _isAiProcessing = MutableStateFlow(false)
+    val isAiProcessing = _isAiProcessing.asStateFlow()
+
+    init {
+        // Auto-load model if exists
+        viewModelScope.launch {
+            val modelFile = java.io.File(context.filesDir, "gemma.task")
+            if (modelFile.exists()) {
+                try {
+                    aiManager.loadModel(modelFile)
+                    _isAiModelLoaded.value = true
+                } catch (e: Exception) { }
+            }
+        }
+    }
+
+    fun loadAiModel(uri: android.net.Uri, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                _isAiProcessing.value = true
+                val modelFile = java.io.File(context.filesDir, "gemma.task")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        modelFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+                aiManager.loadModel(modelFile)
+                _isAiModelLoaded.value = true
+                onResult(true, "Modelo de IA cargado y listo.")
+            } catch (e: Exception) {
+                onResult(false, "Error: ${e.message}")
+            } finally {
+                _isAiProcessing.value = false
+            }
+        }
+    }
+
+    fun improveTextWithAi(rawText: String, onResult: (String?, String?) -> Unit) {
+        viewModelScope.launch {
+            _isAiProcessing.value = true
+            try {
+                val improved = aiManager.generateProfessionalReport(rawText)
+                onResult(improved, null)
+            } catch (e: Exception) {
+                onResult(null, e.message)
+            } finally {
+                _isAiProcessing.value = false
+            }
+        }
+    }
+
     // --- User Profile State (SharedPreferences) ---
     private val prefs = context.getSharedPreferences("user_profile", Context.MODE_PRIVATE)
     private val _isLoggedIn = MutableStateFlow(prefs.getBoolean("is_logged_in", false))

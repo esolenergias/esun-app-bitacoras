@@ -135,6 +135,23 @@ data class SupabaseBitacoraUploadRequest(
     val timestamp: Long
 )
 
+data class SupabaseBitacoraResponse(
+    val id: String,
+    val site_name: String,
+    val date: String,
+    val weather: String,
+    val crew_count: Int,
+    val description: String,
+    val physical_progress: Double,
+    val financial_progress: Double,
+    val budget_estimate: Double,
+    val latitude: Double,
+    val longitude: Double,
+    val photo_uri: String?,
+    val concepto: String?,
+    val timestamp: Long
+)
+
 data class SupabaseObraRequest(
     val nombre: String,
     val cliente: String,
@@ -167,8 +184,16 @@ interface SupabaseApiService {
     suspend fun uploadBitacora(
         @Header("apikey") apiKey: String,
         @Header("Authorization") authorization: String,
+        @Header("Prefer") prefer: String = "return=representation",
         @Body request: SupabaseBitacoraUploadRequest
-    ): Response<Unit>
+    ): Response<List<SupabaseBitacoraResponse>>
+
+    @GET("rest/v1/registros_app")
+    suspend fun getBitacoras(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("select") select: String = "*"
+    ): Response<List<SupabaseBitacoraResponse>>
 
     @retrofit2.http.PATCH("rest/v1/presupuesto_conceptos")
     suspend fun updateConceptoExecuted(

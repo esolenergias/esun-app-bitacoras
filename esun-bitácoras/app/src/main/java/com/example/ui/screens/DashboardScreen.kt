@@ -902,6 +902,9 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
+    }
+
 
             // --- 5. CONTROL DE SINCRONIZACIÓN BENTO ---
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1041,13 +1044,8 @@ fun DashboardScreen(
                         }
                     }
                 }
-
         }
     }
-}
-
-}
-
 }
 }
 @Composable

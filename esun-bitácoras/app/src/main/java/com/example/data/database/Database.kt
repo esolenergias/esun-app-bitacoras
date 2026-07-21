@@ -40,7 +40,9 @@ data class BitacoraEntity(
     val machinery: String = "",
     // Campos añadidos en versión 11
     val concepto_id: String? = null,
-    val concepto_name: String? = null
+    val concepto_name: String? = null,
+    // Campos añadidos en versión 12
+    val supabaseId: String? = null
 )
 
 @Entity(tableName = "obras")
@@ -129,6 +131,12 @@ interface BitacoraDao {
 
     @Query("UPDATE bitacoras SET isSynced = 1 WHERE id = :id")
     suspend fun markAsSynced(id: Int)
+
+    @Query("SELECT * FROM bitacoras WHERE supabaseId = :supabaseId")
+    suspend fun getBitacoraBySupabaseId(supabaseId: String): BitacoraEntity?
+
+    @Query("UPDATE bitacoras SET supabaseId = :supabaseId, isSynced = 1 WHERE id = :id")
+    suspend fun markAsSyncedWithSupabaseId(id: Int, supabaseId: String)
 }
 
 @Dao
@@ -270,6 +278,12 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE bitacoras ADD COLUMN supabaseId TEXT DEFAULT NULL")
+    }
+}
+
 // ==========================================
 // DATABASE CONTAINER
 // ==========================================
@@ -283,7 +297,7 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
         MatrixItemEntity::class,
         TaskEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -306,7 +320,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "esol_bitacoras_db"
                 )
                 .fallbackToDestructiveMigration()
-                .addMigrations(MIGRATION_9_10, MIGRATION_10_11)
+                .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                 .build()
                 INSTANCE = instance
                 instance
