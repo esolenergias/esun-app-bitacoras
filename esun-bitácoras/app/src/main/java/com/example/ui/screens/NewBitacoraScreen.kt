@@ -12,6 +12,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.app.Activity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -104,6 +107,7 @@ fun NewBitacoraScreen(
     var activitiesText by remember { mutableStateOf("Instalación de estructuras metálicas en zona norte y canalización subterránea.") }
     var progressVal by remember { mutableStateOf(45f) }
     var safetyRemarks by remember { mutableStateOf("Charcos por lluvia previa, se acordonó el área.") }
+    var toolsMaterials by remember { mutableStateOf("") }
     
     // Launchers for Camera and Gallery
     // Permiso de cámara
@@ -144,6 +148,21 @@ fun NewBitacoraScreen(
             Toast.makeText(context, "¡Foto capturada y guardada!", Toast.LENGTH_SHORT).show()
         } else if (!success) {
             Toast.makeText(context, "Captura cancelada", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    val recordAudioPermission = rememberPermissionState(android.Manifest.permission.RECORD_AUDIO)
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            val matches = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!matches.isNullOrEmpty()) {
+                val spokenText = matches[0]
+                activitiesText = if (activitiesText.isEmpty()) spokenText else "$activitiesText $spokenText"
+            }
         }
     }
     
@@ -384,7 +403,23 @@ fun NewBitacoraScreen(
                         label = { Text("Descripción de trabajos ejecutados") },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
-                        colors = outlinedTextFieldColors()
+                        colors = outlinedTextFieldColors(),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                if (recordAudioPermission.status.isGranted) {
+                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla para dictar")
+                                    }
+                                    speechRecognizerLauncher.launch(intent)
+                                } else {
+                                    recordAudioPermission.launchPermissionRequest()
+                                }
+                            }) {
+                                Icon(Icons.Default.Mic, contentDescription = "Dictar", tint = ConnectedBlue)
+                            }
+                        }
                     )
                     
                     if (isAiModelLoaded) {
@@ -416,9 +451,29 @@ fun NewBitacoraScreen(
                         Text("Ve a Configuración para cargar Gemma y usar IA Local.", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                     }
                     Column {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("Avance Diario Estimado", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = SlateDeep)
-                            Text("${progressVal.toInt()}%", fontWeight = FontWeight.Black, fontSize = 13.sp, color = ConnectedBlue)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isAiModelLoaded) {
+                                    IconButton(
+                                        onClick = {
+                                            if (activitiesText.isNotEmpty()) {
+                                                viewModel.extractProgress(activitiesText) { p, err ->
+                                                    if (p != null && p in 0..100) {
+                                                        progressVal = p.toFloat()
+                                                    } else {
+                                                        Toast.makeText(context, "No se pudo extraer el avance", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        enabled = !isAiProcessing
+                                    ) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = "Extraer Avance", tint = SolarAmber)
+                                    }
+                                }
+                                Text("${progressVal.toInt()}%", fontWeight = FontWeight.Black, fontSize = 13.sp, color = ConnectedBlue)
+                            }
                         }
                         Slider(
                             value = progressVal,
@@ -426,6 +481,41 @@ fun NewBitacoraScreen(
                             valueRange = 0f..100f,
                             colors = SliderDefaults.colors(thumbColor = ConnectedBlue, activeTrackColor = ConnectedBlue)
                         )
+                    }
+                    OutlinedTextField(
+                        value = toolsMaterials,
+                        onValueChange = { toolsMaterials = it },
+                        label = { Text("Materiales y Herramientas Usados") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        colors = outlinedTextFieldColors()
+                    )
+                    
+                    if (isAiModelLoaded) {
+                        Button(
+                            onClick = { 
+                                if (activitiesText.isNotEmpty()) {
+                                    viewModel.extractMaterials(activitiesText) { extracted, err ->
+                                        if (extracted?.isNotEmpty() == true) {
+                                            toolsMaterials = extracted ?: ""
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = SolarAmber),
+                            enabled = !isAiProcessing && activitiesText.isNotEmpty()
+                        ) {
+                            if (isAiProcessing) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Extrayendo...", fontWeight = FontWeight.Bold, color = Color.White)
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = "IA", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("✨ Extraer Materiales", fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
                     }
                 }
             }

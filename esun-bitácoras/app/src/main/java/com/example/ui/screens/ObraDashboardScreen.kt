@@ -55,6 +55,8 @@ fun ObraDashboardScreen(
     val userRole by viewModel.userRole.collectAsState()
     val canModifyBudget = userRole == "Master" || userRole == "Supervisor"
     val scrollState = rememberScrollState()
+    val isAiModelLoaded by viewModel.isAiModelLoaded.collectAsState()
+    val isAiProcessing by viewModel.isAiProcessing.collectAsState()
     
     val todayDateDbStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
     
@@ -1069,6 +1071,34 @@ fun ObraDashboardScreen(
                             focusedLabelColor = ConnectedBlue
                         )
                     )
+
+                    if (isAiModelLoaded) {
+                        Button(
+                            onClick = {
+                                if (materialNotes.isNotEmpty() || materialName.isNotEmpty()) {
+                                    val promptText = if (materialNotes.isNotEmpty()) materialNotes else "$materialQty $materialUnit de $materialName"
+                                    viewModel.draftMaterialRequest(promptText) { drafted, err ->
+                                        if (drafted?.isNotEmpty() == true) {
+                                            materialNotes = drafted ?: ""
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = SolarAmber),
+                            enabled = !isAiProcessing && (materialNotes.isNotEmpty() || materialName.isNotEmpty())
+                        ) {
+                            if (isAiProcessing) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Redactando...", fontWeight = FontWeight.Bold, color = Color.White)
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = "IA", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("✨ Redactar con IA", fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {

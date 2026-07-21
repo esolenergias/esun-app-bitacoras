@@ -90,6 +90,48 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
         }
     }
 
+    fun extractProgress(rawText: String, onResult: (Int?, String?) -> Unit) {
+        viewModelScope.launch {
+            _isAiProcessing.value = true
+            try {
+                val progress = aiManager.extractProgress(rawText)
+                onResult(progress, null)
+            } catch (e: Exception) {
+                onResult(null, e.message)
+            } finally {
+                _isAiProcessing.value = false
+            }
+        }
+    }
+
+    fun draftMaterialRequest(rawText: String, onResult: (String?, String?) -> Unit) {
+        viewModelScope.launch {
+            _isAiProcessing.value = true
+            try {
+                val draft = aiManager.draftMaterialRequest(rawText)
+                onResult(draft, null)
+            } catch (e: Exception) {
+                onResult(null, e.message)
+            } finally {
+                _isAiProcessing.value = false
+            }
+        }
+    }
+
+    fun extractMaterials(rawText: String, onResult: (String?, String?) -> Unit) {
+        viewModelScope.launch {
+            _isAiProcessing.value = true
+            try {
+                val materials = aiManager.extractMaterials(rawText)
+                onResult(materials, null)
+            } catch (e: Exception) {
+                onResult(null, e.message)
+            } finally {
+                _isAiProcessing.value = false
+            }
+        }
+    }
+
     // --- User Profile State (SharedPreferences) ---
     private val prefs = context.getSharedPreferences("user_profile", Context.MODE_PRIVATE)
     private val _isLoggedIn = MutableStateFlow(prefs.getBoolean("is_logged_in", false))
