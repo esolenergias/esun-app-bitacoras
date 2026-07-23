@@ -65,7 +65,7 @@ fun ObraDashboardScreen(
     }
     
     val todayBitacoras = remember(siteBitacoras, todayDateDbStr) {
-        siteBitacoras.filter { it.date == todayDateDbStr }
+        siteBitacoras.filter { it.date.startsWith(todayDateDbStr) }
     }
 
     // Stateful tasks list

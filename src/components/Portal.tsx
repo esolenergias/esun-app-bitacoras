@@ -18,6 +18,7 @@ import PresupuestosTab from './cotizador/PresupuestosTab';
 import GruposTab from './cotizador/GruposTab';
 import EsunPage from './esun/EsunPage';
 import BitacorasApp from './BitacorasApp';
+import LegalTab from './legal/LegalTab';
 
 const CATEGORIES = [
   'Paneles Solares',
@@ -59,6 +60,7 @@ export function Portal() {
   // Navigation tab based on user roles
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [cotizadorSubTab, setCotizadorSubTab] = useState<'presupuestos' | 'matrices' | 'insumos' | 'grupos'>('presupuestos');
+  const [legalTargetBudgetId, setLegalTargetBudgetId] = useState<string | null>(null);
 
   // Sync activeTab default when logging in & enforce role guards
   useEffect(() => {
@@ -528,6 +530,17 @@ export function Portal() {
                         {!sidebarCollapsed && <span>Presupuestos esol</span>}
                       </button>
                       <button
+                        onClick={() => { setActiveTab('legal'); setLegalTargetBudgetId(null); }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          activeTab === 'legal'
+                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                      >
+                        <Shield className="w-4 h-4 stroke-[2]" />
+                        {!sidebarCollapsed && <span>Legal Esol</span>}
+                      </button>
+                      <button
                         onClick={() => setActiveTab('bitacoras')}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                           activeTab === 'bitacoras'
@@ -667,6 +680,17 @@ export function Portal() {
                       >
                         <Sparkles className="w-4 h-4 stroke-[2]" />
                         {!sidebarCollapsed && <span>Presupuestos esol</span>}
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('legal'); setLegalTargetBudgetId(null); }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          activeTab === 'legal'
+                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                      >
+                        <Shield className="w-4 h-4 stroke-[2]" />
+                        {!sidebarCollapsed && <span>Legal Esol</span>}
                       </button>
                       <button
                         onClick={() => setActiveTab('bitacoras')}
@@ -1967,7 +1991,12 @@ export function Portal() {
 
                   {/* SubTabs Contents */}
                   {cotizadorSubTab === 'presupuestos' && (
-                    <PresupuestosTab />
+                    <PresupuestosTab 
+                      onGenerateContract={(id) => {
+                        setLegalTargetBudgetId(id);
+                        setActiveTab('legal');
+                      }}
+                    />
                   )}
 
                   {cotizadorSubTab === 'matrices' && (
@@ -1982,6 +2011,10 @@ export function Portal() {
                     <GruposTab />
                   )}
                 </div>
+              )}
+
+              {activeTab === 'legal' && (
+                <LegalTab initialBudgetId={legalTargetBudgetId} />
               )}
 
               {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'cfeconfig' && (

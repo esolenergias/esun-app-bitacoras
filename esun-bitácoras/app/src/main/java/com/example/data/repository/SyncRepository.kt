@@ -249,8 +249,29 @@ class SyncRepository(private val context: Context) {
 
     suspend fun deleteBitacora(bitacora: BitacoraEntity) {
         withContext(Dispatchers.IO) {
+            // Si el reporte ya estaba en Supabase, intentamos borrarlo de la nube también
+            if (!bitacora.supabaseId.isNullOrEmpty()) {
+                val supabaseUrl = _syncStatus.value.supabaseUrl
+                val supabaseKey = _syncStatus.value.supabaseKey
+                if (supabaseUrl.isNotEmpty() && supabaseKey.isNotEmpty()) {
+                    try {
+                        val retrofit = Retrofit.Builder()
+                            .baseUrl(if (supabaseUrl.endsWith("/")) supabaseUrl else "$supabaseUrl/")
+                            .addConverterFactory(MoshiConverterFactory.create())
+                            .build()
+                        val service = retrofit.create(SupabaseApiService::class.java)
+                        val bearerToken = "Bearer $supabaseKey"
+                        service.deleteBitacora(apiKey = supabaseKey, authorization = bearerToken, idQuery = "eq.${bitacora.supabaseId}")
+                        addLog("Reporte borrado en la nube exitosamente (Supabase ID: ${bitacora.supabaseId})")
+                    } catch (e: Exception) {
+                        addLog("Error al borrar el reporte en la nube: ${e.message}")
+                    }
+                }
+            }
+
             bitacoraDao.deleteBitacora(bitacora)
             updatePendingCount()
+            
             // Auto-trigger upload/sync with Supabase in the background immediately
             @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
             kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
@@ -303,6 +324,31 @@ class SyncRepository(private val context: Context) {
     suspend fun updateBudgetItem(item: BudgetItemEntity) {
         withContext(Dispatchers.IO) {
             budgetItemDao.updateBudgetItem(item)
+            
+            // Supabase Upload
+            if (_syncStatus.value.isOnline && item.supabaseId.isNotEmpty()) {
+                val url = _syncStatus.value.supabaseUrl
+                val key = _syncStatus.value.supabaseKey
+                if (url.isNotEmpty() && key.isNotEmpty()) {
+                    try {
+                        val cleanUrl = if (url.endsWith("/")) url else "$url/"
+                        val retrofit = Retrofit.Builder()
+                            .baseUrl(cleanUrl)
+                            .addConverterFactory(MoshiConverterFactory.create(com.squareup.moshi.Moshi.Builder().add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()))
+                            .build()
+                        val service = retrofit.create(SupabaseApiService::class.java)
+                        service.updateConceptoExecuted(
+                            apiKey = key,
+                            authorization = "Bearer $key",
+                            idQuery = "eq.${item.supabaseId}",
+                            updates = mapOf("executed_quantity" to item.executedQuantity)
+                        )
+                        addLog("Supabase Sync: Avance de concepto subido correctamente.")
+                    } catch (e: Exception) {
+                        addLog("Error al subir avance de concepto: ${e.message}")
+                    }
+                }
+            }
         }
     }
 
@@ -859,7 +905,8 @@ class SyncRepository(private val context: Context) {
                               unitPrice = sc.unit_price ?: 0.0,
                               executedQuantity = finalExecuted,
                               totalBudget = sc.total_budget ?: ((sc.quantity ?: 0.0) * (sc.unit_price ?: 0.0)),
-                              obraId = obraName
+                              obraId = obraName,
+                              supabaseId = sc.id ?: ""
                           )
                       }
                     budgetItemDao.insertBudgetItems(budgetEntities)

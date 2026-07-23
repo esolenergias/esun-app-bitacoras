@@ -79,7 +79,11 @@ const NumericInput: React.FC<NumericInputProps> = ({ value, onChange, className,
   );
 };
 
-export default function PresupuestosTab() {
+interface PresupuestosTabProps {
+  onGenerateContract?: (presupuestoId: string) => void;
+}
+
+export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabProps) {
   // State variables
   const [presupuestos, setPresupuestos] = useState<PresupuestoWithTotals[]>([]);
   const [matrices, setMatrices] = useState<Matriz[]>([]);
@@ -1613,6 +1617,13 @@ export default function PresupuestosTab() {
                           title="Duplicar presupuesto"
                         >
                           <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onGenerateContract && onGenerateContract(budget.id)}
+                          className="p-1.5 border border-dark-4 bg-dark-1 hover:border-blue-500/30 hover:bg-blue-500/10 rounded-lg text-cream-muted hover:text-blue-400 transition-all cursor-pointer"
+                          title="Generar Contrato"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleOpenDeleteConfirm(budget)}

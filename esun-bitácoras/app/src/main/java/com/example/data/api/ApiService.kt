@@ -195,6 +195,13 @@ interface SupabaseApiService {
         @Query("select") select: String = "*"
     ): Response<List<SupabaseBitacoraResponse>>
 
+    @retrofit2.http.DELETE("rest/v1/registros_app")
+    suspend fun deleteBitacora(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("id") idQuery: String
+    ): Response<Unit>
+
     @retrofit2.http.PATCH("rest/v1/presupuesto_conceptos")
     suspend fun updateConceptoExecuted(
         @Header("apikey") apiKey: String,

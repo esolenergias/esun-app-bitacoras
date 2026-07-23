@@ -1,0 +1,79 @@
+Contrato de prestación de servicios que celebran por una parte SOLUCIONES INTEGRALES DE NAYARIT, S. DE R.L. DE C.V., representada legalmente por GUSTAVO CORONA CERVANTES, a quien en lo sucesivo se le denominará EL PRESTADOR, y por otra parte ROBERTO FRANCO QUIROZ ALTAMIRANO, a quien en lo sucesivo se le denominará EL CLIENTE, al tenor de las siguientes Declaraciones y Cláusulas:
+DECLARACIONES
+PRIMERA. EL PRESTADOR declara:
+Que su denominación social es Soluciones Integrales de Nayarit, S. de R.L. de C.V.
+Que el Sr. GUSTAVO CORONA CERVANTES acredita su representación legal por medio de la Escritura Pública Número 333, Tomo Primero, Libro Cuarto, expedida por el Dr. José Trinidad Espinoza Vargas, Notario Titular de la Notaría Pública Número 37 de Tepic, Nayarit.
+Que tiene su domicilio en Av. Insurgentes 56-A, Interior A, Colonia Centro, C.P. 63000, Tepic, Nayarit.
+Que cuenta con Registro Federal de Contribuyentes de clave SIN190211IC4 y que se encuentra al corriente en el cumplimiento de sus obligaciones fiscales.
+Que es titular y/o licenciatario autorizado de la Marca Energy Solares ®.
+Que cuenta con los recursos humanos, materiales, equipo técnico y personal especializado en la instalación de sistemas generadores de energía fotovoltaicos en residencia, comercio e industria, contando con las certificaciones expedidas por la Asociación de Normalización y Certificación, A.C. (FOLIO 07798416) y CENCER Energía Renovable, S.A. DE C.V. (FOLIO D-0002719919), para ejercer el servicio contratado.
+Que los datos bancarios y de pago contenidos en el “Anexo 1. DATOS GENERALES” son verdaderos y vigentes.
+SEGUNDA. EL CLIENTE declara:
+Que sus datos contenidos en el “Anexo 1. DATOS GENERALES” son verdaderos.
+Que cuenta con la capacidad legal, técnica y jurídica suficiente para obligarse en los términos del presente contrato, y que ostenta la legal posesión o propiedad del inmueble donde se ejecutará la instalación.
+Que es el titular registrado del contrato del suministro eléctrico ante la Comisión Federal de Electricidad (CFE) correspondiente al recibo de luz del inmueble. En caso de ser un tercero que realiza el pago, declara contar con la autorización legal del titular del recibo de CFE para la ejecución del proyecto y los trámites de interconexión.
+Que es su interés contratar los servicios especializados de EL PRESTADOR, teniendo pleno conocimiento de los beneficios, alcances, responsabilidades y especificaciones técnicas correspondientes.
+TERCERA. Declaran LAS PARTES en conjunto:
+Que los datos contenidos en el “Anexo 1. DATOS GENERALES” son verdaderos.
+Que cuentan con la capacidad y medios suficientes para cumplir y celebrar el presente documento.
+Que en el presente contrato no media dolo, error, mala fe, coacción ni cualquier vicio en el consentimiento que pudiese invalidarlo.
+Que reconocen expresamente la validez plena de la firma del presente contrato y sus Anexos mediante firmas autógrafas o medios electrónicos, digitales o de digitalización remota, de conformidad con la legislación aplicable.
+ESTRUCTURA DEL CONTRATO
+Forman parte integrante del presente Contrato los siguientes Anexos:
+Anexo 1: DATOS GENERALES
+Anexo 2: DESCRIPCIÓN DEL SERVICIO, ALCANCE TÉCNICO Y FORMA DE PAGO
+Anexo 3: PÓLIZA DE GARANTÍA ENERGY SOLARES Y CONDICIONES DE MANTENIMIENTO
+Anexo 4: ACTA DE ENTREGA - RECEPCIÓN Y CONFORMIDAD DE OBRA
+CLÁUSULAS
+PRIMERA. OBJETO
+EL PRESTADOR se obliga a prestar los servicios especializados de suministro e instalación de sistema de generación de energía fotovoltaica que se describen en el “Anexo 2. Descripción del Servicio, Alcance Técnico y Forma de Pago” a favor de EL CLIENTE. En el cumplimiento de esta cláusula EL PRESTADOR actuará de manera diligente, profesional y de buena fe.
+SEGUNDA. VALOR DE LA TRANSACCIÓN Y ESTRUCTURA DE PAGOS
+LAS PARTES acuerdan que el valor total de la operación es la cantidad estipulada en el ANEXO 2, la cual asciende a $170,000.00 M.N. (Ciento setenta mil pesos 00/100 M.N.). Los pagos se realizarán vía transferencia bancaria, cheque o efectivo a las cuentas señaladas por EL PRESTADOR.
+La estructura de pagos se establece en porcentajes exactos sobre el valor total de la transacción:
+Anticipo (64.71%): Equivalente a la cantidad de $110,000.00 M.N. (Ciento diez mil pesos 00/100 M.N.), pagaderos a la firma del presente contrato para el suministro de materiales y programación de obra.
+Finiquito / Saldo Final (35.29%): Equivalente a la cantidad de $60,000.00 M.N. (Sesenta mil pesos 00/100 M.N.), los cuales deberán ser liquidados por EL CLIENTE dentro de un plazo máximo de 5 (cinco) días hábiles posteriores a la conclusión de la instalación física y la firma del Acta de Entrega - Recepción (Anexo 4).
+La firma del Acta de Entrega - Recepción constituye la aceptación formal de la obra física y obliga legalmente a EL CLIENTE a realizar el pago del saldo final dentro del plazo establecido. La mora en el pago generará un interés moratorio del 5% (cinco por ciento) mensual sobre el saldo insoluto.
+En caso de mora o incumplimiento de pago por parte de EL CLIENTE transcurrido el plazo de 5 días hábiles, EL PRESTADOR notificará por escrito o vía electrónica a EL CLIENTE requiriendo el pago. De persistir el incumplimiento por más de 5 días adicionales, EL PRESTADOR quedará facultado para suspender servicios, revocar la garantía y/o rescindir el contrato, iniciando las acciones legales o de recuperación correspondientes conforme a derecho.
+SEGUNDA BIS. BLINDAJE SOBRE ADEUDOS Y SITUACIÓN CON CFE
+EL CLIENTE declara expresamente bajo protesta de decir verdad que no cuenta con adeudos, irregularidades, sanciones o reportes pendientes ante la Comisión Federal de Electricidad (CFE), ni en el inmueble objeto de este contrato ni en ningún otro servicio o propiedad registrada a su nombre o al del titular del recibo. Si CFE bloquea o rechaza el trámite de interconexión por adeudos o irregularidades previas del CLIENTE, será responsabilidad exclusiva de EL CLIENTE resolverlo y pagarlo.
+Plazo Límite de Solución: EL CLIENTE contará con un plazo máximo de 30 (treinta) días naturales contados a partir de la notificación de CFE para regularizar cualquier adeudo o impedimento previo. Si EL CLIENTE no resuelve dicha situación en el plazo señalado, el contrato se dará por rescindido por causa imputable a EL CLIENTE, aplicándose la pena convencional del 40% del anticipo prevista en la Cláusula Sexta por gastos operativos y de gestión.
+Cualquier gestión, trámite correctivo o maniobra adicional requerida por situaciones previas del cliente no estará incluida en este contrato y se cobrará mediante un contrato de servicios independientes previamente cotizado.
+TERCERA. ALCANCE TÉCNICO, UBICACIÓN Y TRABAJOS EXTRAORDINARIOS
+EL CLIENTE firmará la aceptación técnica del área asignada, inclinación, ángulos y perímetro proyectados para el sistema fotovoltaico según se detalla en el ANEXO 2. Una vez aceptados, cualquier cambio posterior de ubicación solicitado por EL CLIENTE que implique modificar la estructura, cableado o tubería, generará costos adicionales que deberán ser cubiertos antes de su ejecución conforme al catálogo de precios unitarios o cotización complementaria que emita EL PRESTADOR.
+Adecuaciones Estructurales Imprevistas: Si durante la ejecución de los trabajos el personal técnico detecta vicios ocultos o deterioro en la losa, techumbre o impermeabilización del inmueble que pongan en riesgo la integridad de la instalación, EL PRESTADOR notificará de inmediato a EL CLIENTE. Las reparaciones o refuerzos estructurales extraordinarios requeridos deberán ser autorizados y costeados por EL CLIENTE previamente a la continuación de la obra.
+Facultad Técnica e Ingreso al Inmueble: EL CLIENTE autoriza el ingreso del personal técnico especializado de EL PRESTADOR al inmueble. EL CLIENTE acepta expresamente que el personal técnico tiene la facultad y autoridad profesional para evaluar el sitio y tomar decisiones técnicas definitivas sobre la colocación, sujeción y seguridad de los paneles y cableado. El criterio técnico del instalador prevalecerá en todo momento por encima de sugerencias u opiniones estéticas de EL CLIENTE que pongan en riesgo el rendimiento o la seguridad del sistema.
+TERCERA BIS. TIEMPOS Y TRÁMITES ANTE CFE
+La responsabilidad de EL PRESTADOR respecto al proceso de interconexión concluye formalmente al ingresar la solicitud y expediente técnico completo ante las oficinas de CFE.
+EL CLIENTE reconoce y acepta que los tiempos de revisión, aprobación e instalación del medidor bidireccional (ya sea en baja o media tensión) dependen al 100% de los procesos operativos y agenda de la CFE, eximiendo a EL PRESTADOR de cualquier responsabilidad por demoras en dicho organismo. Asimismo, CFE contacta directamente al cliente para la firma del contrato de interconexión; si EL CLIENTE no acude a las citas o no atiende las notificaciones de CFE, no será causal de cancelación del contrato ni de retención del pago de saldo final.
+CUARTA. GARANTÍAS Y REESTRUCTURACIÓN DE MANTENIMIENTOS
+Las garantías del proyecto se regulan estrictamente bajo los siguientes términos:
+Garantía de Equipos (Módulos e Inversor): Es otorgada directamente por el fabricante de los equipos (Canadian Solar, Huawei u otros especificadas en el Anexo 2) bajo sus propias políticas y vigencias de fábrica. EL PRESTADOR fungirá como gestor autorizado sin costo directo para EL CLIENTE durante el proceso de reclamación.
+Garantía de Instalación (Mano de Obra y Material Eléctrico): EL PRESTADOR otorga una garantía de 3 (tres) años sobre la calidad de la mano de obra, sujetación de estructuras y materiales eléctricos de la instalación.
+Mantenimientos Preventivos: EL CLIENTE reconoce que la garantía de instalación y el rendimiento óptimo del sistema están condicionados a la realización de mantenimientos preventivos anuales. Dichos mantenimientos no son gratuitos; EL CLIENTE deberá contratarlos de forma voluntaria e independiente con EL PRESTADOR (mediante póliza de servicio anual) o a través de un proveedor técnico certificado autorizado por EL PRESTADOR.
+QUINTA. CONECTIVIDAD E INFRAESTRUCTURA DE INTERNET PARA MONITOREO
+El servicio de monitoreo remoto depende enteramente de la infraestructura de red e internet que EL CLIENTE proporcione en el inmueble. EL CLIENTE tiene la obligación de suministrar un punto de acceso a internet (Access Point o Wi-Fi) con señal estable y de buena potencia en la zona donde se instale el inversor.
+Si EL CLIENTE cambia de proveedor de internet, modifica la contraseña o el nombre de su red Wi-Fi, o presenta interrupciones en su servicio de internet, la pérdida del monitoreo en la aplicación no será responsabilidad de EL PRESTADOR. La reconfiguración de la red a solicitud del cliente fuera de la entrega inicial constituirá un servicio técnico con costo adicional.
+SEXTA. CANCELACIONES Y REEMBOLSOS
+Si EL CLIENTE rescinde el contrato antes de la adquisición de insumos, EL PRESTADOR retendrá el 40% del anticipo por gastos administrativos. Una vez adquiridos los materiales o iniciados los trabajos de instalación, no habrá reembolso alguno.
+SÉPTIMA. RESCISIÓN
+Cualquiera de las partes podrá rescindir el contrato mediante aviso por escrito con 10 días naturales de anticipación ante incumplimiento grave. EL PRESTADOR podrá rescindir de inmediato por falta de pago del anticipo o por la negativa injustificada del cliente para permitir el acceso al personal técnico al inmueble.
+OCTAVA. CONCLUSIÓN DEL CONTRATO
+La prestación del servicio se tendrá por formalmente concluida a la firma del Acta de Entrega - Recepción (Anexo 4), la cual habilita el plazo de 5 días hábiles para la liquidación del finiquito pactado en la Cláusula Segunda.
+NOVENA. LEGISLACIÓN, JURISDICCIÓN Y FIRMA ELECTRÓNICA
+Para la interpretación y cumplimiento de este contrato, las partes se someten a la legislación civil aplicable del Estado de Nayarit y a la jurisdicción de los Tribunales de la ciudad de Tepic, Nayarit, renunciando a cualquier otro fuero. LAS PARTES acuerdan que el presente contrato, anexos y actas podrán ser formalizados mediante firmas autógrafas o electrónicas, otorgándoles el mismo valor y alcance probatorio de conformidad con el Código de Comercio y la legislación civil aplicable.
+Leído el presente contrato y enteradas las partes de su alcance legal, se firma en dos tantos en la ciudad de Tepic, Nayarit, el día 17 de Julio de 2026.
+ANEXO 1. DATOS GENERALES
+
+ANEXO 2. DESCRIPCIÓN DEL SERVICIO, ALCANCE TÉCNICO Y FORMA DE PAGO
+
+ANEXO 3. PÓLIZA DE GARANTÍA Y MANTENIMIENTOS ENERGY SOLARES
+Esta Póliza certifica la cobertura de garantía sobre la instalación del Sistema Fotovoltaico, sujeto a las siguientes condiciones:
+Garantía de Instalación: EL PRESTADOR garantiza por 3 (tres) años la mano de obra, sujeción y cableado eléctrico a partir de la firma del Acta de Entrega - Recepción.
+Garantía de Componentes: La garantía sobre los módulos fotovoltaicos e inversor la otorga directamente el fabricante conforme a sus certificados individuales.
+Mantenimientos Preventivos: Para garantizar la eficiencia operativa del sistema y conservar la garantía de instalación, EL CLIENTE deberá realizar mantenimientos preventivos anuales. Dichos mantenimientos deberán ser contratados de forma independiente con EL PRESTADOR o proveedores certificados.
+Exclusiones: Variaciones o descargas eléctricas externas de CFE, modificaciones por personal ajeno a EL PRESTADOR, mala conectividad Wi-Fi del inmueble o contingencias ambientales extremas.
+ANEXO 4. ACTA DE ENTREGA - RECEPCIÓN Y CONFORMIDAD DE OBRA
+En la ciudad de Tepic, Nayarit, se hace constar la entrega de la obra física correspondiente al Sistema de Generación Fotovoltaico de 7.6 kW instalado en el inmueble ubicado en C. Laureles 15, Pantanal, Nayarit.
+DECLARACIÓN DE CONFORMIDAD Y COMPROMISO DE PAGO:
+Mediante la firma del presente documento, EL CLIENTE acusa de recibido a entera satisfacción el sistema fotovoltaico en sus condiciones físicas y operativas, y se obliga incondicionalmente a liquidar a favor de EL PRESTADOR el saldo restante de $60,000.00 M.N. (Sesenta mil pesos 00/100 M.N.) dentro de un plazo no mayor a 5 (cinco) días hábiles a partir de esta fecha.
+Fecha de Entrega: _____ de ____________________ de 2026.
