@@ -429,20 +429,22 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
         const fechaPagoStr = getFechaPago(i + 1);
         pagaresHTML += `
           <div class="letter-sheet page-break" style="padding: 20mm; position: relative;">
-            <div style="position: absolute; top: 15mm; bottom: 15mm; left: 15mm; right: 15mm; border: 2px solid #1e293b; border-radius: 8px; padding: 30px; display: flex; flex-direction: column;">
+            <div style="position: absolute; top: 15mm; bottom: 15mm; left: 15mm; right: 15mm; border: 2px solid #1e293b; border-radius: 8px; padding: 30px;">
               
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
-                <div>
-                  <h2 style="margin: 0; font-family: 'Times New Roman', serif; font-size: 26px; font-weight: 700; color: #1e293b; letter-spacing: 2px;">PAGARÉ</h2>
-                  <p style="margin: 5px 0 0 0; font-size: 13px; color: #475569; font-weight: bold;">NÚMERO: ${i + 1} DE ${formData.numeroPagosDiferidos}</p>
-                </div>
-                <div style="text-align: right;">
-                  <div style="background-color: #f1f5f9; border: 1px solid #94a3b8; padding: 10px 20px; border-radius: 4px; display: inline-block;">
-                    <p style="margin: 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Bueno por:</p>
-                    <p style="margin: 5px 0 0 0; font-size: 18px; font-weight: bold; color: #000;">${formatCurrency(pagoDiferidoAmount)} MXN</p>
-                  </div>
-                </div>
-              </div>
+              <table style="width: 100%; margin-bottom: 25px; border-bottom: 2px solid #1e293b; padding-bottom: 15px; border-collapse: collapse;">
+                <tr>
+                  <td style="vertical-align: top; text-align: left;">
+                    <h2 style="margin: 0; font-family: 'Times New Roman', serif; font-size: 26px; font-weight: 700; color: #1e293b; letter-spacing: 2px;">PAGARÉ</h2>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; color: #475569; font-weight: bold;">NÚMERO: ${i + 1} DE ${formData.numeroPagosDiferidos}</p>
+                  </td>
+                  <td style="vertical-align: top; text-align: right;">
+                    <div style="background-color: #f1f5f9; border: 1px solid #94a3b8; padding: 10px 20px; border-radius: 4px; display: inline-block; text-align: left;">
+                      <p style="margin: 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Bueno por:</p>
+                      <p style="margin: 5px 0 0 0; font-size: 18px; font-weight: bold; color: #000;">${formatCurrency(pagoDiferidoAmount)} MXN</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
 
               <p style="text-align: right; margin-bottom: 25px; font-size: 12px;">
                 <strong>Lugar y fecha de expedición:</strong> Tepic, Nayarit, a ${fechaHoy}.
