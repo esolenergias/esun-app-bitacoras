@@ -10,7 +10,7 @@ import {
   RefreshCw, Sliders, Edit, Save, 
   ArrowRight, Sun, Moon, Zap, Leaf, 
   DollarSign, MessageSquare, Package, Truck, Users, Activity,
-  Settings, Trash2
+  Settings, Trash2, ChevronDown, ChevronRight, ChevronUp, Store, LayoutTemplate
 } from 'lucide-react';
 import InsumosTab from './cotizador/InsumosTab';
 import MatricesTab from './cotizador/MatricesTab';
@@ -19,6 +19,7 @@ import GruposTab from './cotizador/GruposTab';
 import EsunPage from './esun/EsunPage';
 import BitacorasApp from './BitacorasApp';
 import LegalTab from './legal/LegalTab';
+import ClientesTab from './crm/ClientesTab';
 
 const CATEGORIES = [
   'Paneles Solares',
@@ -81,6 +82,11 @@ export function Portal() {
 
   // Collapsed sidebar state (for mobile responsiveness)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Expanded sidebar sections (accordions)
+  const [landingExpanded, setLandingExpanded] = useState(false);
+  const [tiendaExpanded, setTiendaExpanded] = useState(false);
+  const [configExpanded, setConfigExpanded] = useState(false);
 
   // Profile Edit Modal State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -583,138 +589,215 @@ export function Portal() {
                       </button>
 
                       <button
-                        onClick={() => setActiveTab('cms')}
+                        onClick={() => setActiveTab('clientes')}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cms'
+                          activeTab === 'clientes'
                             ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                             : 'text-cream-muted hover:text-cream hover:bg-dark-3'
                         } ${sidebarCollapsed ? 'justify-center' : ''}`}
                       >
-                        <Edit className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Contenido CMS</span>}
+                        <Users className="w-4 h-4 stroke-[2]" />
+                        {!sidebarCollapsed && <span>Clientes (CRM)</span>}
                       </button>
-                      <button
-                        onClick={() => setActiveTab('modules')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'modules'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Layers className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Módulos</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('agents')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'agents'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Bot className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Motores Chat IA</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('seo')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'seo'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Globe className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Lighthouse & SEO</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('roles')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'roles'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Sliders className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Roles y Permisos</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('inventory')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'inventory'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Package className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Productos B2B</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('cfemanager')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cfemanager'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <FileText className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>CFE Manager</span>}
-                      </button>
-                       <button
-                        onClick={() => setActiveTab('esun')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'esun'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Sun className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Esun Solar</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('cotizador')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cotizador'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Sparkles className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Presupuestos esol</span>}
-                      </button>
-                      <button
-                        onClick={() => { setActiveTab('legal'); setLegalTargetBudgetId(null); }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'legal'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Shield className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Legal Esol</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('bitacoras')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'bitacoras'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Layers className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Bitácoras (App)</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('cfeconfig')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cfeconfig'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Settings className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Configuración</span>}
-                      </button>
-                    </>
+
+                      {/* CORE TOOLS (CFE, Esun, Cotizador, Legal, Bitacoras) */}
+                      <div className="pt-2">
+                        <button
+                          onClick={() => setActiveTab('cfemanager')}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'cfemanager'
+                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <FileText className="w-4 h-4 stroke-[2]" />
+                          {!sidebarCollapsed && <span>CFE Manager</span>}
+                        </button>
+                         <button
+                          onClick={() => setActiveTab('esun')}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'esun'
+                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <Sun className="w-4 h-4 stroke-[2]" />
+                          {!sidebarCollapsed && <span>Esun Solar</span>}
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('cotizador')}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'cotizador'
+                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <Sparkles className="w-4 h-4 stroke-[2]" />
+                          {!sidebarCollapsed && <span>Presupuestos esol</span>}
+                        </button>
+                        <button
+                          onClick={() => { setActiveTab('legal'); setLegalTargetBudgetId(null); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'legal'
+                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <Shield className="w-4 h-4 stroke-[2]" />
+                          {!sidebarCollapsed && <span>Legal Esol</span>}
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('bitacoras')}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'bitacoras'
+                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <Layers className="w-4 h-4 stroke-[2]" />
+                          {!sidebarCollapsed && <span>Bitácoras (App)</span>}
+                        </button>
+                      </div>
+
+                      
+                      <div className="mt-8 pt-4 border-t border-dark-4/50 space-y-1">
+                        {!sidebarCollapsed && <div className="px-3 pb-2 text-[8px] font-black uppercase text-cream-muted/40 tracking-widest text-center">Opciones de Administración</div>}
+  {/* LANDING PAGE ACCORDION */}
+                      <div className="pt-2">
+                        {!sidebarCollapsed && (
+                          <button 
+                            onClick={() => setLandingExpanded(!landingExpanded)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <LayoutTemplate className="w-3.5 h-3.5" />
+                              <span>Landing Page</span>
+                            </div>
+                            {landingExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        )}
+                        {(landingExpanded || sidebarCollapsed) && (
+                          <div className={sidebarCollapsed ? "space-y-0" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
+                            <button
+                              onClick={() => setActiveTab('cms')}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                activeTab === 'cms'
+                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                            >
+                              <Edit className="w-4 h-4 stroke-[2]" />
+                              {!sidebarCollapsed && <span>Contenido CMS</span>}
+                            </button>
+                            <button
+                              onClick={() => setActiveTab('modules')}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                activeTab === 'modules'
+                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                            >
+                              <Layers className="w-4 h-4 stroke-[2]" />
+                              {!sidebarCollapsed && <span>Módulos</span>}
+                            </button>
+                            <button
+                              onClick={() => setActiveTab('seo')}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                activeTab === 'seo'
+                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                            >
+                              <Globe className="w-4 h-4 stroke-[2]" />
+                              {!sidebarCollapsed && <span>Lighthouse & SEO</span>}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+  {/* TIENDA ACCORDION */}
+                      <div className="pt-2">
+                        {!sidebarCollapsed && (
+                          <button 
+                            onClick={() => setTiendaExpanded(!tiendaExpanded)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Store className="w-3.5 h-3.5" />
+                              <span>Tienda</span>
+                            </div>
+                            {tiendaExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        )}
+                        {(tiendaExpanded || sidebarCollapsed) && (
+                          <div className={sidebarCollapsed ? "space-y-0" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
+                            <button
+                              onClick={() => setActiveTab('inventory')}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                activeTab === 'inventory'
+                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                            >
+                              <Package className="w-4 h-4 stroke-[2]" />
+                              {!sidebarCollapsed && <span>Productos B2B</span>}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+  {/* CONFIGURACION ACCORDION */}
+                      <div className="pt-2">
+                        {!sidebarCollapsed && (
+                          <button 
+                            onClick={() => setConfigExpanded(!configExpanded)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Settings className="w-3.5 h-3.5" />
+                              <span>Configuración</span>
+                            </div>
+                            {configExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        )}
+                        {(configExpanded || sidebarCollapsed) && (
+                          <div className={sidebarCollapsed ? "space-y-0" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
+                            <button
+                              onClick={() => setActiveTab('agents')}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                activeTab === 'agents'
+                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                            >
+                              <Bot className="w-4 h-4 stroke-[2]" />
+                              {!sidebarCollapsed && <span>Motores Chat IA</span>}
+                            </button>
+                            <button
+                              onClick={() => setActiveTab('roles')}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                activeTab === 'roles'
+                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                            >
+                              <Sliders className="w-4 h-4 stroke-[2]" />
+                              {!sidebarCollapsed && <span>Roles y Permisos</span>}
+                            </button>
+                            <button
+                              onClick={() => setActiveTab('cfeconfig')}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                activeTab === 'cfeconfig'
+                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                            >
+                              <Settings className="w-4 h-4 stroke-[2]" />
+                              {!sidebarCollapsed && <span>Ajustes Generales</span>}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      </div>
+                      </>
                   )}
                 </div>
               </div>
@@ -1423,6 +1506,21 @@ export function Portal() {
 
 
                   {/* MASTER TAB 3: CMS CONTENT EDITOR */}
+                  {activeTab === 'clientes' && (
+                    <ClientesTab 
+                      onNavigateTo={(tab, payload) => {
+                        if (tab === 'esun' && payload) {
+                          localStorage.setItem('esun_target_quote_id', payload);
+                        }
+                        if (tab === 'cotizador' && payload) {
+                          localStorage.setItem('presupuesto_target_id', payload);
+                          setCotizadorSubTab('presupuestos');
+                        }
+                        setActiveTab(tab);
+                      }}
+                    />
+                  )}
+
                   {activeTab === 'cms' && (
                     <CmsTab />
                   )}

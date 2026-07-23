@@ -8,6 +8,7 @@ import EnvironmentalImpact from './EnvironmentalImpact';
 import { calculateFinancials } from './lib/financialEngine';
 import { SOLAR_CONSTANTS } from './lib/solarConstants';
 import html2pdf from 'html2pdf.js';
+import { supabase } from '../../context/supabase';
 
 export default function EsunPage() {
   const [view, setView] = useState<'upload' | 'form' | 'results' | 'export'>('upload');
@@ -36,6 +37,24 @@ export default function EsunPage() {
 
   useEffect(() => {
     loadQuotes();
+    
+    // Check if we were redirected here to edit a specific quote
+    setTimeout(() => {
+      const targetId = localStorage.getItem('esun_target_quote_id');
+      if (targetId) {
+        const stored = localStorage.getItem('esun_quotes');
+        if (stored) {
+          try {
+            const qs = JSON.parse(stored);
+            const q = qs.find((x: any) => x.id === targetId);
+            if (q) {
+              loadQuote(q);
+            }
+          } catch(e) {}
+        }
+        localStorage.removeItem('esun_target_quote_id');
+      }
+    }, 100);
   }, []);
 
   const saveQuote = useCallback((cfe: any, sys: any, finParams: any) => {
@@ -83,6 +102,27 @@ export default function EsunPage() {
     localStorage.setItem('esun_quotes', JSON.stringify(existingQuotes));
     setCurrentQuoteId(newQuote.id);
     setQuotes(existingQuotes);
+
+    // Auto-create client in CRM if they have a name
+    if (newQuote.client_name && newQuote.client_name !== 'Sin Nombre') {
+      supabase
+        .from('clientes')
+        .select('id')
+        .ilike('nombre_razon_social', newQuote.client_name)
+        .limit(1)
+        .then(({ data: existingClients }) => {
+          if (!existingClients || existingClients.length === 0) {
+            supabase.from('clientes').insert({
+              nombre_razon_social: newQuote.client_name,
+              origen: 'Esun Solar',
+              estatus: 'Prospecto'
+            }).then(() => {
+              console.log('Cliente automático creado en CRM desde Esun Solar');
+            }).catch(e => console.error('Error creando cliente:', e));
+          }
+        })
+        .catch(e => console.error('Error verificando cliente:', e));
+    }
   }, [currentQuoteId]);
 
   // Auto-save quote in results view when system or cfeData updates

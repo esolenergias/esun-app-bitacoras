@@ -3,7 +3,7 @@ import { supabase } from '../../context/supabase';
 import { 
   getPresupuestos, getPresupuestoDetails, calculateMatrixSellingPrice, 
   calculateMatrixDirectCost, calculateBudgetTotals, evaluateFormula,
-  getInsumos, getMatrices, saveInsumo, saveMatriz
+  getInsumos, getMatrices, saveInsumo, saveMatriz, getAllSavedGroups
 } from '../../lib/cotizadorService';
 import type { Presupuesto, PresupuestoConcepto, Insumo, Matriz, InsumoType, InsumoSubcategory } from '../../types/cotizador';
 import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
@@ -174,6 +174,8 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const [customUtility, setCustomUtility] = useState<number>(8);
 
   // Grupo de Insumos Form
+  const [savedGroupsList, setSavedGroupsList] = useState<{group: PresupuestoConcepto; insumos: PresupuestoConcepto[]}[]>([]);
+  const [selectedSavedGroupId, setSelectedSavedGroupId] = useState<string>('');
   const [groupName, setGroupName] = useState<string>('');
   const [groupUnit, setGroupUnit] = useState<string>('lote');
   const [groupQty, setGroupQty] = useState<number>(1);
@@ -267,6 +269,13 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
         getMatrices(),
         getInsumos()
       ]);
+      
+      let groupsData = [];
+      try {
+        groupsData = await getAllSavedGroups();
+      } catch (err) {
+        console.error('Error fetching saved groups:', err);
+      }
 
       const allBudgets = await getPresupuestos();
       const sorted = [...allBudgets].sort((a, b) => {
@@ -281,6 +290,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       setBudgetNumber(seqNum);
       setMatrices(matricesData);
       setInsumosCatalog(insumosData);
+      setSavedGroupsList(groupsData);
     } catch (err: any) {
       console.error('Error fetching budget details:', err);
       setError('No se pudo encontrar el presupuesto o no tienes permisos para acceder a él.');
@@ -617,6 +627,41 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       setSubModalError(err.message || 'Error al crear el agrupador.');
     } finally {
       setSubModalSubmitting(false);
+    }
+  };
+
+  const handleSelectSavedGroup = (groupId: string) => {
+    setSelectedSavedGroupId(groupId);
+    if (!groupId) {
+      setGroupName('');
+      setGroupInsumos([]);
+      return;
+    }
+    
+    const sg = savedGroupsList.find(g => g.group.id === groupId);
+    if (sg) {
+      setGroupName(sg.group.description);
+      setGroupUnit(sg.group.unit || 'lote');
+      setGroupQty(1);
+      
+      const mappedInsumos = sg.insumos.map(child => {
+        let ins = insumosCatalog.find(i => i.description.trim().toLowerCase() === child.description.trim().toLowerCase());
+        if (!ins) {
+          ins = {
+            id: `mock-${child.id}`,
+            code: 'S/C',
+            description: child.description,
+            unit: child.unit || 'pza',
+            cost: child.cost_price,
+            type: 'material',
+            subcategory: 'otros',
+            created_at: new Date().toISOString()
+          } as Insumo;
+        }
+        return { insumo: ins, quantity: child.quantity };
+      });
+      
+      setGroupInsumos(mappedInsumos);
     }
   };
 
@@ -2391,6 +2436,26 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               {/* Tab: Grupo de Insumos */}
               {addConceptTab === 'group_insumos' && (
                 <div className="space-y-4 text-xs">
+                  {savedGroupsList.length > 0 && (
+                    <div className="space-y-1.5 mb-4 border-b border-dark-4 pb-4">
+                      <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none flex items-center gap-2">
+                        <Folder className="w-3.5 h-3.5 text-gold" /> Cargar Grupo Guardado (Opcional)
+                      </label>
+                      <select
+                        value={selectedSavedGroupId}
+                        onChange={(e) => handleSelectSavedGroup(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none cursor-pointer"
+                      >
+                        <option value="">-- Crear Nuevo Grupo Manualmente --</option>
+                        {savedGroupsList.map(sg => (
+                          <option key={sg.group.id} value={sg.group.id}>
+                            {sg.group.description} ({sg.insumos.length} insumos)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1.5 md:col-span-2">
                       <label className="text-[10px] text-cream-dim uppercase font-bold tracking-wider block select-none">Nombre del Grupo</label>

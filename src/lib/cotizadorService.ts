@@ -409,6 +409,27 @@ export async function savePresupuesto(
   if (presupuestoError) throw presupuestoError;
   const savedPresupuesto = savedPresupuestoData as DbPresupuesto;
 
+  // Auto-create client if it doesn't exist
+  if (presupuestoToUpsert.client_name) {
+    try {
+      const { data: existingClients } = await supabase
+        .from('clientes')
+        .select('id')
+        .ilike('nombre_razon_social', presupuestoToUpsert.client_name)
+        .limit(1);
+        
+      if (!existingClients || existingClients.length === 0) {
+        await supabase.from('clientes').insert({
+          nombre_razon_social: presupuestoToUpsert.client_name,
+          origen: 'Presupuestos Esol',
+          estatus: 'Prospecto'
+        });
+      }
+    } catch (e) {
+      console.error('Error auto-creating client from presupuesto:', e);
+    }
+  }
+
   if (conceptos !== undefined) {
     // Delta updates for concepts:
     // 1. Fetch existing concepts for this budget
@@ -623,7 +644,7 @@ export async function getAllSavedGroups(): Promise<{ group: PresupuestoConcepto;
     .select(`
       *,
       presupuestos (
-        description
+        name
       )
     `)
     .eq('type', 'group');

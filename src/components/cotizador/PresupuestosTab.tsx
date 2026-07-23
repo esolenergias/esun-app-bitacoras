@@ -242,6 +242,15 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
   useEffect(() => { 
     fetchInitialData(); 
     
+    // Check if redirected to open a specific budget
+    setTimeout(() => {
+      const targetId = localStorage.getItem('presupuesto_target_id');
+      if (targetId) {
+        handleOpenEditModal(targetId);
+        localStorage.removeItem('presupuesto_target_id');
+      }
+    }, 100);
+
     const handleWindowFocus = () => {
       fetchBudgets();
     };
