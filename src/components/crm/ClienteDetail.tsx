@@ -122,6 +122,16 @@ export default function ClienteDetail({ cliente, onBack, onNavigateTo }: Cliente
                       Producción: {p.produccion ? 'Activada' : 'Desactivada'}
                     </div>
                     <div className="mt-3 pt-3 border-t border-dark-4/50 flex justify-end gap-2">
+                      {p.contrato_url && (
+                        <a 
+                          href={p.contrato_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-bold uppercase tracking-wider text-green-400 hover:text-green-300 hover:bg-green-400/10 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-green-400/20 flex items-center gap-1"
+                        >
+                          <FileText className="w-3 h-3" /> Ver Contrato
+                        </a>
+                      )}
                       <button 
                         onClick={() => onNavigateTo && onNavigateTo('cotizador', p.id)}
                         className="text-[10px] font-bold uppercase tracking-wider text-gold hover:text-gold-light hover:bg-gold/10 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-gold/20"

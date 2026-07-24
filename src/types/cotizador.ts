@@ -50,6 +50,7 @@ export interface Presupuesto {
   produccion?: boolean;
   indirect_percentage?: number;
   utility_percentage?: number;
+  contrato_url?: string;
   created_at?: string;
   updated_at?: string;
 }

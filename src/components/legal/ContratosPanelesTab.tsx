@@ -954,10 +954,27 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
             fetch(urlHook, {
               method: 'POST',
               body: webhookData
-            }).then(res => {
-              console.log('¡Enviado a Make exitosamente!', res.status);
+            })
+            .then(res => res.text())
+            .then(text => {
+              console.log('¡Enviado a Make exitosamente!', text);
+              
+              // Intentar parsear si Make devolvió JSON (ej. {"driveUrl": "..."})
+              try {
+                const data = JSON.parse(text);
+                if (data && data.driveUrl && selectedBudget) {
+                  import('../../context/supabase').then(({ supabase }) => {
+                    supabase.from('presupuestos')
+                      .update({ contrato_url: data.driveUrl })
+                      .eq('id', selectedBudget)
+                      .then(res => console.log('Contrato vinculado al CRM:', res));
+                  });
+                }
+              } catch(e) {}
+
               alert('✅ PDF descargado localmente y enviado a Google Drive (vía Make).');
-            }).catch(err => {
+            })
+            .catch(err => {
               console.error('Error enviando al webhook', err);
               alert('⚠️ El PDF se descargó localmente, pero ocurrió un error de red al enviarlo a Make: ' + err.message);
             });
