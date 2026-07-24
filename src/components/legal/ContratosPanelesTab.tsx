@@ -374,6 +374,7 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
 
   const handleGeneratePDF = () => {
     setIsGenerating(true);
+    const webhookUrl = localStorage.getItem('esol_make_webhook_url') || '';
 
     const parseFecha = (dateString: string) => {
       if (!dateString) return '----';
@@ -541,7 +542,6 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
   <div class="no-print-bar">
     <div><strong>VISTA PREVIA DE CONTRATO (FORMATO CARTA - MÁRGENES 2 CM)</strong> - ${cliente}</div>
     <div>
-      <button class="btn" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
       <button class="btn" onclick="descargarDirecto()">💾 Descargar PDF</button>
     </div>
   </div>
@@ -921,7 +921,7 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
         });
       };
       
-      const urlHook = localStorage.getItem('esol_make_webhook_url');
+      const urlHook = '${webhookUrl}';
       
       html2pdf().from(element).set(opt).toPdf().get('pdf').then(function(pdfObj) {
         // 1. Siempre descargar el archivo localmente
