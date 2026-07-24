@@ -962,13 +962,8 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
               // Intentar parsear si Make devolvió JSON (ej. {"driveUrl": "..."})
               try {
                 const data = JSON.parse(text);
-                if (data && data.driveUrl && selectedBudget) {
-                  import('../../context/supabase').then(({ supabase }) => {
-                    supabase.from('presupuestos')
-                      .update({ contrato_url: data.driveUrl })
-                      .eq('id', selectedBudget)
-                      .then(res => console.log('Contrato vinculado al CRM:', res));
-                  });
+                if (data && data.driveUrl && window.opener && window.opener.updateSupabaseContract) {
+                  window.opener.updateSupabaseContract(data.driveUrl);
                 }
               } catch(e) {}
 
@@ -989,6 +984,17 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
   </script>
 </body>
 </html>`;
+
+    (window as any).updateSupabaseContract = async (driveUrl: string) => {
+      if (!selectedBudget) return;
+      try {
+        const { supabase } = await import('../../context/supabase');
+        await supabase.from('presupuestos').update({ contrato_url: driveUrl }).eq('id', selectedBudget);
+        console.log('✅ Contrato vinculado en CRM:', driveUrl);
+      } catch(err) {
+        console.error('Error al actualizar Supabase:', err);
+      }
+    };
 
     const win = window.open('', '_blank');
     if (win) {
