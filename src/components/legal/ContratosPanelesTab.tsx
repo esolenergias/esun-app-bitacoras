@@ -906,8 +906,8 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       const opt = {
         margin: [0, 0, 0, 0],
         filename: 'Contrato_' + '${cliente}'.replace(/\\s+/g, '_') + '.pdf',
-        image: { type: 'jpeg', quality: 1.0 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
+        image: { type: 'jpeg', quality: 0.7 },
+        html2canvas: { scale: 1.5, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
         pagebreak: { mode: [] }
       };
@@ -924,27 +924,48 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       const urlHook = '${webhookUrl}';
       
       html2pdf().from(element).set(opt).toPdf().get('pdf').then(function(pdfObj) {
-        // 1. Siempre descargar el archivo localmente
+        // Obtenemos el archivo completo en formato DataURI antes de guardarlo (para evitar bugs de jsPDF)
+        const pdfDataUri = pdfObj.output('datauristring');
+        
+        // 1. Descargar el archivo localmente
         pdfObj.save(opt.filename);
+        
         restoreStyles();
         
-        // 2. Intentar subir a Drive en segundo plano si hay Webhook
+        // 2. Intentar subir a Drive en segundo plano usando FormData estándar y Blob nativo
         if (urlHook && urlHook.includes('http')) {
-          const pdfBase64 = pdfObj.output('datauristring');
-          fetch(urlHook, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              filename: opt.filename,
-              cliente: '${cliente}',
-              montoTotal: '${montoTotal}',
-              fileData: pdfBase64
-            })
-          }).then(res => {
-            console.log('¡Guardado en Drive exitosamente!');
-          }).catch(err => {
-            console.error('Error enviando a Drive', err);
-          });
+          try {
+            // Convertir Data URI a Blob manualmente (garantiza que el archivo sea idéntico y sin corrupción)
+            const byteString = atob(pdfDataUri.split(',')[1]);
+            const mimeString = pdfDataUri.split(',')[0].split(':')[1].split(';')[0];
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            const blob = new Blob([ab], {type: mimeString});
+
+            const webhookData = new FormData();
+            webhookData.append('file', blob, opt.filename);
+            webhookData.append('filename', opt.filename);
+            webhookData.append('cliente', '${cliente}');
+            webhookData.append('montoTotal', '${montoTotal}');
+            
+            fetch(urlHook, {
+              method: 'POST',
+              body: webhookData
+            }).then(res => {
+              console.log('¡Enviado a Make exitosamente!', res.status);
+              alert('✅ PDF descargado localmente y enviado a Google Drive (vía Make).');
+            }).catch(err => {
+              console.error('Error enviando al webhook', err);
+              alert('⚠️ El PDF se descargó localmente, pero ocurrió un error de red al enviarlo a Make: ' + err.message);
+            });
+          } catch(e) {
+            console.error('Error procesando Blob', e);
+          }
+        } else {
+          alert('ℹ️ PDF descargado localmente.\\n\\nNota: Para subir automáticamente a Google Drive, configura la URL de Webhook de Make.com en el menú "Ajustes" del módulo Legal.');
         }
       });
     }
