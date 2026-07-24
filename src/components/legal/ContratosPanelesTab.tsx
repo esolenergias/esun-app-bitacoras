@@ -906,8 +906,8 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       const opt = {
         margin: [0, 0, 0, 0],
         filename: 'Contrato_' + '${cliente}'.replace(/\\s+/g, '_') + '.pdf',
-        image: { type: 'jpeg', quality: 0.7 },
-        html2canvas: { scale: 1.5, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
+        image: { type: 'jpeg', quality: 0.60 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
         pagebreak: { mode: [] }
       };
