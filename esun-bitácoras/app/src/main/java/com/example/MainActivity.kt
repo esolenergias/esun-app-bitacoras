@@ -304,6 +304,9 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                         },
                         onNavigateToReportDetail = { logId ->
                             navController.navigate("report_detail/$logId")
+                        },
+                        onNavigateToControlObras = {
+                            navController.navigate("control_obras")
                         }
                     )
                 }
@@ -389,6 +392,9 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                 }
                 composable("settings") {
                     SettingsScreen(viewModel = viewModel)
+                }
+                composable("control_obras") {
+                    com.example.ui.screens.ControlObrasScreen(viewModel = viewModel, onNavigateBack = { navController.popBackStack() })
                 }
             }
         }

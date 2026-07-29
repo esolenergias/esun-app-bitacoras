@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -48,6 +50,7 @@ fun DashboardScreen(
     onNavigateToNewLog: (String) -> Unit,
     onNavigateToNewObra: () -> Unit,
     onNavigateToObraDashboard: (String) -> Unit,
+    onNavigateToControlObras: () -> Unit,
     onNavigateToReportDetail: (Int) -> Unit
 ) {
     val bitacoras by viewModel.bitacorasList.collectAsState()
@@ -55,6 +58,8 @@ fun DashboardScreen(
     val budgetItems by viewModel.budgetItems.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val projectsList by viewModel.projectsList.collectAsState()
+    var showObraSelectionDialog by remember { mutableStateOf(false) }
 
     // Fecha dinámica del sistema en español
     val currentDateStr = remember {
@@ -248,7 +253,7 @@ fun DashboardScreen(
                             .weight(1f)
                             .height(100.dp)
                             .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp))
-                            .clickable { onNavigateToNewLog(selectedLocation.siteName) },
+                            .clickable { showObraSelectionDialog = true },
                         colors = CardDefaults.cardColors(containerColor = PureWhite)
                     ) {
                         Column(
@@ -342,7 +347,7 @@ fun DashboardScreen(
                             .weight(1f)
                             .height(100.dp)
                             .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp))
-                            .clickable { onNavigateToObraDashboard(selectedLocation.siteName) },
+                            .clickable { onNavigateToControlObras() },
                         colors = CardDefaults.cardColors(containerColor = PureWhite)
                     ) {
                         Column(
@@ -367,7 +372,7 @@ fun DashboardScreen(
                             }
                             Column {
                                 Text(
-                                    text = "Control de Obra",
+                                    text = "Control de obras",
                                     fontWeight = FontWeight.ExtraBold,
                                     fontSize = 12.sp,
                                     color = SlateDeep
@@ -457,7 +462,8 @@ fun DashboardScreen(
                         bitacoras.take(5).forEach { log ->
                             BeautifulBitacoraCard(
                                 log = log,
-                                onCardClick = { onNavigateToReportDetail(log.id) }
+                                onCardClick = { onNavigateToReportDetail(log.id) },
+                                onDeleteClick = { viewModel.deleteBitacora(log) }
                             )
                         }
                     }
@@ -699,12 +705,11 @@ fun DashboardScreen(
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = if (isSelected) PureWhite else SlateDeep
                                             )
-    
-
-                                }
-                            }
-                        }
-                    }
+                                        } // Closes Box
+                                    } // Closes items
+                                } // Closes LazyRow
+                            } // Closes Row
+                        } // Closes if
 
                     // Ubicación de obra (Always top)
                     Column(
@@ -1044,16 +1049,68 @@ fun DashboardScreen(
                         }
                     }
                 }
+            }
         }
-    }
-}
-}
+
+        if (showObraSelectionDialog) {
+            AlertDialog(
+                onDismissRequest = { showObraSelectionDialog = false },
+                title = { Text("Seleccionar Obra", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                text = {
+                    androidx.compose.foundation.lazy.LazyColumn {
+                        items(projectsList.size) { index ->
+                            val obra = projectsList[index]
+                            TextButton(
+                                onClick = {
+                                    showObraSelectionDialog = false
+                                    if (obra.first != "Sin Obras") {
+                                        onNavigateToNewLog(obra.first)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = obra.first,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Start,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = SlateDeep
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showObraSelectionDialog = false }) {
+                        Text("Cancelar", color = ConnectedBlue)
+                    }
+                },
+                containerColor = PureWhite
+            )
+        }
+    } // Closes DashboardScreen
+
 @Composable
-fun BeautifulBitacoraCard(log: BitacoraEntity, onCardClick: () -> Unit = {}) {
+fun BeautifulBitacoraCard(
+    log: BitacoraEntity,
+    onCardClick: () -> Unit = {},
+    onDeleteClick: (() -> Unit)? = null,
+    onEditClick: (() -> Unit)? = null
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp))
+            .border(
+                BorderStroke(
+                    1.dp, 
+                    when (log.sync_status) {
+                        "SYNCED" -> Color(0xFF10B981) // SuccessGreen
+                        "PENDING" -> Color(0xFFF59E0B) // Amber/Yellow
+                        "ORPHANED" -> Color(0xFFA855F7) // Purple
+                        else -> Color(0xFFEF4444) // Red
+                    }
+                ), 
+                RoundedCornerShape(16.dp)
+            )
             .clickable { onCardClick() },
         colors = CardDefaults.cardColors(containerColor = PureWhite)
     ) {
@@ -1064,9 +1121,9 @@ fun BeautifulBitacoraCard(log: BitacoraEntity, onCardClick: () -> Unit = {}) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Photo or placeholder
-            if (log.photoUri != null) {
+            if (!log.photoUri.isNullOrBlank()) {
                 AsyncImage(
-                    model = log.photoUri,
+                    model = log.photoUri.split(",").firstOrNull { it.isNotBlank() }?.trim(),
                     contentDescription = null,
                     modifier = Modifier
                         .size(72.dp)
@@ -1079,16 +1136,16 @@ fun BeautifulBitacoraCard(log: BitacoraEntity, onCardClick: () -> Unit = {}) {
                     modifier = Modifier
                         .size(72.dp)
                         .background(LightGrayBg, RoundedCornerShape(10.dp))
-                        .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(10.dp)),
+                        .border(BorderStroke(1.dp, SubtleOutline.copy(alpha=0.5f)), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, tint = OnSurfaceVariant)
+                    Icon(Icons.Default.Image, contentDescription = null, tint = OnSurfaceVariant.copy(alpha=0.5f), modifier = Modifier.size(32.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1096,32 +1153,88 @@ fun BeautifulBitacoraCard(log: BitacoraEntity, onCardClick: () -> Unit = {}) {
                 ) {
                     Text(
                         text = log.date,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
                         color = ConnectedBlue
                     )
 
-                    // Sync Status Badge
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier
-                            .background(if (log.isSynced) SuccessGreenBg else WarningRedBg, RoundedCornerShape(100.dp))
-                            .border(BorderStroke(1.dp, if (log.isSynced) Color(0xFFD1FAE5) else Color(0xFFFEE2E2)), RoundedCornerShape(100.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (log.isSynced) Icons.Default.CloudDone else Icons.Default.Save,
-                            contentDescription = null,
-                            tint = if (log.isSynced) SuccessGreen else WarningRed,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = if (log.isSynced) "Sincro" else "Local",
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Black,
-                            color = if (log.isSynced) Color(0xFF047857) else Color(0xFFB91C1C)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Sync Status Badge
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .background(
+                                    when (log.sync_status) {
+                                        "SYNCED" -> SuccessGreenBg
+                                        "PENDING" -> Color(0xFFFEF3C7) // Amber/Yellow bg
+                                        "ORPHANED" -> Color(0xFFF3E8FF) // Light Purple
+                                        else -> WarningRedBg // Yellowish/Red
+                                    }, 
+                                    RoundedCornerShape(100.dp)
+                                )
+                                .border(
+                                    BorderStroke(1.dp, 
+                                        when (log.sync_status) {
+                                            "SYNCED" -> Color(0xFFD1FAE5)
+                                            "PENDING" -> Color(0xFFFDE68A)
+                                            "ORPHANED" -> Color(0xFFE9D5FF)
+                                            else -> Color(0xFFFEE2E2)
+                                        }
+                                    ), 
+                                    RoundedCornerShape(100.dp)
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = when (log.sync_status) {
+                                    "SYNCED" -> Icons.Default.CloudDone
+                                    "PENDING" -> Icons.Default.Sync
+                                    "ORPHANED" -> Icons.Default.CloudOff
+                                    else -> Icons.Default.Save
+                                },
+                                contentDescription = null,
+                                tint = when (log.sync_status) {
+                                    "SYNCED" -> SuccessGreen
+                                    "PENDING" -> Color(0xFFD97706) // Amber/Yellow text
+                                    "ORPHANED" -> Color(0xFF9333EA)
+                                    else -> WarningRed
+                                },
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = when (log.sync_status) {
+                                    "SYNCED" -> "Sincro"
+                                    "PENDING" -> "Pendiente"
+                                    "ORPHANED" -> "Nube"
+                                    else -> "Local"
+                                },
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                color = when (log.sync_status) {
+                                    "SYNCED" -> Color(0xFF047857)
+                                    "ORPHANED" -> Color(0xFF7E22CE)
+                                    else -> Color(0xFFB91C1C)
+                                }
+                            )
+                        }
+
+                        if (onEditClick != null) {
+                            IconButton(onClick = onEditClick, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = ConnectedBlue, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        // Delete button for Orphaned or Local, or if explicitly passed
+                        if ((log.sync_status == "ORPHANED" || log.sync_status == "PENDING") && onDeleteClick != null) {
+                            IconButton(onClick = onDeleteClick, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red.copy(alpha=0.7f), modifier = Modifier.size(16.dp))
+                            }
+                        } else if (onDeleteClick != null) {
+                            IconButton(onClick = onDeleteClick, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red.copy(alpha=0.7f), modifier = Modifier.size(16.dp))
+                            }
+                        }
                     }
                 }
 
@@ -1150,8 +1263,9 @@ fun BeautifulBitacoraCard(log: BitacoraEntity, onCardClick: () -> Unit = {}) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val isTramite = log.concepto_name?.contains("tramit", ignoreCase = true) == true
                     Text(
-                        text = "Físico: ${log.physicalProgress}%",
+                        text = if (isTramite) "Admin: ${log.physicalProgress}%" else "Físico: ${log.physicalProgress}%",
                         fontWeight = FontWeight.ExtraBold,
                         color = SlateDeep,
                         fontSize = 11.sp

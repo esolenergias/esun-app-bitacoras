@@ -209,6 +209,18 @@ class SyncRepository(private val context: Context) {
                 // Automatically synchronize any pending local changes with Supabase/Cloud on startup
                 delay(2000)
                 syncPendingBitacoras()
+                
+                // Also auto-refresh the budget catalog from Supabase so categoryName is always current
+                val url = _syncStatus.value.supabaseUrl
+                val key = _syncStatus.value.supabaseKey
+                if (url.isNotEmpty() && key.isNotEmpty() && url.startsWith("http")) {
+                    try {
+                        syncProductionBudgetsSupabase(url, key)
+                        Log.d("SyncRepository", "Auto-synced budget catalog from Supabase on startup.")
+                    } catch (e: Exception) {
+                        Log.w("SyncRepository", "Auto-sync budget catalog failed: ${e.message}")
+                    }
+                }
             } catch (e: Exception) {
                 Log.e("SyncRepository", "Database prepopulate or auto-sync error", e)
             }
@@ -556,7 +568,7 @@ class SyncRepository(private val context: Context) {
                     return@withContext true
                 }
             }
-
+            val newlyUploadedIds = mutableSetOf<String>()
             var successCount = 0
             for (log in pending) {
                 var uploadSuccess = false
@@ -692,10 +704,12 @@ class SyncRepository(private val context: Context) {
                             if (inserted != null) {
                                 addLog("  -> Supabase: Guardado exitoso (ID local: ${log.id}, UUID remoto: ${inserted.id})")
                                 bitacoraDao.markAsSyncedWithSupabaseId(log.id, inserted.id)
+                                newlyUploadedIds.add(inserted.id)
                                 uploadSuccess = true
                             } else {
                                 addLog("  -> Supabase: Guardado exitoso pero no retornó representación.")
                                 bitacoraDao.markAsSynced(log.id)
+                                if (!log.supabaseId.isNullOrEmpty()) newlyUploadedIds.add(log.supabaseId)
                                 uploadSuccess = true
                             }
                         } else {
@@ -721,20 +735,29 @@ class SyncRepository(private val context: Context) {
             if (supabaseService != null && fetchSuccessful) {
                 addLog("Procesando actualizaciones y eliminaciones desde la nube...")
                 try {
-                    val remoteIds = remoteLogs.map { it.id }.toSet()
+                    val remoteIds = remoteLogs.map { it.id }.toSet() + newlyUploadedIds
                         
-                        // Sincronizar eliminaciones: Si el reporte ya fue sincronizado y no existe en la nube, eliminarlo localmente
+                        // Sincronizar eliminaciones: Si el reporte ya fue sincronizado y no existe en la nube, marcarlo como ORPHANED
                         val localLogs = bitacoraDao.getAllBitacoras().first()
                         var localDeleted = 0
+                        var localRecovered = 0
                         for (localLog in localLogs) {
-                            if (localLog.isSynced && !localLog.supabaseId.isNullOrEmpty()) {
+                            if (!localLog.supabaseId.isNullOrEmpty()) {
                                 if (!remoteIds.contains(localLog.supabaseId)) {
-                                    bitacoraDao.deleteBitacora(localLog)
-                                    localDeleted++
+                                    if (localLog.sync_status != "ORPHANED" && localLog.sync_status == "SYNCED") {
+                                        bitacoraDao.markAsOrphaned(localLog.id)
+                                        localDeleted++
+                                    }
+                                } else {
+                                    // Recover incorrectly orphaned logs
+                                    if (localLog.sync_status == "ORPHANED") {
+                                        bitacoraDao.markAsSynced(localLog.id)
+                                        localRecovered++
+                                    }
                                 }
                             }
                         }
-                        if (localDeleted > 0) addLog("Se eliminaron $localDeleted reportes locales borrados en la nube.")
+                        if (localDeleted > 0) addLog("Se marcaron $localDeleted reportes locales como huérfanos (borrados en la nube).")
 
                         // Sincronizar inserciones y actualizaciones desde la nube
                         var remoteAdded = 0
@@ -748,13 +771,15 @@ class SyncRepository(private val context: Context) {
                                         localMatch.weather != rLog.weather ||
                                         localMatch.crewCount != rLog.crew_count ||
                                         localMatch.physicalProgress != rLog.physical_progress ||
-                                        localMatch.concepto_name != rLog.concepto
+                                        localMatch.concepto_name != rLog.concepto ||
+                                        localMatch.financialProgress != rLog.financial_progress
                                     ) {
                                         val updatedLog = localMatch.copy(
                                             description = rLog.description,
                                             weather = rLog.weather,
                                             crewCount = rLog.crew_count,
                                             physicalProgress = rLog.physical_progress,
+                                            financialProgress = rLog.financial_progress,
                                             concepto_name = rLog.concepto,
                                             photoUri = rLog.photo_uri
                                         )
@@ -790,6 +815,7 @@ class SyncRepository(private val context: Context) {
                                         longitude = rLog.longitude,
                                         photoUri = rLog.photo_uri,
                                         isSynced = true,
+                                        sync_status = "SYNCED",
                                         concepto_name = rLog.concepto,
                                         supabaseId = rLog.id
                                     )
@@ -834,13 +860,14 @@ class SyncRepository(private val context: Context) {
             delay(1200)
             // Simular recarga de conceptos especializados desde el ERP de EsolEnergias
             val updatedBudget = listOf(
-                BudgetItemEntity(code = "ELE-FV-001", description = "Soportería: Estructura de aluminio anodizado para paneles solares", quantity = 240.0, unit = "Pza", unitPrice = 85.0, executedQuantity = 135.0, totalBudget = 20400.0),
-                BudgetItemEntity(code = "ELE-FV-002", description = "Montaje Eléctrico: Módulos fotovoltaicos Jinko Solar 550Wp", quantity = 240.0, unit = "Pza", unitPrice = 45.0, executedQuantity = 110.0, totalBudget = 10800.0),
-                BudgetItemEntity(code = "ELE-AC-003", description = "Canalización: Tubería conduit galvanizada de 2 pulg pared gruesa", quantity = 180.0, unit = "m", unitPrice = 120.0, executedQuantity = 75.0, totalBudget = 21600.0),
-                BudgetItemEntity(code = "ELE-DC-004", description = "Cableado: Tendido de cable fotovoltaico DC XLPE 10 AWG", quantity = 1500.0, unit = "m", unitPrice = 3.5, executedQuantity = 520.0, totalBudget = 5250.0),
-                BudgetItemEntity(code = "ELE-INV-005", description = "Inversor: Montaje y comisionamiento de inversores 100 kW SMA Core 1", quantity = 2.0, unit = "Pza", unitPrice = 4500.0, executedQuantity = 1.0, totalBudget = 9000.0),
-                BudgetItemEntity(code = "ELE-SUB-006", description = "Tierras: Sistema de puesta a tierra con electrodos y soldadura exotérmica", quantity = 1.0, unit = "Lote", unitPrice = 3800.0, executedQuantity = 0.45, totalBudget = 3800.0),
-                BudgetItemEntity(code = "ELE-PRO-007", description = "Protecciones: Tablero de distribución AC 480V con interruptores", quantity = 1.0, unit = "Pza", unitPrice = 6200.0, executedQuantity = 0.0, totalBudget = 6200.0)
+                BudgetItemEntity(code = "ELE-FV-001", description = "Soportería: Estructura de aluminio anodizado para paneles solares", quantity = 240.0, unit = "Pza", unitPrice = 85.0, executedQuantity = 135.0, totalBudget = 20400.0, categoryName = "Instalación"),
+                BudgetItemEntity(code = "ELE-FV-002", description = "Montaje Eléctrico: Módulos fotovoltaicos Jinko Solar 550Wp", quantity = 240.0, unit = "Pza", unitPrice = 45.0, executedQuantity = 110.0, totalBudget = 10800.0, categoryName = "Instalación"),
+                BudgetItemEntity(code = "ELE-AC-003", description = "Canalización: Tubería conduit galvanizada de 2 pulg pared gruesa", quantity = 180.0, unit = "m", unitPrice = 120.0, executedQuantity = 75.0, totalBudget = 21600.0, categoryName = "Instalación"),
+                BudgetItemEntity(code = "ELE-DC-004", description = "Cableado: Tendido de cable fotovoltaico DC XLPE 10 AWG", quantity = 1500.0, unit = "m", unitPrice = 3.5, executedQuantity = 520.0, totalBudget = 5250.0, categoryName = "Instalación"),
+                BudgetItemEntity(code = "ELE-INV-005", description = "Inversor: Montaje y comisionamiento de inversores 100 kW SMA Core 1", quantity = 2.0, unit = "Pza", unitPrice = 4500.0, executedQuantity = 1.0, totalBudget = 9000.0, categoryName = "Instalación"),
+                BudgetItemEntity(code = "ELE-SUB-006", description = "Tierras: Sistema de puesta a tierra con electrodos y soldadura exotérmica", quantity = 1.0, unit = "Lote", unitPrice = 3800.0, executedQuantity = 0.45, totalBudget = 3800.0, categoryName = "Instalación"),
+                BudgetItemEntity(code = "ELE-PRO-007", description = "Protecciones: Tablero de distribución AC 480V con interruptores", quantity = 1.0, unit = "Pza", unitPrice = 6200.0, executedQuantity = 0.0, totalBudget = 6200.0, categoryName = "Instalación"),
+                BudgetItemEntity(code = "TRA-001", description = "Permiso CFE y gestoría de interconexión", quantity = 1.0, unit = "Lote", unitPrice = 15000.0, executedQuantity = 0.5, totalBudget = 15000.0, categoryName = "Tramites")
             )
             budgetItemDao.deleteAllBudgetItems()
             budgetItemDao.insertBudgetItems(updatedBudget)
@@ -883,19 +910,28 @@ class SyncRepository(private val context: Context) {
                     val allMatrices = if (matrixResponse.isSuccessful) matrixResponse.body() ?: emptyList() else emptyList()
                     addLog("Supabase Sync: Matrices obtenidas: ${allMatrices.size}")
                     
+                    val oldBudgetItems = budgetItemDao.getAllBudgetItemsSync()
                     budgetItemDao.deleteAllBudgetItems()
                     matrixItemDao.deleteAllMatrixItems()
                     
                     val filteredConcepts = allConcepts.filter { sc ->
                         presupuestos.any { it.id == sc.presupuesto_id }
                     }
-                                          val oldBudgetItems = budgetItemDao.getAllBudgetItemsSync()
-                      
                       val budgetEntities = filteredConcepts.map { sc ->
                           val obraName = presupuestos.find { it.id == sc.presupuesto_id }?.obra_name ?: sc.presupuesto_id ?: "Obra Desconocida"
                           val codeStr = sc.code ?: sc.id ?: "DESCONOCIDO"
                           val oldItem = oldBudgetItems.find { it.code == codeStr && it.obraId == obraName }
                           val finalExecuted = maxOf(sc.executed_quantity ?: 0.0, oldItem?.executedQuantity ?: 0.0)
+                          
+                          // Detect category:
+                          // 1. unit = "Tramite" → guaranteed Tramites (comes from matrices table)
+                          // 2. categoria field (if view exposes it)
+                          // 3. description keyword fallback
+                          val catName = when {
+                              sc.unit.equals("Tramite", ignoreCase = true) -> "Tramites"
+                              !sc.categoria.isNullOrEmpty() -> sc.categoria
+                              else -> allConcepts.find { it.id == sc.parent_id && it.type == "group" }?.description ?: ""
+                          }
 
                           BudgetItemEntity(
                               code = codeStr,
@@ -906,7 +942,8 @@ class SyncRepository(private val context: Context) {
                               executedQuantity = finalExecuted,
                               totalBudget = sc.total_budget ?: ((sc.quantity ?: 0.0) * (sc.unit_price ?: 0.0)),
                               obraId = obraName,
-                              supabaseId = sc.id ?: ""
+                              supabaseId = sc.id ?: "",
+                              categoryName = catName
                           )
                       }
                     budgetItemDao.insertBudgetItems(budgetEntities)

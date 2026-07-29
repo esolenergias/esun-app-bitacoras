@@ -83,7 +83,7 @@ export const generateObraReport = (obra: ObraApp, bitacoras: Bitacora[], reporte
             </div>
           </div>
           ${bit.concepto ? `<div class="concept-ref">${bit.concepto}</div>` : ''}
-          <div class="report-desc">${bit.description.replace(/\n/g, '<br>')}</div>
+          <div class="report-desc">${(bit.description.charAt(0).toUpperCase() + bit.description.slice(1)).replace(/\n/g, '<br>')}</div>
           ${photoHtml}
         </div>`;
       }).join('');
@@ -188,13 +188,13 @@ export const generateObraReport = (obra: ObraApp, bitacoras: Bitacora[], reporte
       font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;}
     .concept-ref{display:inline-block;background:var(--gold-muted);color:var(--gold-dim);
       padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:8px;letter-spacing:.5px;}
-    .report-desc{font-size:11px;color:var(--text-2);line-height:1.6;margin-bottom:10px;}
+    .report-desc{font-size:12px;color:var(--text-2);line-height:1.8;margin-bottom:12px;}
     .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;}
-    .photo-box{width:100%;height:110px;background:var(--bg-3);border:1px solid var(--border-1);
-      border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+    .photo-box{width:100%;height:160px;background:var(--bg-3);border:1px solid var(--border-1);
+      border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
     .photo-placeholder{font-size:9px;color:var(--text-3);text-align:center;font-style:italic;padding:8px;}
-    .signatures-section{margin-top:auto;padding-top:10mm;page-break-inside:avoid;}
-    .signatures-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:30px;}
+    .signatures-section{margin-top:auto;padding-top:20mm;page-break-inside:avoid;}
+    .signatures-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:40px;max-width:600px;margin:0 auto;}
     .signature-box{text-align:center;}
     .sig-line{height:1px;background:var(--text-1);margin-bottom:6px;}
     .sig-name{font-family:'Cinzel',serif;font-weight:700;font-size:11px;color:var(--text-1);}
@@ -225,7 +225,7 @@ export const generateObraReport = (obra: ObraApp, bitacoras: Bitacora[], reporte
           <h1>Bitácora de Obra</h1>
           <p><strong>FOLIO:</strong> ${folio}</p>
           <p><strong>FECHA DE EMISIÓN:</strong> ${fechaEmision}</p>
-          <div class="reporter-badge">REPORTADO POR: ${reporterName.toUpperCase()}</div>
+          <div class="reporter-badge">REPORTADO POR: ${reporterName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</div>
         </div>
       </header>
       <div class="project-card">
@@ -257,12 +257,12 @@ export const generateObraReport = (obra: ObraApp, bitacoras: Bitacora[], reporte
         <div class="signatures-grid">
           <div class="signature-box">
             <div class="sig-line"></div>
-            <div class="sig-name">${reporterName.toUpperCase()}</div>
+            <div class="sig-name" style="font-weight: 500; color: var(--text-3);">${reporterName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</div>
             <div class="sig-role">RESIDENTE DE OBRA ESOL (ELABORÓ)</div>
           </div>
           <div class="signature-box">
             <div class="sig-line"></div>
-            <div class="sig-name">SUPERVISIÓN / CLIENTE</div>
+            <div class="sig-name" style="font-weight: 500; color: var(--text-3);">Supervisión / Cliente</div>
             <div class="sig-role">REVISÓ</div>
           </div>
         </div>

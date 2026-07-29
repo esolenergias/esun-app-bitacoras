@@ -54,9 +54,14 @@ fun ReportsListScreen(
     val context = LocalContext.current
     val userRole by viewModel.userRole.collectAsState()
     val bitacoras by viewModel.bitacorasList.collectAsState()
+    val allBudgetItems by viewModel.budgetItems.collectAsState()
     
     val siteBitacoras = remember(bitacoras, projectName) {
         bitacoras.filter { it.siteName == projectName }.sortedByDescending { it.id }
+    }
+    
+    val obraBudgetItems = remember(allBudgetItems, projectName) {
+        allBudgetItems.filter { it.obraId == projectName }
     }
     
     val groupedBitacoras = remember(siteBitacoras) {
@@ -71,6 +76,7 @@ fun ReportsListScreen(
     var editDescription by remember { mutableStateOf("") }
     var editPhysicalProgress by remember { mutableStateOf("") }
     var editFinancialProgress by remember { mutableStateOf("") }
+    var editConceptoName by remember { mutableStateOf("") }
     var editPhotoUris by remember { mutableStateOf<List<String>>(emptyList()) }
     
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -188,117 +194,25 @@ fun ReportsListScreen(
                         )
                     }
                     items(reportsForDate) { bitacora ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
-                                .clickable { onNavigateToReportDetail(bitacora.id) }
-                                .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(12.dp)),
-                            colors = CardDefaults.cardColors(containerColor = PureWhite)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .background(LightGrayBg, RoundedCornerShape(8.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.Assignment, contentDescription = null, tint = ConnectedBlue, modifier = Modifier.size(20.dp))
-                                    }
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "${bitacora.weather} • ${bitacora.crewCount} personal",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = OnSurfaceVariant
-                                        )
-                                        Text(
-                                            text = bitacora.description,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = SlateDeep
-                                        )
-                                    }
-
-                                    // Edit / Delete icons ONLY for Supervisors & Master
-                                    if (canModify) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            IconButton(
-                                                onClick = {
-                                                    bitacoraToEdit = bitacora
-                                                    editWeather = bitacora.weather
-                                                    editCrewCount = bitacora.crewCount.toString()
-                                                    editDescription = bitacora.description
-                                                    editPhysicalProgress = bitacora.physicalProgress.toString()
-                                                    editFinancialProgress = bitacora.financialProgress.toString()
-                                                    editPhotoUris = if (bitacora.photoUri.isNullOrEmpty()) emptyList() else bitacora.photoUri.split(",")
-                                                    showEditDialog = true
-                                                },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Edit,
-                                                    contentDescription = "Editar",
-                                                    tint = ConnectedBlue,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                            IconButton(
-                                                onClick = {
-                                                    bitacoraToDelete = bitacora
-                                                    showDeleteDialog = true
-                                                },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Delete,
-                                                    contentDescription = "Eliminar",
-                                                    tint = WarningRed,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text("Avance Físico", fontSize = 9.sp, color = OnSurfaceVariant)
-                                        Text("${bitacora.physicalProgress}%", fontSize = 12.sp, fontWeight = FontWeight.Black, color = SuccessGreen)
-                                    }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("Presupuesto Ejecutado", fontSize = 9.sp, color = OnSurfaceVariant)
-                                        Text("$${bitacora.financialProgress}", fontSize = 12.sp, fontWeight = FontWeight.Black, color = SlateDeep)
-                                    }
-                                }
-
-                                // If user is Trabajador, show simple lock badge
-                                if (!canModify) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                                    ) {
-                                        Icon(Icons.Default.Lock, contentDescription = null, tint = OnSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(10.dp))
-                                        Text("Reporte de lectura. Solo el Supervisor o Master pueden modificarlo.", fontSize = 9.sp, color = OnSurfaceVariant.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
+                        BeautifulBitacoraCard(
+                            log = bitacora,
+                            onCardClick = { onNavigateToReportDetail(bitacora.id) },
+                            onEditClick = if (canModify) { {
+                                bitacoraToEdit = bitacora
+                                editWeather = bitacora.weather
+                                editCrewCount = bitacora.crewCount.toString()
+                                editDescription = bitacora.description
+                                editPhysicalProgress = bitacora.physicalProgress.toString()
+                                editFinancialProgress = bitacora.financialProgress.toString()
+                                editConceptoName = bitacora.concepto_name ?: ""
+                                editPhotoUris = if (bitacora.photoUri.isNullOrEmpty()) emptyList() else bitacora.photoUri.split(",")
+                                showEditDialog = true
+                            } } else null,
+                            onDeleteClick = if (canModify) { {
+                                bitacoraToDelete = bitacora
+                                showDeleteDialog = true
+                            } } else null
+                        )
                     }
                 }
             }
@@ -431,6 +345,45 @@ fun ReportsListScreen(
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ConnectedBlue, unfocusedBorderColor = SubtleOutline)
                     )
 
+                    var expandedConcepto by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = expandedConcepto,
+                        onExpandedChange = { expandedConcepto = !expandedConcepto },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = editConceptoName.ifEmpty { "Ninguno" },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Concepto Vinculado (Opcional)") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedConcepto) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ConnectedBlue, unfocusedBorderColor = SubtleOutline)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedConcepto,
+                            onDismissRequest = { expandedConcepto = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Ninguno") },
+                                onClick = {
+                                    editConceptoName = ""
+                                    expandedConcepto = false
+                                }
+                            )
+                            obraBudgetItems.forEach { item ->
+                                val desc = item.description.take(50) + if (item.description.length > 50) "..." else ""
+                                DropdownMenuItem(
+                                    text = { Text(desc, fontSize = 12.sp) },
+                                    onClick = {
+                                        editConceptoName = item.description
+                                        expandedConcepto = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     Text("Evidencia Fotográfica", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SlateDeep)
                     if (editPhotoUris.isNotEmpty()) {
                         androidx.compose.foundation.lazy.LazyRow(
@@ -480,6 +433,7 @@ fun ReportsListScreen(
                                 description = editDescription,
                                 physicalProgress = editPhysicalProgress.toDoubleOrNull() ?: original.physicalProgress,
                                 financialProgress = editFinancialProgress.toDoubleOrNull() ?: original.financialProgress,
+                                concepto_name = editConceptoName.ifEmpty { null },
                                 photoUri = editPhotoUris.joinToString(","),
                                 isSynced = false
                             )

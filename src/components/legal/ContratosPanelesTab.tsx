@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../context/supabase';
-import { Search, FileText, Download, Loader2, User, Building2, Upload, Sparkles } from 'lucide-react';
+import { Search, FileText, Download, Loader2, User, Building2, Upload, Sparkles, X, CheckCircle2, ScanFace } from 'lucide-react';
 import { getPresupuestos, getPresupuestoDetails, calculateBudgetTotals } from '../../lib/cotizadorService';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
@@ -198,14 +198,24 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
     curp: '',
     cic: '',
     ocr: '',
+    ineFrente: '',
+    ineReverso: '',
     clienteDireccion: '',
     descripcionEquipos: '',
     adicionales: '',
+    descripcionTramitesCfe: '',
     montoTotal: 0,
     porcentajeAnticipo: 70,
     porcentajeAnticipoStr: "70",
     montoAnticipo: 0,
     montoRestante: 0,
+    esquemaTramitesActivo: false,
+    porcentajeEntregaSistema: 20,
+    porcentajeEntregaSistemaStr: "20",
+    montoEntregaSistema: 0,
+    porcentajePuestaMedidor: 10,
+    porcentajePuestaMedidorStr: "10",
+    montoPuestaMedidor: 0,
     pagosDiferidosActivos: false,
     numeroPagosDiferidos: 3,
     // Datos de la Empresa
@@ -220,8 +230,251 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
     empresaClabe: '012560001134567895'
   });
 
+  const updateHitoPorcentaje = (field: 'entrega' | 'medidor', pct: number, strVal?: string) => {
+    const validPct = isNaN(pct) ? 0 : Math.max(0, Math.min(100, pct));
+    const newMonto = formData.montoTotal * (validPct / 100);
+    if (field === 'entrega') {
+      const autoMedidorPct = Math.max(0, 100 - formData.porcentajeAnticipo - validPct);
+      const autoMedidorMonto = formData.montoTotal * (autoMedidorPct / 100);
+      setFormData(prev => ({
+        ...prev,
+        porcentajeEntregaSistema: validPct,
+        porcentajeEntregaSistemaStr: strVal !== undefined ? strVal : validPct.toString(),
+        montoEntregaSistema: newMonto,
+        porcentajePuestaMedidor: autoMedidorPct,
+        porcentajePuestaMedidorStr: autoMedidorPct.toFixed(1),
+        montoPuestaMedidor: autoMedidorMonto
+      }));
+    } else {
+      const autoEntregaPct = Math.max(0, 100 - formData.porcentajeAnticipo - validPct);
+      const autoEntregaMonto = formData.montoTotal * (autoEntregaPct / 100);
+      setFormData(prev => ({
+        ...prev,
+        porcentajePuestaMedidor: validPct,
+        porcentajePuestaMedidorStr: strVal !== undefined ? strVal : validPct.toString(),
+        montoPuestaMedidor: newMonto,
+        porcentajeEntregaSistema: autoEntregaPct,
+        porcentajeEntregaSistemaStr: autoEntregaPct.toFixed(1),
+        montoEntregaSistema: autoEntregaMonto
+      }));
+    }
+  };
+
+  const updateHitoMonto = (field: 'entrega' | 'medidor', monto: number) => {
+    const validMonto = isNaN(monto) ? 0 : Math.max(0, Math.min(formData.montoTotal, monto));
+    const calculatedPct = formData.montoTotal > 0 ? (validMonto / formData.montoTotal) * 100 : 0;
+    if (field === 'entrega') {
+      const autoMedidorMonto = Math.max(0, formData.montoRestante - validMonto);
+      const autoMedidorPct = formData.montoTotal > 0 ? (autoMedidorMonto / formData.montoTotal) * 100 : 0;
+      setFormData(prev => ({
+        ...prev,
+        montoEntregaSistema: validMonto,
+        porcentajeEntregaSistema: calculatedPct,
+        porcentajeEntregaSistemaStr: calculatedPct.toFixed(1),
+        montoPuestaMedidor: autoMedidorMonto,
+        porcentajePuestaMedidor: autoMedidorPct,
+        porcentajePuestaMedidorStr: autoMedidorPct.toFixed(1)
+      }));
+    } else {
+      const autoEntregaMonto = Math.max(0, formData.montoRestante - validMonto);
+      const autoEntregaPct = formData.montoTotal > 0 ? (autoEntregaMonto / formData.montoTotal) * 100 : 0;
+      setFormData(prev => ({
+        ...prev,
+        montoPuestaMedidor: validMonto,
+        porcentajePuestaMedidor: calculatedPct,
+        porcentajePuestaMedidorStr: calculatedPct.toFixed(1),
+        montoEntregaSistema: autoEntregaMonto,
+        porcentajeEntregaSistema: autoEntregaPct,
+        porcentajeEntregaSistemaStr: autoEntregaPct.toFixed(1)
+      }));
+    }
+  };
+
   const pctAnticipo = formData.porcentajeAnticipo.toFixed(1);
   const pagoDiferidoAmount = formData.numeroPagosDiferidos > 0 ? (formData.montoRestante / formData.numeroPagosDiferidos) : 0;
+
+  const [isExtracting, setIsExtracting] = useState(false);
+  const ineFrenteInputRef = useRef<HTMLInputElement>(null);
+  const ineReversoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'ineFrente' | 'ineReverso') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFormData(prev => ({ ...prev, [field]: event.target?.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = (field: 'ineFrente' | 'ineReverso', e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormData(prev => ({ ...prev, [field]: '' }));
+    if (field === 'ineFrente' && ineFrenteInputRef.current) {
+      ineFrenteInputRef.current.value = '';
+    }
+    if (field === 'ineReverso' && ineReversoInputRef.current) {
+      ineReversoInputRef.current.value = '';
+    }
+  };
+
+  const handleExtraerDatos = async () => {
+    if (!formData.ineFrente && !formData.ineReverso) {
+      alert("Por favor, sube al menos una imagen o documento del INE (Frontal o Reverso) para extraer los datos.");
+      return;
+    }
+
+    const apiKey = localStorage.getItem('cfe_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
+    const initialModel = localStorage.getItem('cfe_gemini_model') || 'gemini-2.0-flash';
+    setIsExtracting(true);
+
+    try {
+      if (!apiKey) {
+        // Modo simulación cuando no se tiene API Key configurada
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        setFormData(prev => ({
+          ...prev,
+          clienteRazonSocial: prev.clienteRazonSocial || 'JUAN PÉREZ LÓPEZ',
+          rfc: prev.rfc || 'PELJ850412H89',
+          curp: prev.curp || 'PELJ850412HNTPRN01',
+          cic: prev.cic || '123456789',
+          ocr: prev.ocr || '1234567890123',
+          clienteDireccion: prev.clienteDireccion || 'Av. Insurgentes #123, Col. Centro, Tepic, Nayarit'
+        }));
+        alert("Simulación de extracción completada. NOTA: Para realizar la lectura real con Visión por IA, ingresa tu Gemini API Key en los Ajustes.");
+        return;
+      }
+
+      const parts: any[] = [
+        { text: "Eres un asistente de extracción de datos experto en leer credenciales de identificación oficial de México (INE/IFE) y Constancias de Situación Fiscal. Revisa cuidadosamente la o las imágenes adjuntas. Extrae los siguientes datos con la mayor exactitud: 1. clienteRazonSocial (nombre completo o razón social del titular), 2. rfc (solo el RFC sin texto extra), 3. curp (la CURP de 18 caracteres), 4. cic (el número de 9 dígitos de identificación de credencial o número de emisión), 5. ocr (el número identificador al reverso de 12 o 13 dígitos de la INE), 6. clienteDireccion (domicilio completo si está visible). Si un campo no es visible en las imágenes proporcionadas, devuelve una cadena vacía. Tu respuesta debe ser EXCLUSIVAMENTE un bloque JSON válido con las claves: 'clienteRazonSocial', 'rfc', 'curp', 'cic', 'ocr', 'clienteDireccion'. No incluyas explicaciones, saludos ni markdown fuera del bloque JSON." }
+      ];
+
+      const addImagePart = (dataUrl: string) => {
+        if (!dataUrl) return;
+        const [meta, base64] = dataUrl.split(',');
+        const mime = meta ? meta.split(':')[1]?.split(';')[0] || 'image/jpeg' : 'image/jpeg';
+        parts.push({
+          inline_data: {
+            mime_type: mime,
+            data: base64
+          }
+        });
+      };
+
+      if (formData.ineFrente) addImagePart(formData.ineFrente);
+      if (formData.ineReverso) addImagePart(formData.ineReverso);
+
+      const payload = {
+        contents: [{ parts }]
+      };
+
+      // Model fallback order: initial selected model -> gemini-2.0-flash -> gemini-1.5-flash -> gemini-2.5-flash
+      const modelsToTry = Array.from(new Set([
+        initialModel,
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-2.5-flash'
+      ]));
+
+      let res: Response | null = null;
+      let lastErrText = '';
+      let usedModel = initialModel;
+
+      for (const m of modelsToTry) {
+        try {
+          const fetchRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (fetchRes.ok) {
+            res = fetchRes;
+            usedModel = m;
+            break;
+          }
+          lastErrText = await fetchRes.text();
+          if (fetchRes.status === 403 || lastErrText.includes('leaked') || lastErrText.includes('PERMISSION_DENIED')) {
+            res = fetchRes;
+            usedModel = m;
+            break;
+          }
+          console.warn(`El modelo de Gemini '${m}' devolvió estado ${fetchRes.status}: ${lastErrText}. Intentando modelo de respaldo...`);
+        } catch (err: any) {
+          lastErrText = err.message || String(err);
+        }
+      }
+
+      if (!res || !res.ok) {
+        if (res && (res.status === 403 || lastErrText.includes('leaked') || lastErrText.includes('PERMISSION_DENIED'))) {
+          const runSimulation = confirm(
+            "⚠️ La API Key de Gemini guardada en tu navegador fue revocada por Google (Clave filtrada / reportada como pública).\n\n" +
+            "¿Deseas usar la extracción simulada de demostración para auto-completar los campos?"
+          );
+          if (runSimulation) {
+            setFormData(prev => ({
+              ...prev,
+              clienteRazonSocial: prev.clienteRazonSocial || 'JUAN PÉREZ LÓPEZ',
+              rfc: prev.rfc || 'PELJ850412H89',
+              curp: prev.curp || 'PELJ850412HNTPRN01',
+              cic: prev.cic || '123456789',
+              ocr: prev.ocr || '1234567890123',
+              clienteDireccion: prev.clienteDireccion || 'Av. Insurgentes #123, Col. Centro, Tepic, Nayarit'
+            }));
+            alert("Simulación realizada. Recuerda actualizar tu nueva Gemini API Key en los Ajustes del Portal.");
+            return;
+          }
+        }
+
+        const isHighDemand = (res && res.status === 429) || (res && res.status === 503) || lastErrText.includes('RESOURCE_EXHAUSTED') || lastErrText.toLowerCase().includes('high demand') || lastErrText.toLowerCase().includes('overloaded');
+        if (isHighDemand) {
+          const runSimulation = confirm(
+            "⚠️ La API de Gemini reporta alta demanda de tráfico en sus servidores en este momento (Error 429/503).\n\n" +
+            "¿Deseas cargar la extracción de demostración para autocompletar los datos de la INE de inmediato?"
+          );
+          if (runSimulation) {
+            setFormData(prev => ({
+              ...prev,
+              clienteRazonSocial: prev.clienteRazonSocial || 'JUAN PÉREZ LÓPEZ',
+              rfc: prev.rfc || 'PELJ850412H89',
+              curp: prev.curp || 'PELJ850412HNTPRN01',
+              cic: prev.cic || '123456789',
+              ocr: prev.ocr || '1234567890123',
+              clienteDireccion: prev.clienteDireccion || 'Av. Insurgentes #123, Col. Centro, Tepic, Nayarit'
+            }));
+            return;
+          }
+        }
+
+        throw new Error(`Error en la API de Gemini (${res ? res.status : '500'}): ${lastErrText}`);
+      }
+
+      const jsonRes = await res.json();
+      const rawText = jsonRes.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        setFormData(prev => ({
+          ...prev,
+          clienteRazonSocial: parsed.clienteRazonSocial || prev.clienteRazonSocial,
+          rfc: parsed.rfc || prev.rfc,
+          curp: parsed.curp || prev.curp,
+          cic: parsed.cic || prev.cic,
+          ocr: parsed.ocr || prev.ocr,
+          clienteDireccion: parsed.clienteDireccion || prev.clienteDireccion
+        }));
+        alert("¡Extracción de datos con IA completada con éxito!");
+      } else {
+        throw new Error("No se pudo parsear el resultado en formato JSON devuelto por Gemini.");
+      }
+    } catch (error: any) {
+      console.error("Gemini Vision API Error:", error);
+      alert("Error al extraer datos: " + (error.message || "Ocurrió un error inesperado"));
+    } finally {
+      setIsExtracting(false);
+    }
+  };
 
   const getFechaPago = (monthsToAdd: number) => {
     const parts = formData.fechaEmision.split('-');
@@ -267,65 +520,80 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       const anticipo = totalConIva * (formData.porcentajeAnticipo / 100); 
       const restante = totalConIva - anticipo;
 
-      const validConceptos = details.conceptos.filter((c: any) => 
-        !c.parent_id &&
+      // Filter out commissions and group header containers
+      const leafConceptos = details.conceptos.filter((c: any) => 
+        c.type !== 'group' &&
         !c.description?.toLowerCase().includes('comisión') &&
         !c.description?.toLowerCase().includes('comision')
       );
 
-      const paneles: any[] = [];
-      const inversores: any[] = [];
-      const estructuras: any[] = [];
-      const otros: any[] = [];
+      // Separate main equipment, additional materials, and CFE trámites
+      const isTramiteCfe = (descStr: string) => {
+        const lower = (descStr || '').toLowerCase();
+        return lower.includes('trámite') || lower.includes('tramite') ||
+               lower.includes('interconexión') || lower.includes('interconexion') ||
+               lower.includes('cfe') || lower.includes('medidor') ||
+               lower.includes('dictamen') || lower.includes('uvie') || lower.includes('uveg') ||
+               lower.includes('expediente') || lower.includes('gestión') || lower.includes('gestion') ||
+               lower.includes('plano') || lower.includes('inspección') || lower.includes('inspeccion') ||
+               lower.includes('verificación') || lower.includes('verificacion') ||
+               lower.includes('contratación') || lower.includes('contratacion') ||
+               lower.includes('unidad') || lower.includes('solicitud') || lower.includes('permiso') ||
+               lower.includes('memorandum') || lower.includes('memoria');
+      };
 
-      validConceptos.forEach((c: any) => {
-        const desc = c.description?.toLowerCase() || '';
-        
-        // Force service/labor/materials into 'otros' so they don't get matched as equipment
-        // CRITICAL: We do NOT use 'instalación' here because panels/inverters often say "Suministro e instalación de..."
-        if (
-          desc.includes('mano de obra') || 
-          desc.includes('mano de de obra') || 
-          desc.includes('servicio') || 
-          desc.includes('tramitologia') || 
-          desc.includes('flete') || 
-          desc.includes('envío') || 
-          desc.includes('envio') || 
-          desc.includes('viáticos') || 
-          desc.includes('viaticos') ||
-          desc.includes('material') ||
-          desc.includes('inspección') ||
-          desc.includes('inspeccion') ||
-          desc.includes('verificación') ||
-          desc.includes('verificacion')
-        ) {
-          otros.push(c);
-        } else if (desc.includes('panel') || desc.includes('módulo') || desc.includes('modulo')) {
-          paneles.push(c);
-        } else if (desc.includes('inversor') || desc.includes('inverter') || desc.includes('microinversor') || desc.includes('growat')) {
-          inversores.push(c);
-        } else if (desc.includes('estructura') || desc.includes('estructrura')) {
-          estructuras.push(c);
-        } else {
-          otros.push(c);
-        }
-      });
+      const isMainEquip = (descStr: string) => {
+        const lower = (descStr || '').toLowerCase();
+        return !isTramiteCfe(descStr) && (
+               lower.includes('panel') || 
+               lower.includes('módulo') || 
+               lower.includes('modulo') || 
+               lower.includes('inversor') || 
+               lower.includes('microinversor') || 
+               lower.includes('estructura') || 
+               lower.includes('soporte') ||
+               lower.includes('batería') ||
+               lower.includes('bateria') ||
+               lower.includes('optimizador')
+        );
+      };
+
+      const principales = leafConceptos.filter((c: any) => isMainEquip(c.description));
+      const tramitesConceptos = leafConceptos.filter((c: any) => isTramiteCfe(c.description));
+      const adicionales = leafConceptos.filter((c: any) => !isMainEquip(c.description) && !isTramiteCfe(c.description));
 
       let desc = "SISTEMA DE GENERACIÓN DE ENERGÍA FOTOVOLTAICA QUE INCLUYE:\n";
-      if (paneles.length > 0) {
-        paneles.forEach((p: any) => desc += `- ${p.quantity} x ${p.description}\n`);
-      }
-      if (inversores.length > 0) {
-        inversores.forEach((i: any) => desc += `- ${i.quantity} x ${i.description}\n`);
-      }
-      if (estructuras.length > 0) {
-        estructuras.forEach((e: any) => desc += `- ${e.description}\n`);
+      if (principales.length > 0) {
+        principales.forEach((p: any) => {
+          desc += `- ${p.quantity} x ${p.description}\n`;
+        });
+      } else {
+        leafConceptos.forEach((c: any) => {
+          if (!isTramiteCfe(c.description)) {
+            desc += `- ${c.quantity} x ${c.description}\n`;
+          }
+        });
       }
 
       let adds = "";
-      if (otros.length > 0) {
-        adds = "MATERIALES ADICIONALES:\n";
-        otros.forEach((o: any) => adds += `- ${o.description}\n`);
+      if (adicionales.length > 0) {
+        adds = "MATERIALES ADICIONALES DE INSTALACIÓN Y PROTECCIÓN:\n";
+        adicionales.forEach((a: any) => {
+          adds += `- ${a.quantity} x ${a.description}\n`;
+        });
+      }
+
+      let tramitesDesc = "";
+      if (tramitesConceptos.length > 0) {
+        tramitesDesc = "SERVICIOS Y GESTIONES DE TRÁMITES ANTE CFE:\n";
+        tramitesConceptos.forEach((t: any) => {
+          tramitesDesc += `- ${t.quantity} x ${t.description}\n`;
+        });
+      } else {
+        tramitesDesc = "SERVICIOS DE TRÁMITES E INTERCONEXIÓN CFE INCLUIDOS:\n" +
+          "- Gestiones e integración de expediente técnico fotovoltaico ante CFE\n" +
+          "- Solicitud de interconexión y firma de convenio de interconexión CFE\n" +
+          "- Verificación de requisitos de medición bidireccional y puesta en marcha\n";
       }
 
       setFormData(prev => ({
@@ -334,11 +602,14 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
         clienteDireccion: '',
         descripcionEquipos: desc.trim(),
         adicionales: adds.trim(),
+        descripcionTramitesCfe: tramitesDesc.trim(),
         montoTotal: totalConIva,
         porcentajeAnticipo: prev.porcentajeAnticipo,
         porcentajeAnticipoStr: prev.porcentajeAnticipo.toString(),
         montoAnticipo: anticipo,
         montoRestante: restante,
+        montoEntregaSistema: totalConIva * (prev.porcentajeEntregaSistema / 100),
+        montoPuestaMedidor: totalConIva * (prev.porcentajePuestaMedidor / 100)
       }));
     } catch (error) {
       console.error("Error fetching budget details:", error);
@@ -370,6 +641,225 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       porcentajeAnticipoStr: pct.toFixed(1),
       montoRestante: rest 
     }));
+  };
+
+  const handleGeneratePdfEntrega = async () => {
+    if (!selectedBudget) {
+      alert("Por favor selecciona un presupuesto base.");
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const budget = budgets.find(b => b.id === selectedBudget);
+      const cliente = formData.clienteRazonSocial || budget?.client_name || 'Cliente';
+      const direccion = formData.clienteDireccion || 'Dirección de Instalación';
+      const empRepresentante = formData.empresaRepresentante || 'MANUEL DE JESUS FREGOSO SAMANIEGA';
+      const firmaCliente = formData.tipoPersona === 'moral' 
+        ? `<strong>${cliente}</strong><br/><span style="font-size: 11px; font-weight: normal;">Representada por: ${formData.representanteLegal || '----'}</span>`
+        : `<strong>${cliente}</strong>`;
+
+      const descEquiposHTML = (formData.descripcionEquipos || '').replace(/\n/g, '<br/>');
+      const montoEntregaNum = formData.esquemaTramitesActivo ? formData.montoEntregaSistema : formData.montoRestante;
+      const montoEntregaFormatted = formatCurrency(montoEntregaNum);
+      const montoEntregaLetras = numeroALetras(montoEntregaNum);
+      const porcentajeEntrega = formData.esquemaTramitesActivo ? formData.porcentajeEntregaSistema.toFixed(1) : (formData.montoTotal > 0 ? ((formData.montoRestante / formData.montoTotal) * 100).toFixed(1) : "30.0");
+      const logoUrl = window.location.origin + '/Logo_esol_b.png';
+
+      const element = document.createElement('div');
+      element.innerHTML = `
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Montserrat:wght@400;600;700&display=swap');
+          * { box-sizing: border-box; }
+          .letter-sheet {
+            width: 216mm;
+            height: 279mm;
+            padding: 20mm;
+            margin: 0 auto;
+            background: #ffffff;
+            font-family: 'Montserrat', sans-serif;
+            color: #0f172a;
+            position: relative;
+            box-sizing: border-box;
+          }
+        </style>
+        <div class="letter-sheet">
+          <h3 style="font-weight: bold; font-size: 15px; margin-bottom: 25px; text-transform: uppercase; text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px;">ANEXO 4. ACTA DE ENTREGA - RECEPCIÓN Y CONFORMIDAD DE OBRA</h3>
+          
+          <p style="text-align: justify; margin-bottom: 15px; line-height: 1.8; font-size: 12px;">
+            En la ciudad de Tepic, Nayarit, se hace constar la entrega formal de la obra física correspondiente al Sistema de Generación Fotovoltaico instalado en el inmueble ubicado en: <strong>${direccion}</strong>.
+          </p>
+
+          <p style="text-align: justify; margin-bottom: 10px; line-height: 1.8; font-size: 12px;">
+            Se detallan a continuación los equipos, materiales y conceptos instalados de acuerdo con lo estipulado en el presupuesto original, amparando legalmente la totalidad de la obra ejecutada y entregada funcionando al 100%:
+          </p>
+
+          <div style="background-color: #f8fafc; padding: 15px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11px; margin-bottom: 20px; color: #1e293b;">
+            <div style="font-family: monospace; white-space: pre-wrap; line-height: 1.5;">${descEquiposHTML}</div>
+          </div>
+          
+          <p style="font-weight: bold; margin-bottom: 12px; text-transform: uppercase; text-align: center; font-size: 12px;">DECLARACIÓN DE CONFORMIDAD Y COMPROMISO DE PAGO:</p>
+          
+          <p style="text-align: justify; margin-bottom: 15px; line-height: 1.8; font-size: 12px;">
+            Mediante la firma del presente documento, EL CLIENTE (o su representante autorizado) acusa de recibido a entera satisfacción el sistema fotovoltaico con los conceptos previamente listados en sus condiciones físicas y operativas, y se obliga incondicionalmente a liquidar a favor de EL PRESTADOR el pago correspondiente de <strong>${formData.esquemaTramitesActivo ? `${montoEntregaFormatted} MXN (${numeroALetras(formData.montoEntregaSistema)}) - ${porcentajeEntrega}%` : `${formatCurrency(formData.montoRestante)} MXN (${numeroALetras(formData.montoRestante)})`}</strong> dentro de un plazo no mayor a 5 (cinco) días hábiles a partir de esta fecha.
+          </p>
+
+          <p style="text-align: justify; margin-bottom: 20px; line-height: 1.8; font-size: 12px;">
+            El presente instrumento se emite de conformidad con lo establecido en el Código Civil aplicable al Estado de Nayarit y Código Civil Federal en materia de contratos de obra y prestación de servicios. Se anexa de forma indisoluble al Contrato Principal celebrado entre las partes, constituyendo prueba plena de la entrega real y jurídica de los bienes, aceptando el cliente irrevocablemente su conformidad.
+          </p>
+          
+          <p style="text-align: justify; margin-bottom: 40px; line-height: 1.8; font-size: 12px;">
+            Fecha de Entrega Física: _____ de ____________________ de 20____.
+          </p>
+
+          <div style="position: absolute; bottom: 60px; left: 0; width: 100%; box-sizing: border-box; padding: 0 20mm;">
+            <div style="display: flex; justify-content: space-evenly; margin-bottom: 55px;">
+              <div style="text-align: center; width: 35%;">
+                <div style="border-top: 1px solid #000; width: 100%; margin-bottom: 8px;"></div>
+                <p style="font-weight: bold; margin: 0; font-size: 12px;">ENTREGA (EL PRESTADOR)</p>
+                <p style="font-size: 11px; margin-top: 2px;">${empRepresentante}</p>
+              </div>
+              <div style="text-align: center; width: 35%;">
+                <div style="border-top: 1px solid #000; width: 220px; margin-bottom: 8px;"></div>
+                <p style="font-weight: bold; margin: 0; font-size: 12px;">RECIBE (EL CLIENTE)</p>
+                <p style="font-size: 11px; margin-top: 2px;">${firmaCliente}</p>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: center;">
+              <div style="text-align: center; width: 35%;">
+                <div style="border-top: 1px solid #000; width: 100%; margin-bottom: 8px;"></div>
+                <p style="font-weight: bold; margin: 0; font-size: 12px;">TESTIGO</p>
+                <p style="font-size: 11px; margin-top: 2px; color: #64748b;">Nombre y Firma</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const opt = {
+        margin: 0,
+        filename: `Acta_Entrega_Recepcion_${cliente.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
+      };
+
+      const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      window.open(blobUrl, '_blank');
+    } catch (err: any) {
+      console.error("Error al generar PDF de Entrega - Recepción:", err);
+      alert("Error al generar PDF de Entrega - Recepción: " + (err.message || "Error al exportar PDF"));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGeneratePdfTramites = async () => {
+    if (!selectedBudget) {
+      alert("Por favor selecciona un presupuesto base.");
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const budget = budgets.find(b => b.id === selectedBudget);
+      const cliente = formData.clienteRazonSocial || budget?.client_name || 'Cliente';
+      const direccion = formData.clienteDireccion || 'Dirección de Instalación';
+      const empRepresentante = formData.empresaRepresentante || 'MANUEL DE JESUS FREGOSO SAMANIEGA';
+      const firmaCliente = formData.tipoPersona === 'moral' 
+        ? `<strong>${cliente}</strong><br/><span style="font-size: 11px; font-weight: normal;">Representada por: ${formData.representanteLegal || '----'}</span>`
+        : `<strong>${cliente}</strong>`;
+
+      const tramitesHTML = (formData.descripcionTramitesCfe || '').replace(/\n/g, '<br/>');
+      const montoMedidorNum = formData.esquemaTramitesActivo ? formData.montoPuestaMedidor : (formData.montoTotal * 0.10);
+      const montoPuestaMedidorFormatted = formatCurrency(montoMedidorNum);
+      const montoMedidorLetras = numeroALetras(montoMedidorNum);
+      const porcentajeMedidor = formData.esquemaTramitesActivo ? formData.porcentajePuestaMedidor.toFixed(1) : "10.0";
+      const logoUrl = window.location.origin + '/Logo_esol_b.png';
+
+      const element = document.createElement('div');
+      element.innerHTML = `
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Montserrat:wght@400;600;700&display=swap');
+          * { box-sizing: border-box; }
+          .letter-sheet {
+            width: 216mm;
+            height: 279mm;
+            padding: 20mm;
+            margin: 0 auto;
+            background: #ffffff;
+            font-family: 'Montserrat', sans-serif;
+            color: #0f172a;
+            position: relative;
+            box-sizing: border-box;
+          }
+        </style>
+        <div class="letter-sheet">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #C49825; padding-bottom: 12px; margin-bottom: 25px; margin-top: 10px;">
+            <img src="${logoUrl}" style="height: 55px; width: auto;" alt="eSol Energías" onerror="this.style.display='none';">
+            <div style="text-align: right;">
+              <h3 style="font-family: 'Cinzel', serif; font-weight: 700; font-size: 18px; margin: 0; color: #0f172a; letter-spacing: 0.5px;">ACTA DE ENTREGABLE DE TRÁMITES CFE</h3>
+              <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Documento Oficial • ESOL ENERGÍAS</p>
+            </div>
+          </div>
+
+          <p style="text-align: justify; margin-bottom: 15px; line-height: 1.8; font-size: 12px;">
+            En la ciudad de Tepic, Nayarit, se hace constar la entrega formal de la documentación técnica, gestiones e integración del expediente de interconexión ante la <strong>Comisión Federal de Electricidad (CFE)</strong> para el inmueble ubicado en: <strong>${direccion}</strong>.
+          </p>
+
+          <p style="font-weight: bold; font-size: 12px; margin-bottom: 8px; color: #1e293b;">DETALLE DE TRÁMITES Y GESTIONES EJECUTADAS:</p>
+          <div style="background-color: #f8fafc; padding: 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; margin-bottom: 20px; color: #1e293b; line-height: 1.7;">
+            <div style="font-family: monospace; white-space: pre-wrap; line-height: 1.5;">${tramitesHTML}</div>
+          </div>
+
+          <p style="font-weight: bold; margin-bottom: 12px; text-transform: uppercase; text-align: center; font-size: 12px; color: #1e293b;">DECLARACIÓN DE CONFORMIDAD Y LIQUIDACIÓN FINAL DE TRÁMITES:</p>
+
+          <p style="text-align: justify; margin-bottom: 15px; line-height: 1.8; font-size: 12px;">
+            Mediante la firma de la presente Acta, EL CLIENTE acusa de recibido a entera satisfacción la conclusión formal de los trámites de interconexión y/o colocación del medidor bidireccional por parte de la CFE. Se obliga incondicionalmente a liquidar a favor de EL PRESTADOR el pago final pactado de <strong>${montoPuestaMedidorFormatted} MXN (${montoMedidorLetras})</strong> equivalente al <strong>${porcentajeMedidor}%</strong> correspondiente a la conclusión de trámites y puesta en marcha del sistema.
+          </p>
+
+          <p style="text-align: justify; margin-bottom: 40px; line-height: 1.8; font-size: 12px;">
+            Fecha de Conclusión de Trámites: _____ de ____________________ de 20____.
+          </p>
+
+          <div style="position: absolute; bottom: 60px; left: 0; width: 100%; box-sizing: border-box; padding: 0 20mm;">
+            <div style="display: flex; justify-content: space-evenly; margin-bottom: 55px;">
+              <div style="text-align: center; width: 40%;">
+                <div style="border-top: 1px solid #000; width: 100%; margin-bottom: 8px;"></div>
+                <p style="font-weight: bold; margin: 0; font-size: 12px;">ENTREGA (EL PRESTADOR)</p>
+                <p style="font-size: 11px; margin-top: 2px;">${empRepresentante}</p>
+              </div>
+              <div style="text-align: center; width: 40%;">
+                <div style="border-top: 1px solid #000; width: 100%; margin-bottom: 8px;"></div>
+                <p style="font-weight: bold; margin: 0; font-size: 12px;">RECIBE (EL CLIENTE)</p>
+                <p style="font-size: 11px; margin-top: 2px;">${firmaCliente}</p>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: center;">
+              <p style="font-size: 9px; color: #94a3b8; margin: 0; text-transform: uppercase;">
+                eSol Energías • Soluciones Integrales de Nayarit S. de R.L. de C.V. • Entregable de Trámites CFE
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const opt = {
+        margin: 0,
+        filename: `Acta_Tramites_CFE_${cliente.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
+      };
+
+      const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      window.open(blobUrl, '_blank');
+    } catch (err: any) {
+      console.error("Error al generar PDF de trámites:", err);
+      alert("Error al generar PDF de Trámites CFE: " + (err.message || "Error al exportar PDF"));
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleGeneratePDF = () => {
@@ -420,6 +910,10 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
     const montoTotal = formatCurrency(formData.montoTotal);
     const montoAnticipo = formatCurrency(formData.montoAnticipo);
     const montoRestante = formatCurrency(formData.montoRestante);
+    const montoEntregaFormatted = formatCurrency(formData.montoEntregaSistema);
+    const montoPuestaMedidorFormatted = formatCurrency(formData.montoPuestaMedidor);
+    const porcentajeEntrega = formData.porcentajeEntregaSistema.toFixed(1);
+    const porcentajeMedidor = formData.porcentajePuestaMedidor.toFixed(1);
 
     const descEquiposHTML = (formData.descripcionEquipos || '').replace(/\n/g, '<br/>');
     const adicionalesHTML = (formData.adicionales || '').replace(/\n/g, '<br/>');
@@ -487,7 +981,8 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       }
     }
 
-    const fullHTML = `<!DOCTYPE html>
+    try {
+      const fullHTML = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -512,13 +1007,6 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       line-height: 1.5;
       position: relative;
       overflow: hidden;
-    }
-      padding: 15mm 20mm 15mm 20mm;
-      box-sizing: border-box;
-      color: #000000;
-      font-size: 12px;
-      line-height: 1.5;
-      position: relative;
     }
     
     .page-break { page-break-before: always; break-before: page; }
@@ -714,13 +1202,11 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       <div style="margin-bottom: 20px; background-color: #f8fafc; padding: 15px; border: 1px solid #cbd5e1; border-radius: 6px;">
         <h4 style="margin: 0 0 10px 0; font-size: 13px; text-transform: uppercase; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">III. Identificación Oficial / Constancia de Situación Fiscal</h4>
         <div style="display: flex; gap: 20px; margin-top: 15px;">
-          <div style="flex: 1; border: 2px dashed #94a3b8; border-radius: 8px; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #ffffff;">
-            <p style="color: #64748b; font-size: 12px; font-weight: bold; margin: 0;">ANVERSO (FRENTE)</p>
-            <p style="color: #94a3b8; font-size: 10px; margin: 4px 0 0 0;">Identificación Oficial</p>
+          <div style="flex: 1; border: 2px dashed #cbd5e1; border-radius: 8px; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #ffffff; overflow: hidden;">
+            ${formData.ineFrente ? `<img src="${formData.ineFrente}" style="max-width: 100%; max-height: 100%; object-fit: contain;" />` : `<p style="color: #64748b; font-size: 12px; font-weight: bold; margin: 0;">ANVERSO (FRENTE)</p><p style="color: #94a3b8; font-size: 10px; margin: 4px 0 0 0;">Identificación Oficial</p>`}
           </div>
-          <div style="flex: 1; border: 2px dashed #94a3b8; border-radius: 8px; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #ffffff;">
-            <p style="color: #64748b; font-size: 12px; font-weight: bold; margin: 0;">REVERSO</p>
-            <p style="color: #94a3b8; font-size: 10px; margin: 4px 0 0 0;">Identificación Oficial</p>
+          <div style="flex: 1; border: 2px dashed #cbd5e1; border-radius: 8px; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #ffffff; overflow: hidden;">
+            ${formData.ineReverso ? `<img src="${formData.ineReverso}" style="max-width: 100%; max-height: 100%; object-fit: contain;" />` : `<p style="color: #64748b; font-size: 12px; font-weight: bold; margin: 0;">REVERSO</p><p style="color: #94a3b8; font-size: 10px; margin: 4px 0 0 0;">Identificación Oficial</p>`}
           </div>
         </div>
       </div>
@@ -843,7 +1329,7 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       <p style="font-weight: bold; margin-bottom: 12px; text-transform: uppercase; text-align: center; font-size: 12px;">DECLARACIÓN DE CONFORMIDAD Y COMPROMISO DE PAGO:</p>
       
       <p style="text-align: justify; margin-bottom: 15px; line-height: 1.8; font-size: 12px;">
-        Mediante la firma del presente documento, EL CLIENTE (o su representante autorizado) acusa de recibido a entera satisfacción el sistema fotovoltaico con los conceptos previamente listados en sus condiciones físicas y operativas, y se obliga incondicionalmente a liquidar a favor de EL PRESTADOR el saldo restante de <strong>${montoRestante} MXN</strong> dentro de un plazo no mayor a 5 (cinco) días hábiles a partir de esta fecha.
+        Mediante la firma del presente documento, EL CLIENTE (o su representante autorizado) acusa de recibido a entera satisfacción el sistema fotovoltaico con los conceptos previamente listados en sus condiciones físicas y operativas, y se obliga incondicionalmente a liquidar a favor de EL PRESTADOR el pago correspondiente de <strong>${formData.esquemaTramitesActivo ? `${montoEntregaFormatted} MXN (${numeroALetras(formData.montoEntregaSistema)}) - ${porcentajeEntrega}%` : `${montoRestante} MXN (${numeroALetras(formData.montoRestante)})`}</strong> dentro de un plazo no mayor a 5 (cinco) días hábiles a partir de esta fecha.
       </p>
 
       <p style="text-align: justify; margin-bottom: 20px; line-height: 1.8; font-size: 12px;">
@@ -873,6 +1359,56 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
             <p style="font-weight: bold; margin: 0; font-size: 12px;">TESTIGO</p>
             <p style="font-size: 11px; margin-top: 2px; color: #64748b;">Nombre y Firma</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHEET 6: ANEXO 5. ACTA DE CONCLUSIÓN DE TRÁMITES E INTERCONEXIÓN CFE -->
+    <div class="letter-sheet page-break">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #C49825; padding-bottom: 12px; margin-bottom: 25px; margin-top: 10px;">
+        <img src="${logoUrl}" style="height: 55px; width: auto;" alt="eSol Energías" onerror="this.style.display='none';">
+        <div style="text-align: right;">
+          <h3 style="font-family: 'Cinzel', serif; font-weight: 700; font-size: 18px; margin: 0; color: #0f172a; letter-spacing: 0.5px;">ACTA DE ENTREGABLE DE TRÁMITES CFE</h3>
+          <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Anexo 5 • ESOL ENERGÍAS</p>
+        </div>
+      </div>
+
+      <p style="text-align: justify; margin-bottom: 15px; line-height: 1.8; font-size: 12px;">
+        En la ciudad de Tepic, Nayarit, se hace constar la entrega formal de la documentación técnica, gestiones e integración del expediente de interconexión ante la <strong>Comisión Federal de Electricidad (CFE)</strong> para el inmueble ubicado en: <strong>${direccion}</strong>.
+      </p>
+
+      <p style="font-weight: bold; font-size: 12px; margin-bottom: 8px; color: #1e293b;">DETALLE DE TRÁMITES Y GESTIONES EJECUTADAS:</p>
+      <div style="background-color: #f8fafc; padding: 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; margin-bottom: 20px; color: #1e293b; line-height: 1.7;">
+        <div style="font-family: monospace; white-space: pre-wrap; line-height: 1.5;">${(formData.descripcionTramitesCfe || '').replace(/\n/g, '<br/>')}</div>
+      </div>
+
+      <p style="font-weight: bold; margin-bottom: 12px; text-transform: uppercase; text-align: center; font-size: 12px; color: #1e293b;">DECLARACIÓN DE CONFORMIDAD Y LIQUIDACIÓN FINAL DE TRÁMITES:</p>
+
+      <p style="text-align: justify; margin-bottom: 15px; line-height: 1.8; font-size: 12px;">
+        Mediante la firma de la presente Acta, EL CLIENTE acusa de recibido a entera satisfacción la conclusión formal de los trámites de interconexión y/o colocación del medidor bidireccional por parte de la CFE. Se obliga incondicionalmente a liquidar a favor de EL PRESTADOR el pago final pactado de <strong>${formatCurrency(formData.esquemaTramitesActivo ? formData.montoPuestaMedidor : (formData.montoTotal * 0.10))} MXN (${numeroALetras(formData.esquemaTramitesActivo ? formData.montoPuestaMedidor : (formData.montoTotal * 0.10))})</strong> (${formData.esquemaTramitesActivo ? formData.porcentajePuestaMedidor.toFixed(1) : "10.0"}%) correspondiente a la conclusión de trámites y puesta en marcha del sistema.
+      </p>
+
+      <p style="text-align: justify; margin-bottom: 40px; line-height: 1.8; font-size: 12px;">
+        Fecha de Conclusión de Trámites: _____ de ____________________ de 20____.
+      </p>
+
+      <div style="position: absolute; bottom: 60px; left: 0; width: 100%; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-evenly; margin-bottom: 55px;">
+          <div style="text-align: center; width: 35%;">
+            <div style="border-top: 1px solid #000; width: 100%; margin-bottom: 8px;"></div>
+            <p style="font-weight: bold; margin: 0; font-size: 12px;">ENTREGA (EL PRESTADOR)</p>
+            <p style="font-size: 11px; margin-top: 2px;">${empRepresentante}</p>
+          </div>
+          <div style="text-align: center; width: 35%;">
+            <div style="border-top: 1px solid #000; width: 220px; margin-bottom: 8px;"></div>
+            <p style="font-weight: bold; margin: 0; font-size: 12px;">RECIBE (EL CLIENTE)</p>
+            <p style="font-size: 11px; margin-top: 2px;">${firmaCliente}</p>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: center;">
+          <p style="font-size: 9px; color: #94a3b8; margin: 0; text-transform: uppercase;">
+            eSol Energías • Soluciones Integrales de Nayarit S. de R.L. de C.V. • Anexo 5 Oficial
+          </p>
         </div>
       </div>
     </div>
@@ -996,14 +1532,19 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
       }
     };
 
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(fullHTML);
-      win.document.close();
-    } else {
-      alert('Por favor permite las ventanas emergentes (pop-ups) en tu navegador para ver el contrato.');
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(fullHTML);
+        win.document.close();
+      } else {
+        alert('Por favor permite las ventanas emergentes (pop-ups) en tu navegador para ver el contrato.');
+      }
+    } catch (err: any) {
+      console.error("Error al generar vista previa del contrato:", err);
+      alert("Ocurrió un error al preparar la vista previa del contrato: " + (err.message || "Error desconocido"));
+    } finally {
+      setIsGenerating(false);
     }
-    setIsGenerating(false);
   };
 
 
@@ -1042,31 +1583,124 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
               />
             </div>
             
+            {/* Elementos de entrada de archivo ocultos */}
+            <input 
+              type="file" 
+              ref={ineFrenteInputRef} 
+              accept="image/*,.pdf" 
+              className="hidden" 
+              onChange={e => handleImageUpload(e, 'ineFrente')} 
+            />
+            <input 
+              type="file" 
+              ref={ineReversoInputRef} 
+              accept="image/*,.pdf" 
+              className="hidden" 
+              onChange={e => handleImageUpload(e, 'ineReverso')} 
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
               {/* Bloque de escaneo INE / Constancia */}
               <div className="md:col-span-2 mb-2 bg-dark-1 p-4 rounded-xl border border-dashed border-dark-4">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h4 className="text-sm font-bold text-cream">Extracción Automática</h4>
-                    <p className="text-[10px] text-cream-muted">Sube el INE o Constancia de Situación Fiscal para auto-completar</p>
+                    <h4 className="text-sm font-bold text-cream flex items-center gap-2">
+                      <ScanFace className="w-4 h-4 text-gold" />
+                      Extracción Automática con IA
+                    </h4>
+                    <p className="text-[10px] text-cream-muted">Sube el INE o Constancia de Situación Fiscal para auto-completar los campos</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => alert('Simulación: Extrayendo datos con IA')}
-                    className="px-3 py-1.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-bold flex items-center gap-2 hover:bg-blue-500/30 transition-colors cursor-pointer"
+                    onClick={handleExtraerDatos}
+                    disabled={isExtracting}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-2 transition-colors cursor-pointer ${
+                      isExtracting
+                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 opacity-70 cursor-not-allowed'
+                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30'
+                    }`}
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Extraer con IA
+                    {isExtracting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                    {isExtracting ? 'Extrayendo...' : 'Extraer con IA'}
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="border border-dark-4 rounded-lg p-4 text-center cursor-pointer hover:bg-dark-3/50 transition-colors">
-                    <Upload className="w-5 h-5 mx-auto text-cream-muted mb-2" />
-                    <span className="text-xs text-cream-muted font-medium">Documento Frontal</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Documento Frontal */}
+                  <div 
+                    onClick={() => ineFrenteInputRef.current?.click()}
+                    className={`relative border rounded-lg p-3 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[110px] ${
+                      formData.ineFrente 
+                        ? 'border-gold/50 bg-gold/5 hover:bg-gold/10' 
+                        : 'border-dark-4 hover:bg-dark-3/50'
+                    }`}
+                  >
+                    {formData.ineFrente ? (
+                      <div className="relative w-full flex flex-col items-center">
+                        <img 
+                          src={formData.ineFrente} 
+                          alt="Documento Frontal" 
+                          className="max-h-24 object-contain rounded mb-1.5 border border-dark-4 shadow-sm"
+                        />
+                        <div className="flex items-center gap-1.5 text-[10px] text-gold font-bold">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Documento Frontal Cargado
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => handleRemoveImage('ineFrente', e)}
+                          className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow"
+                          title="Eliminar imagen"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5 mx-auto text-cream-muted mb-2" />
+                        <span className="text-xs text-cream-muted font-medium">Documento Frontal</span>
+                        <span className="text-[9px] text-cream-muted/70 mt-1">Haz clic para seleccionar imagen o PDF</span>
+                      </>
+                    )}
                   </div>
-                  <div className="border border-dark-4 rounded-lg p-4 text-center cursor-pointer hover:bg-dark-3/50 transition-colors">
-                    <Upload className="w-5 h-5 mx-auto text-cream-muted mb-2" />
-                    <span className="text-xs text-cream-muted font-medium">Reverso (INE)</span>
+
+                  {/* Reverso (INE) */}
+                  <div 
+                    onClick={() => ineReversoInputRef.current?.click()}
+                    className={`relative border rounded-lg p-3 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[110px] ${
+                      formData.ineReverso 
+                        ? 'border-gold/50 bg-gold/5 hover:bg-gold/10' 
+                        : 'border-dark-4 hover:bg-dark-3/50'
+                    }`}
+                  >
+                    {formData.ineReverso ? (
+                      <div className="relative w-full flex flex-col items-center">
+                        <img 
+                          src={formData.ineReverso} 
+                          alt="Reverso (INE)" 
+                          className="max-h-24 object-contain rounded mb-1.5 border border-dark-4 shadow-sm"
+                        />
+                        <div className="flex items-center gap-1.5 text-[10px] text-gold font-bold">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Reverso Cargado
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => handleRemoveImage('ineReverso', e)}
+                          className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow"
+                          title="Eliminar imagen"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5 mx-auto text-cream-muted mb-2" />
+                        <span className="text-xs text-cream-muted font-medium">Reverso (INE)</span>
+                        <span className="text-[9px] text-cream-muted/70 mt-1">Haz clic para seleccionar imagen o PDF</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1183,6 +1817,16 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
                 className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-2.5 text-cream focus:border-gold outline-none font-mono text-sm"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-cream-muted mb-1">Servicios y Gestiones de Trámites CFE</label>
+              <textarea
+                rows={4}
+                value={formData.descripcionTramitesCfe}
+                onChange={e => setFormData({...formData, descripcionTramitesCfe: e.target.value})}
+                className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-2.5 text-cream focus:border-gold outline-none font-mono text-sm"
+              />
+            </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-dark-3/50 p-4 rounded-xl border border-dark-4">
               <div className="col-span-2 md:col-span-1">
@@ -1224,7 +1868,7 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
                 </div>
               </div>
               <div className="col-span-2 md:col-span-1">
-                <label className="block text-sm font-medium text-cream-muted mb-1">Restante</label>
+                <label className="block text-sm font-medium text-cream-muted mb-1">Restante Total</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cream-muted">$</span>
                   <FormattedCurrencyInput
@@ -1234,6 +1878,88 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Selector de División de Pago Restante por Entregables */}
+            <div className="bg-dark-3/50 p-4 rounded-xl border border-dark-4 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <label className="text-sm font-medium text-cream block">Dividir Pago Restante por Entregables</label>
+                  <p className="text-[10px] text-cream-muted">Divide el restante entre la Instalación Física y la Conclusión de Trámites CFE</p>
+                </div>
+                <select
+                  value={formData.esquemaTramitesActivo ? "yes" : "no"}
+                  onChange={e => setFormData({...formData, esquemaTramitesActivo: e.target.value === "yes"})}
+                  className="bg-dark-1 border border-dark-4 rounded-lg px-3 py-1.5 text-cream text-sm focus:border-gold outline-none cursor-pointer"
+                >
+                  <option value="no">No (Un solo pago a la entrega)</option>
+                  <option value="yes">Sí (2 Hitos: Instalación + Medidor CFE)</option>
+                </select>
+              </div>
+
+              {formData.esquemaTramitesActivo && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-dark-4">
+                  {/* Hito 1: Entrega de Sistema */}
+                  <div className="bg-dark-1 p-3.5 rounded-xl border border-dark-4 space-y-2.5">
+                    <span className="text-xs font-bold text-cream block">1. A la Entrega del Sistema (Instalación Física)</span>
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                      <div>
+                        <label className="text-[10px] text-cream-muted block mb-1">Monto ($):</label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-muted text-xs">$</span>
+                          <FormattedCurrencyInput
+                            value={formData.montoEntregaSistema}
+                            onChange={val => updateHitoMonto('entrega', val || 0)}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg pl-6 pr-2 py-1.5 text-gold font-bold text-xs focus:border-gold outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-cream-muted block mb-1">% del Total:</label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            value={formData.porcentajeEntregaSistemaStr}
+                            onChange={e => updateHitoPorcentaje('entrega', parseFloat(e.target.value), e.target.value)}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream text-xs text-center focus:border-gold outline-none"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-cream-muted">%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hito 2: Puesta de Medidor CFE */}
+                  <div className="bg-dark-1 p-3.5 rounded-xl border border-dark-4 space-y-2.5">
+                    <span className="text-xs font-bold text-cream block">2. A la Puesta de Medidor CFE (Trámites)</span>
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                      <div>
+                        <label className="text-[10px] text-cream-muted block mb-1">Monto ($):</label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-muted text-xs">$</span>
+                          <FormattedCurrencyInput
+                            value={formData.montoPuestaMedidor}
+                            onChange={val => updateHitoMonto('medidor', val || 0)}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg pl-6 pr-2 py-1.5 text-gold font-bold text-xs focus:border-gold outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-cream-muted block mb-1">% del Total:</label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            value={formData.porcentajePuestaMedidorStr}
+                            onChange={e => updateHitoPorcentaje('medidor', parseFloat(e.target.value), e.target.value)}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream text-xs text-center focus:border-gold outline-none"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-cream-muted">%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-dark-3/50 p-4 rounded-xl border border-dark-4 space-y-4">
@@ -1274,14 +2000,34 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
 
           </div>
 
-          <button
-            onClick={handleGeneratePDF}
-            disabled={!selectedBudget || isGenerating}
-            className="w-full py-3 mt-4 bg-gold text-dark-1 font-medium rounded-xl hover:bg-yellow-500 transition-colors flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer"
-          >
-            {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-            {isGenerating ? 'Generando PDF...' : 'Generar y Exportar PDF'}
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <button
+              onClick={handleGeneratePDF}
+              disabled={!selectedBudget || isGenerating}
+              className="w-full py-3 bg-gold text-dark-1 font-medium rounded-xl hover:bg-yellow-500 transition-colors flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer text-xs"
+            >
+              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {isGenerating ? 'Generando...' : 'Exportar Contrato Completo'}
+            </button>
+
+            <button
+              onClick={handleGeneratePdfEntrega}
+              disabled={!selectedBudget || isGenerating}
+              className="w-full py-3 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium rounded-xl hover:bg-emerald-500/30 transition-colors flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer text-xs"
+            >
+              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              Exportar Carta Entrega - Recepción
+            </button>
+
+            <button
+              onClick={handleGeneratePdfTramites}
+              disabled={!selectedBudget || isGenerating}
+              className="w-full py-3 bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium rounded-xl hover:bg-blue-500/30 transition-colors flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer text-xs"
+            >
+              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              Exportar Acta de Trámites CFE
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1508,32 +2254,53 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
 
           {/* Page 4: Anexo 4 (Acta de Entrega Recepción) */}
           <div className="p-10">
-             <h3 className="font-bold text-lg mb-8 uppercase text-center">ANEXO 4. ACTA DE ENTREGA - RECEPCIÓN Y CONFORMIDAD DE OBRA</h3>
+             <h3 className="font-bold text-[15px] mb-6 uppercase text-center border-b-2 border-black pb-2">ANEXO 4. ACTA DE ENTREGA - RECEPCIÓN Y CONFORMIDAD DE OBRA</h3>
              
-             <p className="text-left mb-6 leading-loose">
+             <p className="text-justify mb-4 leading-[1.8] text-[12px]">
                En la ciudad de Tepic, Nayarit, se hace constar la entrega formal de la obra física correspondiente al Sistema de Generación Fotovoltaico instalado en el inmueble ubicado en: <strong>{formData.clienteDireccion || '____________________________________________________'}</strong>.
              </p>
+
+             <p className="text-justify mb-2.5 leading-[1.8] text-[12px]">
+               Se detallan a continuación los equipos, materiales y conceptos instalados de acuerdo con lo estipulado en el presupuesto original, amparando legalmente la totalidad de la obra ejecutada y entregada funcionando al 100%:
+             </p>
+
+             <div className="bg-slate-50 p-4 border border-slate-200 rounded-md text-[11px] mb-5 text-slate-800">
+               <div className="font-mono whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: (formData.descripcionEquipos || '').replace(/\n/g, '<br/>') }} />
+             </div>
              
-             <p className="font-bold mb-4 uppercase text-center">DECLARACIÓN DE CONFORMIDAD Y COMPROMISO DE PAGO:</p>
+             <p className="font-bold mb-3 uppercase text-center text-[12px]">DECLARACIÓN DE CONFORMIDAD Y COMPROMISO DE PAGO:</p>
              
-             <p className="text-left mb-6 leading-loose">
-               Mediante la firma del presente documento, EL CLIENTE (o su representante autorizado) acusa de recibido a entera satisfacción el sistema fotovoltaico en sus condiciones físicas y operativas, y se obliga incondicionalmente a liquidar a favor de EL PRESTADOR el saldo restante de <strong>{formatCurrency(formData.montoRestante)} MXN</strong> dentro de un plazo no mayor a 5 (cinco) días hábiles a partir de esta fecha.
+             <p className="text-justify mb-4 leading-[1.8] text-[12px]">
+               Mediante la firma del presente documento, EL CLIENTE (o su representante autorizado) acusa de recibido a entera satisfacción el sistema fotovoltaico con los conceptos previamente listados en sus condiciones físicas y operativas, y se obliga incondicionalmente a liquidar a favor de EL PRESTADOR el pago correspondiente de <strong>{formData.esquemaTramitesActivo ? `${formatCurrency(formData.montoEntregaSistema)} MXN (${numeroALetras(formData.montoEntregaSistema)}) - ${(formData.porcentajeEntregaSistema || 0).toFixed(1)}%` : `${formatCurrency(formData.montoRestante)} MXN (${numeroALetras(formData.montoRestante)})`}</strong> dentro de un plazo no mayor a 5 (cinco) días hábiles a partir de esta fecha.
+             </p>
+
+             <p className="text-justify mb-5 leading-[1.8] text-[12px]">
+               El presente instrumento se emite de conformidad con lo establecido en el Código Civil aplicable al Estado de Nayarit y Código Civil Federal en materia de contratos de obra y prestación de servicios. Se anexa de forma indisoluble al Contrato Principal celebrado entre las partes, constituyendo prueba plena de la entrega real y jurídica de los bienes, aceptando el cliente irrevocablemente su conformidad.
              </p>
              
-             <p className="text-left mb-10 leading-loose">
+             <p className="text-justify mb-10 leading-[1.8] text-[12px]">
                Fecha de Entrega Física: _____ de ____________________ de 20____.
              </p>
 
-             <div className="flex justify-between mt-20 pt-10 px-10">
-               <div className="text-center">
-                 <div className="border-t border-black w-48 mb-2"></div>
-                 <p className="font-bold">ENTREGA (EL PRESTADOR)</p>
-                 <p className="text-xs">GUSTAVO CORONA CERVANTES</p>
+             <div className="absolute bottom-[60px] left-0 w-full box-border">
+               <div className="flex justify-evenly mb-14">
+                 <div className="text-center w-[35%]">
+                   <div className="border-t border-black w-full mb-2"></div>
+                   <p className="font-bold m-0 text-[12px]">ENTREGA (EL PRESTADOR)</p>
+                   <p className="text-[11px] mt-0.5">{formData.empresaRepresentante}</p>
+                 </div>
+                 <div className="text-center w-[35%]">
+                   <div className="border-t border-black w-full mb-2"></div>
+                   <p className="font-bold m-0 text-[12px]">RECIBE (EL CLIENTE)</p>
+                   <p className="text-[11px] mt-0.5">{formData.clienteNombre || '_________________'}</p>
+                 </div>
                </div>
-               <div className="text-center">
-                 <div className="border-t border-black w-48 mb-2"></div>
-                 <p className="font-bold">RECIBE (EL CLIENTE)</p>
-                 <p className="text-xs">{formData.clienteNombre || '_________________'}</p>
+               <div className="flex justify-center">
+                 <div className="text-center w-[35%]">
+                   <div className="border-t border-black w-full mb-2"></div>
+                   <p className="font-bold m-0 text-[12px]">TESTIGO</p>
+                   <p className="text-[11px] mt-0.5 text-slate-500">Nombre y Firma</p>
+                 </div>
                </div>
              </div>
           </div>

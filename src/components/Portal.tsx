@@ -2202,8 +2202,9 @@ export function Portal() {
                             }}
                             className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-xs text-cream px-3 py-2.5 rounded-lg focus:outline-none"
                           >
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado - Nueva Generación)</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Veloz)</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recomendado - Rápido y Estable)</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Alta Disponibilidad)</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Nueva Generación)</option>
                             <option value="gemini-1.5-pro">Gemini 1.5 Pro (Razonamiento Avanzado)</option>
                           </select>
                         </div>

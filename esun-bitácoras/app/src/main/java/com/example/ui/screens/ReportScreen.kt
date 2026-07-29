@@ -51,8 +51,17 @@ fun ReportScreen(viewModel: BitacoraViewModel) {
     val projectsList by viewModel.projectsList.collectAsState()
     val scrollState = rememberScrollState()
     
-    // Store recent generated reports: List of Pair<FileName, File>
+    val context = LocalContext.current
     var generatedReports by remember { mutableStateOf<List<Pair<String, File>>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        val files = context.cacheDir.listFiles { _, name -> 
+            name.startsWith("Reporte_") && name.endsWith(".pdf") 
+        }
+        if (files != null) {
+            generatedReports = files.map { it.name to it }.sortedByDescending { it.second.lastModified() }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -157,9 +166,19 @@ fun GeneralSummaryCard(
 ) {
     val totalProjectBudget = budgetItems.sumOf { it.quantity * it.unitPrice }
     val totalCostExecuted = budgetItems.sumOf { it.executedQuantity * it.unitPrice }
-    val overallPhysicalProgress = if (budgetItems.isNotEmpty()) {
-        budgetItems.sumOf { if (it.quantity > 0.0) (it.executedQuantity / it.quantity) * 100.0 else 0.0 } / budgetItems.size
-    } else 65.0
+    fun isAdmin(item: com.example.data.database.BudgetItemEntity) =
+        if (item.categoryName.isNotEmpty()) item.categoryName.contains("tramit", ignoreCase = true)
+        else item.description.contains("tramit", ignoreCase = true)
+    val physicalItems = budgetItems.filter { !isAdmin(it) }
+    val adminItems = budgetItems.filter { isAdmin(it) }
+
+    val overallPhysicalProgress = if (physicalItems.isNotEmpty()) {
+        physicalItems.sumOf { if (it.quantity > 0.0) (it.executedQuantity / it.quantity) * 100.0 else 0.0 } / physicalItems.size
+    } else 0.0
+
+    val adminProgress = if (adminItems.isNotEmpty()) {
+        adminItems.sumOf { if (it.quantity > 0.0) (it.executedQuantity / it.quantity) * 100.0 else 0.0 } / adminItems.size
+    } else 0.0
 
     Card(
         modifier = Modifier
@@ -191,7 +210,7 @@ fun GeneralSummaryCard(
             HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
             
             Text("Gráficas Generales", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
-            ProjectStatusCharts(totalProjectBudget, totalCostExecuted, overallPhysicalProgress)
+            ProjectStatusCharts(totalProjectBudget, totalCostExecuted, overallPhysicalProgress, adminProgress, adminItems.isNotEmpty())
             
             HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
 
@@ -261,7 +280,7 @@ fun RecentReportsSection(reports: List<Pair<String, File>>, onDelete: (File) -> 
                                 setDataAndType(uri, "application/pdf")
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
-                            context.startActivity(Intent.createChooser(intent, "Abrir PDF"))
+                            context.startActivity(intent)
                         } catch (e: Exception) {
                             android.widget.Toast.makeText(context, "No se pudo abrir el archivo", android.widget.Toast.LENGTH_SHORT).show()
                         }
@@ -302,9 +321,19 @@ fun ProjectReportRow(
 
     val totalProjectBudget = budgetItems.sumOf { it.quantity * it.unitPrice }
     val totalCostExecuted = budgetItems.sumOf { it.executedQuantity * it.unitPrice }
-    val overallPhysicalProgress = if (budgetItems.isNotEmpty()) {
-        budgetItems.sumOf { if (it.quantity > 0.0) (it.executedQuantity / it.quantity) * 100.0 else 0.0 } / budgetItems.size
-    } else 65.0
+    fun isAdmin(item: com.example.data.database.BudgetItemEntity) =
+        if (item.categoryName.isNotEmpty()) item.categoryName.contains("tramit", ignoreCase = true)
+        else item.description.contains("tramit", ignoreCase = true)
+    val physicalItems = budgetItems.filter { !isAdmin(it) }
+    val adminItems = budgetItems.filter { isAdmin(it) }
+
+    val overallPhysicalProgress = if (physicalItems.isNotEmpty()) {
+        physicalItems.sumOf { if (it.quantity > 0.0) (it.executedQuantity / it.quantity) * 100.0 else 0.0 } / physicalItems.size
+    } else 0.0
+
+    val adminProgress = if (adminItems.isNotEmpty()) {
+        adminItems.sumOf { if (it.quantity > 0.0) (it.executedQuantity / it.quantity) * 100.0 else 0.0 } / adminItems.size
+    } else 0.0
 
     Card(
         modifier = Modifier
@@ -346,13 +375,15 @@ fun ProjectReportRow(
                         LedgerRow("Gasto Ejecutado:", "$${String.format("%,.2f", totalCostExecuted)} MXN", SuccessGreen)
                         val remanente = totalProjectBudget - totalCostExecuted
                         LedgerRow("Remanente Disponible:", "$${String.format("%,.2f", remanente)} MXN", if (remanente >= 0) ConnectedBlue else WarningRed)
-                        LedgerRow("Avance Físico:", "${"%.1f".format(overallPhysicalProgress)}%", ConnectedBlue)
+                        val isTramiteUi = bitacoras.any { it.concepto_name?.contains("tramit", ignoreCase = true) == true }
+                        val lblFisicoUi = if (isTramiteUi) "Avance Admin.:" else "Avance Físico:"
+                        LedgerRow(lblFisicoUi, "${"%.1f".format(overallPhysicalProgress)}%", ConnectedBlue)
                     }
                     
                     HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
                     
                     Text("Gráficas del Proyecto", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
-                    ProjectStatusCharts(totalProjectBudget, totalCostExecuted, overallPhysicalProgress)
+                    ProjectStatusCharts(totalProjectBudget, totalCostExecuted, overallPhysicalProgress, adminProgress, adminItems.isNotEmpty())
                     
                     HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
                     
@@ -411,7 +442,7 @@ fun ProjectReportRow(
                                             setDataAndType(uri, "application/pdf")
                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                         }
-                                        context.startActivity(Intent.createChooser(intent, "Previsualizar Reporte"))
+                                        context.startActivity(intent)
                                     } catch (e: Exception) {
                                         android.widget.Toast.makeText(context, "No hay lector PDF", android.widget.Toast.LENGTH_SHORT).show()
                                     }
@@ -489,7 +520,7 @@ fun generatePdfReportMockupStyle(
         val paintSection = Paint().apply { color = text1Color; textSize = 14f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD) }
         val paintLabel = Paint().apply { color = text2Color; textSize = 9f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
         val paintValue = Paint().apply { color = text1Color; textSize = 11f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
-        val paintDesc = Paint().apply { color = text2Color; textSize = 10f; }
+        val paintDesc = Paint().apply { color = text2Color; textSize = 11f; }
         val paintLine = Paint().apply { color = border1Color; strokeWidth = 1f }
 
         // ---- HEADER ----
@@ -529,18 +560,26 @@ fun generatePdfReportMockupStyle(
         canvas.drawText("En Progreso", margin + 300f, y + 28f, Paint(paintValue).apply { color = successColor })
 
         canvas.drawText("RESPONSABLE TÉCNICO", margin + 10f, y + 43f, paintLabel)
-        canvas.drawText(reporterName.uppercase(), margin + 10f, y + 55f, paintValue)
+        val reporterTitleCase = reporterName.split(" ").joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.uppercase() } }
+        val paintResidente = Paint(paintValue).apply { 
+            color = Color.parseColor("#666666") 
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL) 
+        }
+        canvas.drawText(reporterTitleCase, margin + 10f, y + 55f, paintResidente)
 
         y += 80f
 
         // ---- FINANCE / PHYSICAL GRID ----
+        val isTramite = bitacoras.any { it.concepto_name?.contains("tramit", ignoreCase = true) == true }
+        val lblFisico = if (isTramite) "Avance Admin." else "Avance Físico"
+        
         if (includeFinancial) {
             canvas.drawText("CONTROL DE GESTIÓN", margin, y, paintSection)
             canvas.drawLine(margin + 170f, y - 5f, pageWidth - margin, y - 5f, Paint().apply { color = goldColor; strokeWidth = 1f })
             y += 15f
             
             val boxW = (pageWidth - margin * 2 - 30) / 4
-            val labels = listOf("Avance Físico", "Presup. Aprob.", "Devengado", "Remanente")
+            val labels = listOf(lblFisico, "Presup. Aprob.", "Devengado", "Remanente")
             val values = listOf("${"%.1f".format(physicalProgress)}%", "$${String.format("%,.0f", totalBudget)}", "$${String.format("%,.0f", totalExecuted)}", "$${String.format("%,.0f", totalBudget - totalExecuted)}")
             val colors = listOf(goldColor, goldColor, successColor, goldColor)
             
@@ -558,8 +597,53 @@ fun generatePdfReportMockupStyle(
             canvas.drawText("RESUMEN DE AVANCE", margin, y, paintSection)
             canvas.drawLine(margin + 160f, y - 5f, pageWidth - margin, y - 5f, Paint().apply { color = goldColor; strokeWidth = 1f })
             y += 15f
-            canvas.drawText("Avance Físico: ${"%.1f".format(physicalProgress)}%", margin, y + 10f, paintValue)
+            canvas.drawText("$lblFisico: ${"%.1f".format(physicalProgress)}%", margin, y + 10f, paintValue)
             y += 35f
+        }
+
+        // ---- CONCEPTOS TRABAJADOS (CHECKLIST) ----
+        val uniqueConcepts = bitacoras.mapNotNull { it.concepto_name }.filter { it.isNotBlank() }.distinct()
+        if (uniqueConcepts.isNotEmpty()) {
+            canvas.drawText("CONCEPTOS TRABAJADOS", margin, y, paintSection)
+            canvas.drawLine(margin + 190f, y - 5f, pageWidth - margin, y - 5f, Paint().apply { color = goldColor; strokeWidth = 1f })
+            y += 20f
+            
+            uniqueConcepts.forEach { concept ->
+                // Draw elegant checkbox
+                val cbX = margin
+                val cbY = y - 10f
+                canvas.drawRoundRect(RectF(cbX, cbY, cbX + 12f, cbY + 12f), 3f, 3f, Paint().apply { style = Paint.Style.FILL; color = successColor })
+                // Draw checkmark
+                canvas.drawLine(cbX + 3f, cbY + 6f, cbX + 5f, cbY + 9f, Paint().apply { color = Color.WHITE; strokeWidth = 1.5f; style = Paint.Style.STROKE })
+                canvas.drawLine(cbX + 5f, cbY + 9f, cbX + 9f, cbY + 3f, Paint().apply { color = Color.WHITE; strokeWidth = 1.5f; style = Paint.Style.STROKE })
+                
+                // Draw concept name with simple word wrap
+                val words = concept.split(" ")
+                var line = ""
+                words.forEach { w ->
+                    if (paintValue.measureText("$line $w") < (pageWidth - margin * 2 - 20f)) {
+                        line += "$w "
+                    } else {
+                        canvas.drawText(line.trim(), cbX + 20f, y, paintValue)
+                        y += 16f
+                        line = "$w "
+                    }
+                }
+                if (line.isNotBlank()) {
+                    canvas.drawText(line.trim(), cbX + 20f, y, paintValue)
+                }
+                y += 20f
+                
+                // Page break check for concepts
+                if (y > pageHeight - margin) {
+                    pdf.finishPage(page)
+                    pageNumber++
+                    val next = newPage(pageNumber)
+                    page = next.first; canvas = next.second
+                    y = margin + 20f
+                }
+            }
+            y += 10f
         }
 
         // ---- DAILY LOGS (WITH IMAGES) ----
@@ -568,8 +652,38 @@ fun generatePdfReportMockupStyle(
         y += 20f
 
         bitacoras.forEach { bit ->
+            var conceptHeight = 0f
+            if (!bit.concepto_name.isNullOrBlank()) {
+                conceptHeight = 22f
+            }
+            
+            val descTextLocal = bit.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+            val descWordsLocal = descTextLocal.split(" ")
+            var tmpLineStr = ""
+            var descLineCount = 0
+            descWordsLocal.forEach { word ->
+                if (paintDesc.measureText("$tmpLineStr $word") < (pageWidth - margin * 2)) {
+                    tmpLineStr += "$word "
+                } else {
+                    descLineCount++
+                    tmpLineStr = "$word "
+                }
+            }
+            if (tmpLineStr.isNotEmpty()) {
+                descLineCount++
+            }
+            val descHeight = descLineCount * 16f + 10f
+            
+            val urisCount = bit.photoUri?.split(",")?.filter { it.isNotBlank() }?.size ?: 0
+            val targetW = (pageWidth - margin * 2 - 20f) / 3f
+            val targetH = targetW * 0.75f
+            val numRows = kotlin.math.ceil(urisCount / 3.0).toInt()
+            val imagesHeight = if (urisCount > 0) numRows * (targetH + 10f) else 0f
+            
+            val totalHeight = 20f + conceptHeight + descHeight + imagesHeight
+
             // Check space
-            if (y > pageHeight - 200f) {
+            if (y + totalHeight > pageHeight - margin) {
                 pdf.finishPage(page)
                 pageNumber++
                 val next = newPage(pageNumber)
@@ -582,22 +696,29 @@ fun generatePdfReportMockupStyle(
             canvas.drawText(bit.date, margin, y + 10f, paintValue)
             canvas.drawText("Clima: ${bit.weather}  |  Cuadrilla: ${bit.crewCount}", pageWidth - margin - 150f, y + 10f, paintLabel)
             y += 20f
+
+            if (!bit.concepto_name.isNullOrBlank()) {
+                canvas.drawRoundRect(RectF(margin, y, pageWidth - margin, y + 18f), 4f, 4f, Paint().apply { color = android.graphics.Color.parseColor("#F3F4F6") }) // Light gray badge
+                canvas.drawText("Avance en: ${bit.concepto_name}", margin + 5f, y + 13f, Paint(paintLabel).apply { color = goldColor; textSize = 9f })
+                y += 22f
+            }
             
             // Text word wrap logic (simplified)
-            val descWords = bit.description.split(" ")
+            val descText = bit.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+            val descWords = descText.split(" ")
             var lineStr = ""
             descWords.forEach { word ->
                 if (paintDesc.measureText("$lineStr $word") < (pageWidth - margin * 2)) {
                     lineStr += "$word "
                 } else {
                     canvas.drawText(lineStr, margin, y + 10f, paintDesc)
-                    y += 14f
+                    y += 16f
                     lineStr = "$word "
                 }
             }
             if (lineStr.isNotEmpty()) {
                 canvas.drawText(lineStr, margin, y + 10f, paintDesc)
-                y += 14f
+                y += 16f
             }
             y += 10f
 
@@ -616,10 +737,32 @@ fun generatePdfReportMockupStyle(
                     
                     if (uri.startsWith("content://") || uri.startsWith("file://")) {
                         try {
-                            val stream = context.contentResolver.openInputStream(android.net.Uri.parse(uri))
+                            val parsedUri = android.net.Uri.parse(uri)
+                            val stream = context.contentResolver.openInputStream(parsedUri)
                             if (stream != null) {
                                 bMap = BitmapFactory.decodeStream(stream)
                                 stream.close()
+                                
+                                // Fix EXIF rotation
+                                val exifStream = context.contentResolver.openInputStream(parsedUri)
+                                if (exifStream != null && bMap != null) {
+                                    val exif = android.media.ExifInterface(exifStream)
+                                    val orientation = exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL)
+                                    val matrix = android.graphics.Matrix()
+                                    when (orientation) {
+                                        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+                                        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+                                        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+                                    }
+                                    if (!matrix.isIdentity) {
+                                        val rotated = android.graphics.Bitmap.createBitmap(bMap!!, 0, 0, bMap!!.width, bMap!!.height, matrix, true)
+                                        if (rotated != bMap) {
+                                            bMap!!.recycle()
+                                            bMap = rotated
+                                        }
+                                    }
+                                    exifStream.close()
+                                }
                             }
                         } catch (e: Exception) { e.printStackTrace() }
                     } else {
@@ -647,8 +790,9 @@ fun generatePdfReportMockupStyle(
                     }
                     
                     if (bMap != null) {
-                        val targetW = 120f
-                        val targetH = 90f
+                        // 3 images per row (pageWidth - 2*margin - 2*10f padding) / 3
+                        val targetW = (pageWidth - margin * 2 - 20f) / 3f
+                        val targetH = targetW * 0.75f // Keep 4:3 aspect ratio
                         
                         if (imgX + targetW > pageWidth - margin) {
                             imgX = margin
@@ -713,8 +857,16 @@ fun generatePdfReportMockupStyle(
                             )
                             val destRect = RectF(imgX, y, imgX + targetW, y + targetH)
                             
-                            canvas.drawRoundRect(destRect, 4f, 4f, Paint().apply { color = border1Color })
+                            canvas.save()
+                            val clipPath = android.graphics.Path().apply {
+                                addRoundRect(destRect, 8f, 8f, android.graphics.Path.Direction.CW)
+                            }
+                            canvas.clipPath(clipPath)
                             canvas.drawBitmap(scaledMap, srcRect, destRect, null)
+                            canvas.restore()
+                            
+                            // Draw stroke border
+                            canvas.drawRoundRect(destRect, 8f, 8f, Paint().apply { style = Paint.Style.STROKE; color = border1Color; strokeWidth = 1f })
                             
                             if (scaledMap != bMap) {
                                 scaledMap.recycle()
@@ -748,20 +900,27 @@ fun generatePdfReportMockupStyle(
             y = margin + 20f
         }
 
-        y += 40f
+        y += 60f // Increased space before the section title
         canvas.drawText("VALIDACIÓN TÉCNICA Y APROBACIÓN", margin, y, paintSection)
-        canvas.drawLine(margin + 260f, y - 5f, pageWidth - margin, y - 5f, Paint().apply { color = goldColor; strokeWidth = 1f })
-        y += 40f
+        canvas.drawLine(margin + 270f, y - 5f, pageWidth - margin, y - 5f, Paint().apply { color = goldColor; strokeWidth = 1f })
+        y += 80f // Increased space for the physical signature
 
-        val sigW = 160f
-        canvas.drawLine(margin, y, margin + sigW, y, paintLine)
-        canvas.drawText(reporterName.uppercase(), margin, y + 15f, paintValue)
-        canvas.drawText("RESIDENTE DE OBRA (ELABORÓ)", margin, y + 27f, paintLabel)
+        val sigW = 180f
+        val centerX1 = pageWidth / 4f
+        val centerX2 = (pageWidth / 4f) * 3f
+        
+        val paintCenterValue = Paint(paintValue).apply { textAlign = Paint.Align.CENTER }
+        val paintCenterLabel = Paint(paintLabel).apply { textAlign = Paint.Align.CENTER }
 
-        val rx = pageWidth - margin - sigW
-        canvas.drawLine(rx, y, rx + sigW, y, paintLine)
-        canvas.drawText("REVISIÓN CLIENTE", rx, y + 15f, paintValue)
-        canvas.drawText("SUPERVISIÓN / CLIENTE (REVISÓ)", rx, y + 27f, paintLabel)
+        val left1 = centerX1 - sigW / 2f
+        canvas.drawLine(left1, y, left1 + sigW, y, paintLine)
+        canvas.drawText(reporterTitleCase, centerX1, y + 15f, paintCenterValue)
+        canvas.drawText("RESIDENTE DE OBRA (ELABORÓ)", centerX1, y + 27f, paintCenterLabel)
+
+        val left2 = centerX2 - sigW / 2f
+        canvas.drawLine(left2, y, left2 + sigW, y, paintLine)
+        canvas.drawText("REVISIÓN CLIENTE", centerX2, y + 15f, paintCenterValue)
+        canvas.drawText("SUPERVISIÓN / CLIENTE (REVISÓ)", centerX2, y + 27f, paintCenterLabel)
 
         pdf.finishPage(page)
 
@@ -844,7 +1003,9 @@ fun CuadrillaTelemetryCard(
 fun ProjectStatusCharts(
     totalBudget: Double,
     totalExecuted: Double,
-    physicalProgress: Double
+    physicalProgress: Double,
+    adminProgress: Double = 0.0,
+    hasAdmin: Boolean = false
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         val finProgress = if (totalBudget > 0) (totalExecuted / totalBudget) else 0.0
@@ -858,6 +1019,19 @@ fun ProjectStatusCharts(
                 trackColor = LightGrayBg
             )
             Text("${"%.1f".format(physicalProgress)}%", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = SuccessGreen, modifier = Modifier.padding(start = 12.dp).width(50.dp))
+        }
+        
+        if (hasAdmin) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Avance Admin.", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = SlateDeep, modifier = Modifier.width(130.dp))
+                LinearProgressIndicator(
+                    progress = { (adminProgress / 100.0).toFloat().coerceIn(0f, 1f) },
+                    modifier = Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(100.dp)),
+                    color = ConnectedBlue,
+                    trackColor = LightGrayBg
+                )
+                Text("${"%.1f".format(adminProgress)}%", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = ConnectedBlue, modifier = Modifier.padding(start = 12.dp).width(50.dp))
+            }
         }
         
         Row(verticalAlignment = Alignment.CenterVertically) {

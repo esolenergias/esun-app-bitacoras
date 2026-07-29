@@ -82,6 +82,7 @@ fun NewBitacoraScreen(
     val capturedPhotoUris by viewModel.capturedPhotoUris.collectAsState()
     val budgetItems by viewModel.budgetItems.collectAsState()
     val selectedConceptoName by viewModel.conceptoName.collectAsState()
+    val selectedConceptoId by viewModel.conceptoId.collectAsState()
     val isAiModelLoaded by viewModel.isAiModelLoaded.collectAsState()
     val isAiProcessing by viewModel.isAiProcessing.collectAsState()
     
@@ -390,8 +391,9 @@ fun NewBitacoraScreen(
             }
 
             // --- 4. ACTIVIDADES Y AVANCE ---
+            val isTramite = selectedConceptoName?.contains("tramit", ignoreCase = true) == true
             ExpandableFormSection(
-                title = "Actividades y Avance Físico",
+                title = if (isTramite) "Actividades y Avance Administrativo" else "Actividades y Avance Físico",
                 icon = Icons.Default.Engineering,
                 isExpanded = expActivities,
                 onToggle = { expActivities = !expActivities }
@@ -680,8 +682,9 @@ fun NewBitacoraScreen(
             // Save Button
             Button(
                 onClick = {
+                    if (isSaving) return@Button
+                    isSaving = true
                     coroutineScope.launch {
-                        isSaving = true
                         saveButtonText = "GUARDANDO..."
                         delay(800)
 
@@ -690,9 +693,19 @@ fun NewBitacoraScreen(
                         viewModel.setDescription(activitiesText)
                         val totalCrew = (internalCrew.toIntOrNull() ?: 0) + (subCrew.toIntOrNull() ?: 0)
                         viewModel.setCrewCount(totalCrew)
-                        viewModel.setPhysicalProgress(progressVal.toDouble())
-                        // El progreso financiero se deja como porcentaje (se calcula desde budget_items)
-                        viewModel.setFinancialProgress(progressVal.toDouble())
+                        val prog = progressVal.toDouble()
+                        viewModel.setPhysicalProgress(prog)
+                        
+                        // El progreso financiero se calcula en base al presupuesto del concepto vinculado
+                        var calcFin = 0.0
+                        if (selectedConceptoId != null) {
+                            val bItem = budgetItems.find { it.id.toString() == selectedConceptoId }
+                            if (bItem != null) {
+                                calcFin = (prog / 100.0) * bItem.totalBudget
+                            }
+                        }
+                        viewModel.setFinancialProgress(calcFin)
+                        
                         // Pasar los nuevos campos
                         viewModel.setSafetyRemarks(safetyRemarks)
                         viewModel.setMachinery(machineryUsed)

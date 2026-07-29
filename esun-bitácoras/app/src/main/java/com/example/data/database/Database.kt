@@ -42,7 +42,9 @@ data class BitacoraEntity(
     val concepto_id: String? = null,
     val concepto_name: String? = null,
     // Campos añadidos en versión 12
-    val supabaseId: String? = null
+    val supabaseId: String? = null,
+    // Campos añadidos en versión 13
+    val sync_status: String = "PENDING"
 )
 
 @Entity(tableName = "obras")
@@ -69,7 +71,8 @@ data class BudgetItemEntity(
     val executedQuantity: Double,
     val obraId: String = "",
     val totalBudget: Double,
-    val supabaseId: String = ""
+    val supabaseId: String = "",
+    val categoryName: String = ""
 )
 
 @Entity(tableName = "crew_members")
@@ -117,7 +120,7 @@ interface BitacoraDao {
     @Query("SELECT * FROM bitacoras ORDER BY date DESC, id DESC")
     fun getAllBitacoras(): Flow<List<BitacoraEntity>>
 
-    @Query("SELECT * FROM bitacoras WHERE isSynced = 0")
+    @Query("SELECT * FROM bitacoras WHERE isSynced = 0 OR sync_status = 'PENDING'")
     suspend fun getUnsyncedBitacoras(): List<BitacoraEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -129,14 +132,17 @@ interface BitacoraDao {
     @Delete
     suspend fun deleteBitacora(bitacora: BitacoraEntity)
 
-    @Query("UPDATE bitacoras SET isSynced = 1 WHERE id = :id")
+    @Query("UPDATE bitacoras SET isSynced = 1, sync_status = 'SYNCED' WHERE id = :id")
     suspend fun markAsSynced(id: Int)
 
     @Query("SELECT * FROM bitacoras WHERE supabaseId = :supabaseId")
     suspend fun getBitacoraBySupabaseId(supabaseId: String): BitacoraEntity?
 
-    @Query("UPDATE bitacoras SET supabaseId = :supabaseId, isSynced = 1 WHERE id = :id")
+    @Query("UPDATE bitacoras SET supabaseId = :supabaseId, isSynced = 1, sync_status = 'SYNCED' WHERE id = :id")
     suspend fun markAsSyncedWithSupabaseId(id: Int, supabaseId: String)
+    
+    @Query("UPDATE bitacoras SET sync_status = 'ORPHANED' WHERE id = :id")
+    suspend fun markAsOrphaned(id: Int)
 }
 
 @Dao
@@ -297,7 +303,7 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
         MatrixItemEntity::class,
         TaskEntity::class
     ],
-    version = 12,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -312,6 +318,19 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE bitacoras ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'PENDING'")
+                db.execSQL("UPDATE bitacoras SET sync_status = 'SYNCED' WHERE isSynced = 1")
+            }
+        }
+        
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE budget_items ADD COLUMN categoryName TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -320,7 +339,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "esol_bitacoras_db"
                 )
                 .fallbackToDestructiveMigration()
-                .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                 .build()
                 INSTANCE = instance
                 instance

@@ -1,14 +1,20 @@
 package com.example.ui.screens
 
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -71,7 +77,73 @@ fun ReportDetailScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = bitacora.siteName, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = bitacora.siteName, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                        // Sync Status Badge
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .background(
+                                    when (bitacora.sync_status) {
+                                        "SYNCED" -> Color(0xFF10B981).copy(alpha=0.2f)
+                                        "PENDING" -> Color(0xFFF59E0B).copy(alpha=0.2f)
+                                        "ORPHANED" -> Color(0xFFF3E8FF).copy(alpha=0.2f)
+                                        else -> Color(0xFFEF4444).copy(alpha=0.2f)
+                                    },
+                                    RoundedCornerShape(100.dp)
+                                )
+                                .border(
+                                    BorderStroke(1.dp,
+                                        when (bitacora.sync_status) {
+                                            "SYNCED" -> Color(0xFF10B981)
+                                            "PENDING" -> Color(0xFFFBBF24)
+                                            "ORPHANED" -> Color(0xFFA855F7)
+                                            else -> Color(0xFFEF4444)
+                                        }
+                                    ),
+                                    RoundedCornerShape(100.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = when (bitacora.sync_status) {
+                                    "SYNCED" -> Icons.Default.CloudDone
+                                    "PENDING" -> Icons.Default.Sync
+                                    "ORPHANED" -> Icons.Default.CloudOff
+                                    else -> Icons.Default.Save
+                                },
+                                contentDescription = null,
+                                tint = when (bitacora.sync_status) {
+                                    "SYNCED" -> Color(0xFF10B981)
+                                    "PENDING" -> Color(0xFFF59E0B)
+                                    "ORPHANED" -> Color(0xFFA855F7)
+                                    else -> Color(0xFFEF4444)
+                                },
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = when (bitacora.sync_status) {
+                                    "SYNCED" -> "Sincro"
+                                    "PENDING" -> "Pendiente"
+                                    "ORPHANED" -> "Nube"
+                                    else -> "Local"
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                color = when (bitacora.sync_status) {
+                                    "SYNCED" -> Color(0xFF10B981)
+                                    "PENDING" -> Color(0xFFF59E0B)
+                                    "ORPHANED" -> Color(0xFFA855F7)
+                                    else -> Color(0xFFEF4444)
+                                }
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(text = "Fecha: ${bitacora.date}", color = Color.Gray, fontSize = 14.sp)
                     Text(text = "Clima: ${bitacora.weather}", color = Color.Gray, fontSize = 14.sp)
@@ -140,24 +212,49 @@ fun ReportDetailScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Evidencia Fotográfica", color = Color(0xFFD4AF37), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(12.dp))
-                    if (bitacora.photoUri != null) {
-                        val driveRegex = "[?&]id=([^&]+)".toRegex()
-                        val match = driveRegex.find(bitacora.photoUri)
-                        val thumbUrl = if (match != null) {
-                            "https://drive.google.com/thumbnail?id=${match.groupValues[1]}&sz=w1000"
-                        } else {
-                            bitacora.photoUri
-                        }
+                    if (!bitacora.photoUri.isNullOrBlank()) {
+                        val uris = bitacora.photoUri.split(",").filter { it.isNotBlank() }
+                        if (uris.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(uris.size) { index ->
+                                    val uri = uris[index].trim()
+                                    val driveRegex = "[?&]id=([^&]+)".toRegex()
+                                    val match = driveRegex.find(uri)
+                                    val thumbUrl = if (match != null) {
+                                        "https://drive.google.com/thumbnail?id=${match.groupValues[1]}&sz=w1000"
+                                    } else {
+                                        uri
+                                    }
 
-                        AsyncImage(
-                            model = thumbUrl,
-                            contentDescription = "Evidencia fotográfica",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                                .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                                    AsyncImage(
+                                        model = thumbUrl,
+                                        contentDescription = "Evidencia fotográfica",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(300.dp)
+                                            .clip(RoundedCornerShape(12.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .background(Color(0xFF2A2A2A), RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.Image, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Sin imagen adjunta", color = Color.Gray)
+                                }
+                            }
+                        }
                     } else {
                         Box(
                             modifier = Modifier

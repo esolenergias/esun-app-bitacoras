@@ -93,7 +93,10 @@ data class SupabaseConceptResponse(
     val unit: String? = null,
     val unit_price: Double? = 0.0,
     val executed_quantity: Double? = 0.0,
-    val total_budget: Double? = 0.0
+    val total_budget: Double? = 0.0,
+    val parent_id: String? = null,
+    val type: String? = null,
+    val categoria: String? = null
 )
 
 data class SupabaseMatrixResponse(
@@ -214,7 +217,8 @@ interface SupabaseApiService {
     suspend fun getConceptos(
         @Header("apikey") apiKey: String,
         @Header("Authorization") authorization: String,
-        @Query("select") select: String = "*"
+        @Query("select") select: String = "*",
+        @Query("type") typeFilter: String = "neq.insumo_directo"
     ): Response<List<SupabaseConceptResponse>>
 
     @GET("rest/v1/matrices")

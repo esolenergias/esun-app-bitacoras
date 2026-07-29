@@ -393,7 +393,7 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
 
     // Streams from database
     val bitacorasList: StateFlow<List<BitacoraEntity>> = repository.getAllBitacoras()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val selectedObraId = MutableStateFlow<String>("")
 
@@ -402,10 +402,10 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     
     
     val allTasks: StateFlow<List<TaskEntity>> = repository.getAllTasks()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val tasks: StateFlow<List<TaskEntity>> = selectedObraId.flatMapLatest { id -> repository.getTasksForObra(id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun addTask(task: TaskEntity) {
         viewModelScope.launch { repository.addTask(task) }
@@ -420,10 +420,10 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     }
 
     val budgetItems: StateFlow<List<BudgetItemEntity>> = selectedObraId.flatMapLatest { id -> repository.getBudgetForObra(id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val crewMembers: StateFlow<List<CrewMemberEntity>> = repository.getAllCrew()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     // Stream from SyncRepository
     val syncStatus = repository.syncStatus
@@ -470,7 +470,10 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     val conceptoId = _conceptoId.asStateFlow()
 
     private val _conceptoName = MutableStateFlow<String?>(null)
-    val conceptoName = _conceptoName.asStateFlow()
+    val conceptoName: StateFlow<String?> = _conceptoName.asStateFlow()
+
+    private val _isSubmitting = MutableStateFlow(false)
+    val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
 
     // Real-time Push Notification Simulation Queue
     private val _pushNotifications = MutableStateFlow<List<PushNotification>>(emptyList())
@@ -535,12 +538,16 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
 
     // --- Save Report Action ---
     fun submitDailyLog(onSuccess: () -> Unit) {
+        if (_isSubmitting.value) return
+        _isSubmitting.value = true
+
         viewModelScope.launch {
-            val dateStr = _customReportDate.value ?: SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-            _customReportDate.value = null
-            
-            val lat = _currentLocation.value?.latitude ?: 29.0892 // Fallback coordinates Hermosillo
-            val lng = _currentLocation.value?.longitude ?: -110.9613
+            try {
+                val dateStr = _customReportDate.value ?: SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+                _customReportDate.value = null
+                
+                val lat = _currentLocation.value?.latitude ?: 29.0892 // Fallback coordinates Hermosillo
+                val lng = _currentLocation.value?.longitude ?: -110.9613
 
             val newLog = BitacoraEntity(
                 siteName = _siteName.value,
@@ -558,7 +565,8 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
                 machinery = _machinery.value,
                 concepto_id = _conceptoId.value,
                 concepto_name = _conceptoName.value,
-                isSynced = false // Force offline capture first!
+                isSynced = false, // Force offline capture first!
+                sync_status = "PENDING"
             )
 
             repository.saveBitacora(newLog)
@@ -580,6 +588,9 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
             _physicalProgress.value = 0.0
 
             onSuccess()
+            } finally {
+                _isSubmitting.value = false
+            }
         }
     }
 

@@ -80,9 +80,24 @@ fun ObraDashboardScreen(
     }
 
     // Dynamic metrics calculated from the live database
-    val overallPhysicalProgress = if (budgetItems.isNotEmpty()) {
-        val totalExecuted = budgetItems.sumOf { if (it.executedQuantity >= it.quantity) 1.0 else 0.0 }
-        (totalExecuted / budgetItems.size) * 100.0
+    // isAdminItem: checks categoryName first (after sync), falls back to description keyword (legacy data)
+    fun isAdminItem(item: com.example.data.database.BudgetItemEntity): Boolean {
+        if (item.categoryName.isNotEmpty()) return item.categoryName.contains("tramit", ignoreCase = true)
+        return item.description.contains("tramit", ignoreCase = true)
+    }
+    val physicalItems = budgetItems.filter { !isAdminItem(it) }
+    val adminItems = budgetItems.filter { isAdminItem(it) }
+
+    val physicalProgressVal = if (physicalItems.isNotEmpty()) {
+        val totalExecuted = physicalItems.sumOf { if (it.executedQuantity >= it.quantity) 1.0 else 0.0 }
+        (totalExecuted / physicalItems.size) * 100.0
+    } else {
+        0.0
+    }
+
+    val adminProgressVal = if (adminItems.isNotEmpty()) {
+        val totalExecuted = adminItems.sumOf { if (it.executedQuantity >= it.quantity) 1.0 else 0.0 }
+        (totalExecuted / adminItems.size) * 100.0
     } else {
         0.0
     }
@@ -255,7 +270,7 @@ fun ObraDashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = "${String.format("%.0f", overallPhysicalProgress)}%",
+                                text = "${String.format("%.0f", physicalProgressVal)}%",
                                 fontWeight = FontWeight.Black,
                                 fontSize = 32.sp,
                                 color = SlateDeep
@@ -263,7 +278,7 @@ fun ObraDashboardScreen(
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         LinearProgressIndicator(
-                            progress = (overallPhysicalProgress / 100.0).toFloat(),
+                            progress = { (physicalProgressVal / 100.0).toFloat().coerceIn(0f, 1f) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(6.dp)
@@ -274,6 +289,71 @@ fun ObraDashboardScreen(
                     }
                 }
             }
+
+            // --- 2.1 AVANCE ADMINISTRATIVO (If present) ---
+            if (adminItems.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
+                    colors = CardDefaults.cardColors(containerColor = PureWhite)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Avance Administrativo de Obra",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = OnSurfaceVariant
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(Color(0xFFEFF6FF), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FactCheck,
+                                    contentDescription = null,
+                                    tint = ConnectedBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.Bottom,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "${String.format("%.0f", adminProgressVal)}%",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 32.sp,
+                                    color = SlateDeep
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LinearProgressIndicator(
+                                progress = { (adminProgressVal / 100.0).toFloat().coerceIn(0f, 1f) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(100.dp)),
+                                color = ConnectedBlue,
+                                trackColor = LightGrayBg
+                            )
+                        }
+                    }
+                }
+            }
+
 
 
             // --- 4. TAREAS ---
@@ -456,51 +536,12 @@ fun ObraDashboardScreen(
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                 } else {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
-                        colors = CardDefaults.cardColors(containerColor = PureWhite)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            todayBitacoras.forEachIndexed { index, bitacora ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onNavigateToReportDetail(bitacora.id) }
-                                        .padding(vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .background(LightGrayBg, RoundedCornerShape(8.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Filled.Assignment, contentDescription = null, tint = ConnectedBlue, modifier = Modifier.size(20.dp))
-                                    }
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = bitacora.weather + " • " + bitacora.crewCount + " pers.",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = OnSurfaceVariant
-                                        )
-                                        Text(
-                                            text = bitacora.description,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = SlateDeep,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                                if (index < todayBitacoras.size - 1) {
-                                    HorizontalDivider(color = SubtleOutline.copy(alpha = 0.5f), thickness = 1.dp)
-                                }
-                            }
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        todayBitacoras.forEach { bitacora ->
+                            BeautifulBitacoraCard(
+                                log = bitacora,
+                                onCardClick = { onNavigateToReportDetail(bitacora.id) }
+                            )
                         }
                     }
                 }

@@ -78,7 +78,9 @@ if ($Full) {
     Write-Host "Modo: PARCIAL (solo archivos cambiados)`n"
     MakeDir "$ftpHost/assets"
     UploadFile "$localDist\index.html"      "$ftpHost/index.html"
-    UploadFile "$localDist\.htaccess"       "$ftpHost/.htaccess"
+    if (Test-Path "$localDist\.htaccess") {
+        UploadFile "$localDist\.htaccess"   "$ftpHost/.htaccess"
+    }
     if (Test-Path "$localDist\proxy.php") {
         UploadFile "$localDist\proxy.php"   "$ftpHost/proxy.php"
     }
