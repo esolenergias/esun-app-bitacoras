@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { FileText, Shield, Cloud, Settings } from 'lucide-react';
+import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool } from 'lucide-react';
 import ContratosPanelesTab from './ContratosPanelesTab';
+import SubcontratacionTab from './SubcontratacionTab';
+import InstaladoresManagerTab from './InstaladoresManagerTab';
+import ExtensionGarantiaTab from './ExtensionGarantiaTab';
 
 interface LegalTabProps {
   initialBudgetId?: string | null;
 }
 
 export default function LegalTab({ initialBudgetId }: LegalTabProps) {
-  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'ajustes'>('contratos_paneles');
+  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'extension_garantia' | 'instaladores' | 'ajustes'>('contratos_paneles');
   const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem('esol_make_webhook_url') || '');
 
   return (
@@ -25,8 +28,8 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
         </div>
       </div>
 
-      <div className="flex justify-between border-b border-dark-4">
-        <div className="flex space-x-1">
+      <div className="flex justify-between border-b border-dark-4 overflow-x-auto custom-scrollbar">
+        <div className="flex space-x-1 min-w-max">
           <button
             onClick={() => setLegalSubTab('contratos_paneles')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
@@ -38,25 +41,75 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
             <FileText className="w-4 h-4" />
             Contratos Paneles
           </button>
+          
+          <button
+            onClick={() => setLegalSubTab('subcontratacion')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              legalSubTab === 'subcontratacion'
+                ? 'border-gold text-gold bg-gold/5'
+                : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
+            }`}
+          >
+            <HardHat className="w-4 h-4" />
+            Subcontratación
+          </button>
+
+          <button
+            onClick={() => setLegalSubTab('extension_garantia')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              legalSubTab === 'extension_garantia'
+                ? 'border-gold text-gold bg-gold/5'
+                : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
+            }`}
+          >
+            <PenTool className="w-4 h-4" />
+            Extensión de Garantía
+          </button>
         </div>
         
-        <button
-          onClick={() => setLegalSubTab('ajustes')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-            legalSubTab === 'ajustes'
-              ? 'border-gold text-gold bg-gold/5'
-              : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          Ajustes
-        </button>
+        <div className="flex space-x-1 min-w-max">
+          <button
+            onClick={() => setLegalSubTab('instaladores')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              legalSubTab === 'instaladores'
+                ? 'border-gold text-gold bg-gold/5'
+                : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Directorio Instaladores
+          </button>
+
+          <button
+            onClick={() => setLegalSubTab('ajustes')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              legalSubTab === 'ajustes'
+                ? 'border-gold text-gold bg-gold/5'
+                : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            Ajustes
+          </button>
+        </div>
       </div>
 
       {/* Content */}
       <div className="mt-6">
         {legalSubTab === 'contratos_paneles' && (
           <ContratosPanelesTab initialBudgetId={initialBudgetId} />
+        )}
+
+        {legalSubTab === 'subcontratacion' && (
+          <SubcontratacionTab initialBudgetId={initialBudgetId} />
+        )}
+
+        {legalSubTab === 'extension_garantia' && (
+          <ExtensionGarantiaTab initialBudgetId={initialBudgetId} />
+        )}
+
+        {legalSubTab === 'instaladores' && (
+          <InstaladoresManagerTab />
         )}
 
         {legalSubTab === 'ajustes' && (

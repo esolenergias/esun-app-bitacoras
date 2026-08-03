@@ -339,15 +339,14 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
           rfc: prev.rfc || 'PELJ850412H89',
           curp: prev.curp || 'PELJ850412HNTPRN01',
           cic: prev.cic || '123456789',
-          ocr: prev.ocr || '1234567890123',
-          clienteDireccion: prev.clienteDireccion || 'Av. Insurgentes #123, Col. Centro, Tepic, Nayarit'
+          ocr: prev.ocr || '1234567890123'
         }));
         alert("Simulación de extracción completada. NOTA: Para realizar la lectura real con Visión por IA, ingresa tu Gemini API Key en los Ajustes.");
         return;
       }
 
       const parts: any[] = [
-        { text: "Eres un asistente de extracción de datos experto en leer credenciales de identificación oficial de México (INE/IFE) y Constancias de Situación Fiscal. Revisa cuidadosamente la o las imágenes adjuntas. Extrae los siguientes datos con la mayor exactitud: 1. clienteRazonSocial (nombre completo o razón social del titular), 2. rfc (solo el RFC sin texto extra), 3. curp (la CURP de 18 caracteres), 4. cic (el número de 9 dígitos de identificación de credencial o número de emisión), 5. ocr (el número identificador al reverso de 12 o 13 dígitos de la INE), 6. clienteDireccion (domicilio completo si está visible). Si un campo no es visible en las imágenes proporcionadas, devuelve una cadena vacía. Tu respuesta debe ser EXCLUSIVAMENTE un bloque JSON válido con las claves: 'clienteRazonSocial', 'rfc', 'curp', 'cic', 'ocr', 'clienteDireccion'. No incluyas explicaciones, saludos ni markdown fuera del bloque JSON." }
+        { text: "Eres un asistente de extracción de datos experto en leer credenciales de identificación oficial de México (INE/IFE) y Constancias de Situación Fiscal. Revisa cuidadosamente la o las imágenes adjuntas. Extrae los siguientes datos con la mayor exactitud: 1. clienteRazonSocial (nombre completo o razón social del titular), 2. rfc (solo el RFC sin texto extra), 3. curp (la CURP de 18 caracteres), 4. cic (el número de 9 dígitos de identificación de credencial o número de emisión), 5. ocr (el número identificador al reverso de 12 o 13 dígitos de la INE). Si un campo no es visible en las imágenes proporcionadas, devuelve una cadena vacía. Tu respuesta debe ser EXCLUSIVAMENTE un bloque JSON válido con las claves: 'clienteRazonSocial', 'rfc', 'curp', 'cic', 'ocr'. No incluyas explicaciones, saludos ni markdown fuera del bloque JSON." }
       ];
 
       const addImagePart = (dataUrl: string) => {
@@ -418,8 +417,7 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
               rfc: prev.rfc || 'PELJ850412H89',
               curp: prev.curp || 'PELJ850412HNTPRN01',
               cic: prev.cic || '123456789',
-              ocr: prev.ocr || '1234567890123',
-              clienteDireccion: prev.clienteDireccion || 'Av. Insurgentes #123, Col. Centro, Tepic, Nayarit'
+              ocr: prev.ocr || '1234567890123'
             }));
             alert("Simulación realizada. Recuerda actualizar tu nueva Gemini API Key en los Ajustes del Portal.");
             return;
@@ -439,8 +437,7 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
               rfc: prev.rfc || 'PELJ850412H89',
               curp: prev.curp || 'PELJ850412HNTPRN01',
               cic: prev.cic || '123456789',
-              ocr: prev.ocr || '1234567890123',
-              clienteDireccion: prev.clienteDireccion || 'Av. Insurgentes #123, Col. Centro, Tepic, Nayarit'
+              ocr: prev.ocr || '1234567890123'
             }));
             return;
           }
@@ -461,8 +458,7 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
           rfc: parsed.rfc || prev.rfc,
           curp: parsed.curp || prev.curp,
           cic: parsed.cic || prev.cic,
-          ocr: parsed.ocr || prev.ocr,
-          clienteDireccion: parsed.clienteDireccion || prev.clienteDireccion
+          ocr: parsed.ocr || prev.ocr
         }));
         alert("¡Extracción de datos con IA completada con éxito!");
       } else {
@@ -596,10 +592,24 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
           "- Verificación de requisitos de medición bidireccional y puesta en marcha\n";
       }
 
+      let fetchedAddress = '';
+      if (budget.client_name) {
+        const { data: clientData } = await supabase
+          .from('clientes')
+          .select('direccion')
+          .ilike('nombre_razon_social', budget.client_name.trim())
+          .limit(1);
+        if (clientData && clientData.length > 0 && clientData[0].direccion) {
+          fetchedAddress = clientData[0].direccion;
+        }
+      }
+      
+      const finalAddress = details.ubicacion || fetchedAddress;
+
       setFormData(prev => ({
         ...prev,
         clienteRazonSocial: budget.client_name || '',
-        clienteDireccion: '',
+        clienteDireccion: finalAddress,
         descripcionEquipos: desc.trim(),
         adicionales: adds.trim(),
         descripcionTramitesCfe: tramitesDesc.trim(),

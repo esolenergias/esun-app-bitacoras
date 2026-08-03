@@ -135,6 +135,7 @@ interface PresupuestoDashboardPageProps {
 export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPageProps) {
   const [budget, setBudget] = useState<(Presupuesto & { conceptos: PresupuestoConcepto[] }) | null>(null);
   const [budgetNumber, setBudgetNumber] = useState<number>(1);
+  const [clientAddress, setClientAddress] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
@@ -286,7 +287,20 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       const idx = sorted.findIndex(b => b.id === data.id);
       const seqNum = idx !== -1 ? idx + 1 : 1;
 
+      let fetchedAddress = '';
+      if (data.client_name) {
+        const { data: clientData } = await supabase
+          .from('clientes')
+          .select('direccion')
+          .ilike('nombre_razon_social', data.client_name.trim())
+          .limit(1);
+        if (clientData && clientData.length > 0 && clientData[0].direccion) {
+          fetchedAddress = clientData[0].direccion;
+        }
+      }
+
       setBudget(data);
+      setClientAddress(fetchedAddress);
       setBudgetNumber(seqNum);
       setMatrices(matricesData);
       setInsumosCatalog(insumosData);
@@ -1693,6 +1707,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
           </div>
           <p className="text-xs text-cream-muted leading-relaxed font-body">
             Cliente: <strong className="text-cream">{budget.client_name}</strong> &bull; Nombre: <strong className="text-cream">{budget.name}</strong>
+            {clientAddress && <><br />Domicilio de Instalación: <strong className="text-cream">{clientAddress}</strong></>}
           </p>
         </div>
 

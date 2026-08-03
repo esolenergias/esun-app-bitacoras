@@ -100,6 +100,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
   // Editor Form states
   const [formName, setFormName] = useState<string>('');
   const [formClientName, setFormClientName] = useState<string>('');
+  const [formClientAddress, setFormClientAddress] = useState<string>('');
   const [formStatus, setFormStatus] = useState<'borrador' | 'enviado' | 'aprobado' | 'rechazado'>('borrador');
   const [formProduccion, setFormProduccion] = useState<boolean>(false);
   const [formConceptos, setFormConceptos] = useState<Partial<PresupuestoConcepto>[]>([]);
@@ -266,6 +267,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
     setEditingPresupuesto(null);
     setFormName('');
     setFormClientName('');
+    setFormClientAddress('');
     setFormStatus('borrador');
     setFormProduccion(false);
     setFormConceptos([]);
@@ -281,9 +283,25 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
     setLoadingDetails(true);
     try {
       const details = await getPresupuestoDetails(id);
+      
+      let fetchedAddress = '';
+      if (details.client_name) {
+        const { data: clientData } = await supabase
+          .from('clientes')
+          .select('direccion')
+          .ilike('nombre_razon_social', details.client_name.trim())
+          .limit(1);
+        if (clientData && clientData.length > 0 && clientData[0].direccion) {
+          fetchedAddress = clientData[0].direccion;
+        }
+      }
+      
+      const addressToUse = details.ubicacion || fetchedAddress;
+      
       setEditingPresupuesto(details);
       setFormName(details.name);
       setFormClientName(details.client_name);
+      setFormClientAddress(addressToUse);
       setFormStatus(details.status);
       setFormProduccion(details.produccion ?? false);
       setFormConceptos(details.conceptos || []);
@@ -624,10 +642,11 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
     setIsSubmitting(true);
     try {
       const budgetData: Partial<Presupuesto> = {
-        name: formName.trim(),
-        client_name: formClientName.trim(),
+        name: (formName || '').trim(),
+        client_name: (formClientName || '').trim(),
         status: formStatus,
         produccion: formProduccion,
+        ubicacion: (formClientAddress || '').trim(),
         ...(editingPresupuesto?.id ? { id: editingPresupuesto.id } : {})
       };
 
@@ -641,6 +660,28 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
       });
 
       await savePresupuesto(budgetData, cleanedConcepts);
+      
+      // Sync address to CRM
+      if (formClientName && formClientName.trim()) {
+        const { data: existingClient } = await supabase
+          .from('clientes')
+          .select('id, direccion')
+          .ilike('nombre_razon_social', formClientName.trim())
+          .limit(1);
+          
+        if (existingClient && existingClient.length > 0) {
+          // Ya no sobreescribimos la dirección principal del cliente en el CRM
+          // porque cada presupuesto/obra puede tener una dirección de instalación distinta.
+        } else {
+          await supabase.from('clientes').insert({
+            nombre_razon_social: formClientName.trim(),
+            direccion: (formClientAddress || '').trim(),
+            origen: 'Presupuestos Esol',
+            estatus: 'Prospecto'
+          });
+        }
+      }
+      
       await fetchBudgets();
       handleCloseEditor();
     } catch (err: any) {
@@ -1704,6 +1745,16 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
                         onChange={(e) => setFormClientName(e.target.value)}
                         className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none transition-colors"
                         required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9.5px] text-cream-dim uppercase font-bold tracking-wider block select-none">Dirección de Obra / Instalación</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Av. Insurgentes 123, Col. Centro"
+                        value={formClientAddress}
+                        onChange={(e) => setFormClientAddress(e.target.value)}
+                        className="w-full p-2.5 bg-dark-1 border border-dark-4 focus:border-gold/40 text-xs text-cream rounded-xl focus:outline-none transition-colors"
                       />
                     </div>
                     <div className="space-y-1.5">
