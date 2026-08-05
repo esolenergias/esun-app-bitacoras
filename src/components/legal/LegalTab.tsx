@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool } from 'lucide-react';
+import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool, Award } from 'lucide-react';
 import ContratosPanelesTab from './ContratosPanelesTab';
 import SubcontratacionTab from './SubcontratacionTab';
 import InstaladoresManagerTab from './InstaladoresManagerTab';
 import ExtensionGarantiaTab from './ExtensionGarantiaTab';
+import PolizaGarantiaTab from './PolizaGarantiaTab';
 
 interface LegalTabProps {
   initialBudgetId?: string | null;
 }
 
 export default function LegalTab({ initialBudgetId }: LegalTabProps) {
-  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'extension_garantia' | 'instaladores' | 'ajustes'>('contratos_paneles');
+  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'extension_garantia' | 'poliza_garantia' | 'instaladores' | 'ajustes'>('contratos_paneles');
   const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem('esol_make_webhook_url') || '');
 
   return (
@@ -23,7 +24,7 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
             Legal Esol
           </h2>
           <p className="text-cream-muted text-sm mt-1">
-            Gestión de contratos, notificaciones y recibos oficiales.
+            Gestión de contratos, pólizas de garantía multidisciplinarias, notificaciones y recibos oficiales.
           </p>
         </div>
       </div>
@@ -64,6 +65,18 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
           >
             <PenTool className="w-4 h-4" />
             Extensión de Garantía
+          </button>
+
+          <button
+            onClick={() => setLegalSubTab('poliza_garantia')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              legalSubTab === 'poliza_garantia'
+                ? 'border-gold text-gold bg-gold/5'
+                : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            Póliza de Garantía
           </button>
         </div>
         
@@ -106,6 +119,10 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
 
         {legalSubTab === 'extension_garantia' && (
           <ExtensionGarantiaTab initialBudgetId={initialBudgetId} />
+        )}
+
+        {legalSubTab === 'poliza_garantia' && (
+          <PolizaGarantiaTab initialBudgetId={initialBudgetId} />
         )}
 
         {legalSubTab === 'instaladores' && (
