@@ -24,6 +24,21 @@ import type { PresupuestoDetalle } from '../../lib/cotizadorService';
 import type { Presupuesto, PresupuestoConcepto, Matriz, Insumo, InsumoType, InsumoSubcategory } from '../../types/cotizador';
 import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
 
+const getBase64ImageFromUrl = async (imageUrl: string): Promise<string> => {
+  try {
+    const res = await fetch(imageUrl);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return '';
+  }
+};
+
 interface PresupuestoWithTotals extends Presupuesto {
   conceptos: PresupuestoConcepto[];
   totals: {
@@ -765,14 +780,15 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
     }
   };
 
-  const handleGeneratePDF = () => {
+  const handleGeneratePDF = async () => {
     if (!pdfBudgetDetails) return;
     
     const details = pdfBudgetDetails;
     const sections = selectedPDFSections;
     setIsPDFDialogOpen(false);
     
-    const logoUrl = window.location.origin + '/Logo_esol_b.png';
+    const logoBase64 = await getBase64ImageFromUrl(window.location.origin + '/Logo_esol_b.png');
+    const logoSrc = logoBase64 || (window.location.origin + '/Logo_esol_b.png');
     const formattedDate = new Date(details.created_at || new Date()).toLocaleDateString('es-MX', {
       year: 'numeric',
       month: 'long',
@@ -955,7 +971,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
       <!-- PAGE HEADER -->
       <div class="header-container" style="margin-bottom: 20px;">
         <div>
-          <img src="${logoUrl}" class="logo-img" alt="eSol Energías" onerror="this.style.display='none';">
+          <img src="${logoSrc}" class="logo-img" alt="eSol Energías">
         </div>
         <div class="meta-block">
           <h1 class="pdf-title-font">PRESUPUESTO FORMAL</h1>
@@ -1166,7 +1182,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
         innerHtml += `<div style="page-break-before: always; break-before: page; height: 0px; margin: 0px; padding: 0px; font-size: 0px; line-height: 0px; border: none; display: block;"></div>`;
         // Second page header - all inline, no CSS classes for spacing
         innerHtml += `<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C49825; padding-top: 0px; padding-bottom: 8px; margin: 0px 0px 5px 0px;">
-          <div style="margin:0; padding:0;"><img src="${logoUrl}" style="height:48px; width:auto; display:block;" alt="eSol Energías" onerror="this.style.display='none';"></div>
+          <div style="margin:0; padding:0;"><img src="${logoSrc}" style="height:48px; width:auto; display:block;" alt="eSol Energías"></div>
           <div style="text-align:right; font-size:10px; color:#64748b; margin:0; padding:0; line-height:1.4;">
             <div style="margin:0 0 3px 0; padding:0; font-family:'Cinzel',serif; font-size:16px; font-weight:900; color:#0f172a; letter-spacing:1px; line-height:1.2;">EXPLOSIÓN DE INSUMOS</div>
             <div style="margin:2px 0; padding:0;"><span style="color:#64748b; font-weight:600;">Presupuesto:</span> <span style="color:#1e293b;">${details.name}</span></div>
@@ -1376,7 +1392,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
     const utPct = details.utility_percentage ?? 8.00;
     const totals = calculateBudgetTotals(details.conceptos, indPct, utPct);
     
-    let md = `# REPORTE TÉCNICO Y COMERCIAL - ESOL ENERGÍAS\n\n`;
+    let md = `# REPORTE TÉCNICO Y COMERCIAL - Esol Energias\n\n`;
     md += `**Presupuesto:** ${details.name}\n`;
     md += `**Cliente:** ${details.client_name}\n`;
     md += `**Estado:** ${details.status.toUpperCase()}\n`;

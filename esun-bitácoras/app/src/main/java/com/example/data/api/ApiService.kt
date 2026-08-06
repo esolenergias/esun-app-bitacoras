@@ -235,4 +235,43 @@ interface SupabaseApiService {
         @Query("produccion") produccion: String = "eq.true",
         @Query("select") select: String = "*"
     ): Response<List<SupabasePresupuestoResponse>>
+
+    @GET("rest/v1/polizas_garantia")
+    suspend fun getPolizasGarantia(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("select") select: String = "*"
+    ): Response<List<SupabasePolizaGarantiaResponse>>
+
+    @GET("rest/v1/visitas_mantenimiento_poliza")
+    suspend fun getVisitasMantenimiento(
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("select") select: String = "*"
+    ): Response<List<SupabaseVisitaMantenimientoResponse>>
 }
+
+data class SupabasePolizaGarantiaResponse(
+    val id: String,
+    val folio: String,
+    val presupuesto_id: String?,
+    val cliente_nombre: String,
+    val nombre_obra: String,
+    val estado: String,
+    val fecha_inicio: String,
+    val fecha_fin: String,
+    val periodicidad: String,
+    val conceptos_incluidos: Any? = null
+)
+
+data class SupabaseVisitaMantenimientoResponse(
+    val id: String,
+    val poliza_id: String,
+    val numero_visita: Int,
+    val fecha_programada: String,
+    val concepto_servicio: String?,
+    val estado: String,
+    val fecha_realizada: String?,
+    val tecnico_asignado: String?,
+    val notas_visita: String?
+)

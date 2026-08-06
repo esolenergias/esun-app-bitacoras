@@ -382,9 +382,14 @@ export default function ExtensionGarantiaTab({ initialBudgetId }: ExtensionGaran
         <div class="letter-sheet">
           
           <!-- Header -->
-          <div class="header-box">
-            <h2 class="header-title">PÓLIZA DE GARANTÍA EXTENDIDA</h2>
-            <div class="header-subtitle">Certificado Oficial de Operación y Mantenimiento Anual</div>
+          <div class="header-box" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <img src="${window.location.origin}/Logo_esol_w.png" style="height: 40px; width: auto; display: block;" alt="Esol Energias" onerror="this.style.display='none';" />
+              <div style="text-align: left;">
+                <h2 class="header-title" style="margin: 0; font-size: 16px; color: #d4af37; letter-spacing: 1px;">Esol Energias</h2>
+                <div class="header-subtitle" style="margin-top: 2px; color: #cbd5e1; font-size: 8.5px;">Póliza de Garantía Extendida • Certificado de Mantenimiento Anual</div>
+              </div>
+            </div>
           </div>
 
           <!-- Info Grid -->
@@ -481,7 +486,7 @@ export default function ExtensionGarantiaTab({ initialBudgetId }: ExtensionGaran
           <div class="signatures">
             <div class="sig-box">
               <div class="sig-line"></div>
-              <div class="sig-name">ESOL ENERGÍAS</div>
+              <div class="sig-name">ESOL ENERGIAS</div>
               <div class="sig-role">Área de Ingeniería y Mantenimiento</div>
             </div>
             <div class="sig-box">
