@@ -383,6 +383,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                       onDragStart={(e) => {
                         setDraggedIndex(idx);
                         e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', idx.toString());
                       }}
                       onDragOver={(e) => {
                         e.preventDefault();
