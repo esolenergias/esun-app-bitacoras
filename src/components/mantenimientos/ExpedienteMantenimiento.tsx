@@ -27,7 +27,6 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const [pendingPhotos, setPendingPhotos] = useState<{file: File, preview: string}[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [draggedPendingIndex, setDraggedPendingIndex] = useState<number | null>(null);
-  const [localPreviews, setLocalPreviews] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchVisitas();
@@ -500,21 +499,6 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                           referrerPolicy="no-referrer"
                           alt={`Evidencia ${idx+1}`} 
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none bg-dark-2" 
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            const currentSrc = target.src;
-                            const driveId = extractDriveId(getPhotoDriveUrl(foto)) || extractDriveId(currentSrc);
-                            
-                            if (driveId && !target.dataset.failed) {
-                              if (currentSrc.includes('lh3.googleusercontent.com')) {
-                                target.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
-                              } else if (currentSrc.includes('drive.google.com/thumbnail')) {
-                                target.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
-                              } else {
-                                target.dataset.failed = 'true';
-                              }
-                            }
-                          }}
                         />
                       </a>
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-1/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>

@@ -480,9 +480,6 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                                           referrerPolicy="no-referrer"
                                           alt={`Evidencia ${idx + 1}`} 
                                           className="w-full h-full object-cover"
-                                          onError={(e) => {
-                                            (e.target as HTMLImageElement).src = uri;
-                                          }}
                                         />
                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
                                           <a 
@@ -754,9 +751,6 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                             src={getDriveImageUrl(firstUri)} 
                             alt="Evidencia" 
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = firstUri;
-                            }}
                           />
                           {uris.length > 1 && (
                             <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded-md text-[10px] font-bold text-white border border-white/20">
