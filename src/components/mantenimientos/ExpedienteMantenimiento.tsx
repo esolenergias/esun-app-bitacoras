@@ -63,7 +63,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
         reader.readAsDataURL(file);
       });
       
-      const response = await fetch('https://script.google.com/macros/s/AKfycbwm5qwhrgsD37Hd8tFTZkECfKv-rYUoF3omNjm_GX0hZKeDyxC5tQTdXTPLUWEUUT5s/exec', {
+      const response = await fetch('https://script.google.com/macros/s/AKfycbx2I7-77T-EUv-3DCK7ueL9eGn4871nv-EJY_qBJxRu5TFQ3IWNcXOjEE89ghI4UbLa2w/exec', {
         method: 'POST',
         body: JSON.stringify({
           filename: `mtto_${obra.folio}_visita${selectedVisita.numero_visita}_${Date.now()}_${file.name}`,
