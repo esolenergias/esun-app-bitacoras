@@ -1,39 +1,87 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../context/supabase';
-import { HardHat, Search, Edit2, Trash2, MapPin, User, Plus, X, Save } from 'lucide-react';
+import { HardHat, Search, Edit2, Trash2, MapPin, User, Plus, X, Save, FileText } from 'lucide-react';
 
-export interface MantenimientoObra {
+export interface PolizaGarantia {
   id?: string;
-  nombre: string;
-  cliente: string;
-  ubicacion: string;
-  status: string;
-  residente?: string;
-  created_at: string;
+  folio: string;
+  presupuesto_id: string | null;
+  cliente_nombre: string;
+  cliente_direccion: string;
+  cliente_telefono: string;
+  cliente_email: string;
+  nombre_obra: string;
+  conceptos_incluidos: any;
+  tipo_cobertura: string;
+  periodicidad: string;
+  duracion_anos: number;
+  fecha_inicio: string;
+  fecha_fin: string;
+  monto_total: number;
+  created_at?: string;
 }
 
+const generarFolioProtocolo = (nombreObra: string = '', clienteFinal: string = '', consecutivo: number = 1) => {
+  const d = new Date();
+  const yy = d.getFullYear().toString().slice(-2);
+  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+  const dateCode = `${yy}${mm}`;
+
+  const sourceText = (nombreObra.trim() || clienteFinal.trim() || 'ESOL');
+  const stopWords = ['de', 'del', 'la', 'las', 'los', 'el', 'en', 'y', 'sa', 'cv', 's.a.', 'c.v.'];
+  const words = sourceText
+    .split(/\s+/)
+    .filter(w => w.length > 0 && !stopWords.includes(w.toLowerCase()));
+
+  let iniciales = '';
+  if (words.length >= 2) {
+    iniciales = (words[0][0] + words[1][0]).toUpperCase();
+  } else if (words.length === 1 && words[0].length >= 2) {
+    iniciales = words[0].substring(0, 2).toUpperCase();
+  } else if (words.length === 1 && words[0].length === 1) {
+    iniciales = (words[0] + 'X').toUpperCase();
+  } else {
+    iniciales = 'ES';
+  }
+
+  iniciales = iniciales.replace(/[^A-Z]/g, 'X').padEnd(2, 'X');
+  const numFormatted = consecutivo.toString().padStart(3, '0');
+  return `POL-${dateCode}-${iniciales}-${numFormatted}`;
+};
+
 export default function MantenimientosObrasTab() {
-  const [obras, setObras] = useState<MantenimientoObra[]>([]);
+  const [obras, setObras] = useState<PolizaGarantia[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
-  const [editingData, setEditingData] = useState<MantenimientoObra | null>(null);
+  const [editingData, setEditingData] = useState<PolizaGarantia | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewFolio, setPreviewFolio] = useState('');
+  
+  // Form live state for folio generation
+  const [formNombreObra, setFormNombreObra] = useState('');
+  const [formClienteNombre, setFormClienteNombre] = useState('');
 
   const fetchObras = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('mantenimientos_proyectos')
+        .from('polizas_garantia')
         .select('*')
         .order('created_at', { ascending: false });
         
-      if (error) throw error;
+      if (error) {
+        if (error.code === '42P01') {
+          console.warn("Tabla polizas_garantia no existe aún.");
+          return;
+        }
+        throw error;
+      }
       setObras(data || []);
     } catch (err) {
-      console.error('Error fetching mantenimientos_proyectos:', err);
+      console.error('Error fetching polizas_garantia:', err);
     } finally {
       setLoading(false);
     }
@@ -43,50 +91,97 @@ export default function MantenimientosObrasTab() {
     fetchObras();
   }, []);
 
+  useEffect(() => {
+    if (!editingData) {
+      const num = obras.length + 1;
+      setPreviewFolio(generarFolioProtocolo(formNombreObra, formClienteNombre, num));
+    } else {
+      setPreviewFolio(editingData.folio);
+    }
+  }, [formNombreObra, formClienteNombre, obras.length, editingData]);
+
+  const handleOpenNew = () => {
+    setEditingData(null);
+    setFormNombreObra('');
+    setFormClienteNombre('');
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (obra: PolizaGarantia) => {
+    setEditingData(obra);
+    setFormNombreObra(obra.nombre_obra);
+    setFormClienteNombre(obra.cliente_nombre);
+    setShowModal(true);
+  };
+
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = {
-      nombre: formData.get('nombre') as string,
-      cliente: formData.get('cliente') as string,
-      ubicacion: formData.get('ubicacion') as string,
-      status: formData.get('status') as string,
-      residente: formData.get('residente') as string,
+    
+    // Auto-fill dates if empty to avoid DB errors
+    const today = new Date().toISOString().split('T')[0];
+    let dInicio = formData.get('fecha_inicio') as string;
+    if (!dInicio) dInicio = today;
+    
+    let dFin = formData.get('fecha_fin') as string;
+    if (!dFin) {
+      const endD = new Date();
+      endD.setFullYear(endD.getFullYear() + 1);
+      dFin = endD.toISOString().split('T')[0];
+    }
+
+    const data: Partial<PolizaGarantia> = {
+      cliente_nombre: formData.get('cliente_nombre') as string,
+      cliente_direccion: formData.get('cliente_direccion') as string,
+      cliente_telefono: formData.get('cliente_telefono') as string,
+      cliente_email: formData.get('cliente_email') as string,
+      nombre_obra: formData.get('nombre_obra') as string,
+      tipo_cobertura: formData.get('tipo_cobertura') as string,
+      periodicidad: formData.get('periodicidad') as string,
+      duracion_anos: parseFloat((formData.get('duracion_anos') as string) || '1'),
+      fecha_inicio: dInicio,
+      fecha_fin: dFin,
+      monto_total: parseFloat((formData.get('monto_total') as string) || '0'),
     };
+
+    if (!editingData) {
+      // It's new, set the generated folio
+      data.folio = previewFolio;
+      data.conceptos_incluidos = []; // default
+    }
 
     setIsSubmitting(true);
     try {
       if (editingData?.id) {
         // Update
         const { error } = await supabase
-          .from('mantenimientos_proyectos')
+          .from('polizas_garantia')
           .update(data)
           .eq('id', editingData.id);
         if (error) throw error;
       } else {
         // Insert
         const { error } = await supabase
-          .from('mantenimientos_proyectos')
+          .from('polizas_garantia')
           .insert([data]);
         if (error) throw error;
       }
       setShowModal(false);
-      setEditingData(null);
       fetchObras();
     } catch (error: any) {
-      console.error('Error saving:', error);
+      console.error('Error saving poliza:', error);
       alert('Error guardando el mantenimiento: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (obra: MantenimientoObra) => {
-    if (!window.confirm(`¿Estás seguro de eliminar el mantenimiento "${obra.nombre}"? Se borrarán todos los registros asociados.`)) return;
+  const handleDelete = async (obra: PolizaGarantia) => {
+    if (!window.confirm(`¿Estás seguro de eliminar el mantenimiento "${obra.folio}"? Se borrarán todos los registros asociados.`)) return;
     
     try {
       const { error } = await supabase
-        .from('mantenimientos_proyectos')
+        .from('polizas_garantia')
         .delete()
         .eq('id', obra.id);
         
@@ -99,8 +194,9 @@ export default function MantenimientosObrasTab() {
   };
 
   const filteredObras = obras.filter(o => 
-    o.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.cliente?.toLowerCase().includes(searchTerm.toLowerCase())
+    o.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    o.nombre_obra.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    o.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -110,18 +206,18 @@ export default function MantenimientosObrasTab() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cream-muted" />
           <input 
             type="text" 
-            placeholder="Buscar mantenimientos..." 
+            placeholder="Buscar póliza, cliente u obra..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-sm text-cream pl-10 pr-4 py-2.5 rounded-xl focus:outline-none transition-colors"
           />
         </div>
         <button 
-          onClick={() => { setEditingData(null); setShowModal(true); }}
+          onClick={handleOpenNew}
           className="flex items-center gap-2 px-4 py-2.5 bg-gold text-dark-1 hover:bg-yellow-400 rounded-xl transition-colors font-bold text-sm shrink-0"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
-          Nuevo Mantenimiento
+          Crear Mantenimiento
         </button>
       </div>
 
@@ -132,9 +228,9 @@ export default function MantenimientosObrasTab() {
       ) : filteredObras.length === 0 ? (
         <div className="border border-dark-4 bg-dark-2/40 p-16 rounded-2xl text-center space-y-4 select-none">
           <HardHat className="w-10 h-10 text-gold mx-auto opacity-50" />
-          <h4 className="font-display font-black text-base text-cream">No hay mantenimientos</h4>
+          <h4 className="font-display font-black text-base text-cream">No hay Pólizas/Mantenimientos</h4>
           <p className="text-xs text-cream-muted max-w-sm mx-auto font-body">
-            Comienza registrando tu primer mantenimiento para este módulo.
+            Comienza registrando tu primer mantenimiento o emitir una póliza desde el área Legal.
           </p>
         </div>
       ) : (
@@ -148,16 +244,16 @@ export default function MantenimientosObrasTab() {
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-dark-3 rounded-xl border border-dark-4">
-                    <HardHat className="w-6 h-6 text-blue-400" />
+                    <FileText className="w-6 h-6 text-gold" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-cream text-base">{obra.nombre}</h3>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mt-1">{obra.status}</p>
+                    <h3 className="font-bold text-cream text-base line-clamp-1">{obra.folio}</h3>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mt-1">{obra.periodicidad}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); setEditingData(obra); setShowModal(true); }}
+                    onClick={(e) => { e.stopPropagation(); handleOpenEdit(obra); }}
                     className="p-1.5 bg-dark-3 hover:bg-blue-500/20 hover:text-blue-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-blue-500/30"
                     title="Editar Mantenimiento"
                   >
@@ -172,18 +268,23 @@ export default function MantenimientosObrasTab() {
                   </button>
                 </div>
               </div>
-              {obra.ubicacion && (
-                <p className="text-sm text-cream-muted flex items-start gap-2 mb-2">
-                  <MapPin className="w-4 h-4 mt-0.5 text-cream-dim shrink-0" />
-                  <span className="line-clamp-2">{obra.ubicacion}</span>
+              <div className="space-y-2 mt-2">
+                <p className="text-sm font-bold text-cream-muted line-clamp-1">
+                  {obra.nombre_obra}
                 </p>
-              )}
-              {obra.cliente && (
-                <p className="text-sm text-cream-muted flex items-start gap-2 mb-2">
-                  <User className="w-4 h-4 mt-0.5 text-cream-dim shrink-0" />
-                  <span className="line-clamp-1">{obra.cliente}</span>
-                </p>
-              )}
+                {obra.cliente_nombre && (
+                  <p className="text-xs text-cream-dim flex items-center gap-2">
+                    <User className="w-3.5 h-3.5 shrink-0" />
+                    <span className="line-clamp-1">{obra.cliente_nombre}</span>
+                  </p>
+                )}
+                {obra.cliente_direccion && (
+                  <p className="text-xs text-cream-dim flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span className="line-clamp-1">{obra.cliente_direccion}</span>
+                  </p>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -192,10 +293,10 @@ export default function MantenimientosObrasTab() {
       {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-md flex flex-col overflow-hidden shadow-2xl animate-scale-up">
+          <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-2xl flex flex-col overflow-hidden shadow-2xl animate-scale-up">
             <div className="flex justify-between items-center px-6 py-4 border-b border-dark-4">
               <h3 className="font-display font-black text-lg text-cream uppercase tracking-wider">
-                {editingData ? 'Editar Mantenimiento' : 'Nuevo Mantenimiento'}
+                {editingData ? 'Editar Póliza/Mantenimiento' : 'Crear Póliza de Mantenimiento'}
               </h3>
               <button 
                 onClick={() => setShowModal(false)}
@@ -205,30 +306,82 @@ export default function MantenimientosObrasTab() {
               </button>
             </div>
             
-            <form onSubmit={handleSave} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-cream-muted mb-1.5 uppercase">Identificador de Mantenimiento / Póliza *</label>
-                <input required name="nombre" defaultValue={editingData?.nombre || ''} placeholder="Ej: POL-2412-MT-001" className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" />
+            <form onSubmit={handleSave} className="p-6 overflow-y-auto custom-scrollbar max-h-[80vh] space-y-6">
+              
+              <div className="bg-dark-3/50 p-4 rounded-xl border border-gold/20 flex flex-col items-center justify-center text-center">
+                <p className="text-xs text-gold uppercase tracking-widest font-black mb-1">Folio Generado (Auto)</p>
+                <p className="text-xl font-mono text-cream">{previewFolio}</p>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-cream-muted mb-1.5 uppercase">Cliente *</label>
-                <input required name="cliente" defaultValue={editingData?.cliente || ''} placeholder="Nombre del cliente" className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-cream-muted mb-1.5 uppercase">Ubicación</label>
-                <input name="ubicacion" defaultValue={editingData?.ubicacion || ''} placeholder="Dirección del sitio" className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-cream-muted mb-1.5 uppercase">Estado</label>
-                <select name="status" defaultValue={editingData?.status || 'Pendiente'} className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors appearance-none">
-                  <option value="Pendiente">Pendiente</option>
-                  <option value="En proceso">En proceso</option>
-                  <option value="Completado">Completado</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-cream-muted mb-1.5 uppercase">Técnico / Residente Asignado</label>
-                <input name="residente" defaultValue={editingData?.residente || ''} placeholder="Nombre del técnico" className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Nombre de la Obra / Proyecto *</label>
+                  <input 
+                    required 
+                    name="nombre_obra" 
+                    value={formNombreObra}
+                    onChange={e => setFormNombreObra(e.target.value)}
+                    placeholder="Ej: SFV Residencial Lomas" 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Nombre del Cliente *</label>
+                  <input 
+                    required 
+                    name="cliente_nombre" 
+                    value={formClienteNombre}
+                    onChange={e => setFormClienteNombre(e.target.value)}
+                    placeholder="Ej: Juan Pérez" 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Dirección de la Instalación</label>
+                  <input 
+                    name="cliente_direccion" 
+                    defaultValue={editingData?.cliente_direccion || ''} 
+                    placeholder="Calle, Colonia, Ciudad" 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Teléfono</label>
+                  <input 
+                    name="cliente_telefono" 
+                    defaultValue={editingData?.cliente_telefono || ''} 
+                    placeholder="10 dígitos" 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Correo Electrónico</label>
+                  <input 
+                    name="cliente_email" 
+                    type="email"
+                    defaultValue={editingData?.cliente_email || ''} 
+                    placeholder="cliente@correo.com" 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Periodicidad</label>
+                  <select name="periodicidad" defaultValue={editingData?.periodicidad || 'Trimestral'} className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors appearance-none">
+                    <option value="Mensual">Mensual</option>
+                    <option value="Bimestral">Bimestral</option>
+                    <option value="Trimestral">Trimestral</option>
+                    <option value="Semestral">Semestral</option>
+                    <option value="Anual">Anual</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Cobertura</label>
+                  <select name="tipo_cobertura" defaultValue={editingData?.tipo_cobertura || 'Preventivo'} className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors appearance-none">
+                    <option value="Preventivo">Preventivo</option>
+                    <option value="Correctivo">Correctivo</option>
+                    <option value="Preventivo y Correctivo">Preventivo y Correctivo</option>
+                  </select>
+                </div>
               </div>
               
               <div className="pt-4 border-t border-dark-4 flex justify-end gap-3">
@@ -237,7 +390,7 @@ export default function MantenimientosObrasTab() {
                 </button>
                 <button type="submit" disabled={isSubmitting} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-gold text-dark-1 hover:bg-yellow-400 transition-colors disabled:opacity-50">
                   <Save className="w-4 h-4" />
-                  {isSubmitting ? 'Guardando...' : 'Guardar'}
+                  {isSubmitting ? 'Guardando...' : 'Guardar Mantenimiento'}
                 </button>
               </div>
             </form>
