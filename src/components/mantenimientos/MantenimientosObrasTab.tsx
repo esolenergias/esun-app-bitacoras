@@ -18,8 +18,34 @@ export interface PolizaGarantia {
   fecha_inicio: string;
   fecha_fin: string;
   monto_total: number;
+  estado_mantenimiento?: string;
+  fecha_proximo_mantenimiento?: string;
   created_at?: string;
 }
+
+const getAlertaMantenimiento = (fechaProximo?: string) => {
+  if (!fechaProximo) return { text: 'No programada', color: 'text-gray-400 bg-gray-400/10 border-gray-400/20' };
+  
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  
+  // Appending T00:00:00 avoids time zone shifts with string dates like YYYY-MM-DD
+  const scheduledDate = new Date(`${fechaProximo}T00:00:00`);
+  scheduledDate.setHours(0,0,0,0); 
+
+  const diffTime = scheduledDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return { text: 'Atrasado', color: 'text-red-400 bg-red-400/10 border-red-400/20' };
+  } else if (diffDays <= 3) {
+    return { text: 'Urgente', color: 'text-orange-400 bg-orange-400/10 border-orange-400/20' };
+  } else if (diffDays <= 14) {
+    return { text: 'Próximamente', color: 'text-gold bg-gold/10 border-gold/20' };
+  } else {
+    return { text: 'A tiempo', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' };
+  }
+};
 
 const generarFolioProtocolo = (nombreObra: string = '', clienteFinal: string = '', consecutivo: number = 1) => {
   const d = new Date();
@@ -142,6 +168,8 @@ export default function MantenimientosObrasTab() {
       fecha_inicio: dInicio,
       fecha_fin: dFin,
       monto_total: parseFloat((formData.get('monto_total') as string) || '0'),
+      estado_mantenimiento: formData.get('estado_mantenimiento') as string,
+      fecha_proximo_mantenimiento: formData.get('fecha_proximo_mantenimiento') as string || null,
     };
 
     if (!editingData) {
@@ -242,6 +270,8 @@ export default function MantenimientosObrasTab() {
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Número de Póliza</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Nombre de Cliente</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Nombre de Obra</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Estatus</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Alerta</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Fecha / Frecuencia</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Dirección de Mantenimiento</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider text-right">Acciones</th>
@@ -273,8 +303,29 @@ export default function MantenimientosObrasTab() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        obra.estado_mantenimiento === 'Sin programar' ? 'bg-dark-4 text-cream-muted' :
+                        obra.estado_mantenimiento === 'Programado' ? 'bg-blue-500/20 text-blue-400' :
+                        obra.estado_mantenimiento === 'En proceso' ? 'bg-gold/20 text-gold' :
+                        obra.estado_mantenimiento === 'Terminado' ? 'bg-emerald-500/20 text-emerald-400' :
+                        'bg-dark-4 text-cream-muted'
+                      }`}>
+                        {obra.estado_mantenimiento || 'Sin programar'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const alertData = getAlertaMantenimiento(obra.fecha_proximo_mantenimiento);
+                        return (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-bold ${alertData.color}`}>
+                            {alertData.text}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-sm text-cream-muted whitespace-nowrap">{obra.fecha_inicio}</span>
+                        <span className="text-sm text-cream-muted whitespace-nowrap">{obra.fecha_proximo_mantenimiento || obra.fecha_inicio}</span>
                         <span className="text-[10px] font-black uppercase text-blue-400 mt-0.5">{obra.periodicidad}</span>
                       </div>
                     </td>
@@ -401,6 +452,24 @@ export default function MantenimientosObrasTab() {
                     <option value="Correctivo">Correctivo</option>
                     <option value="Preventivo y Correctivo">Preventivo y Correctivo</option>
                   </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Estatus de Mantenimiento</label>
+                  <select name="estado_mantenimiento" defaultValue={editingData?.estado_mantenimiento || 'Sin programar'} className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors appearance-none">
+                    <option value="Sin programar">Sin programar</option>
+                    <option value="Programado">Programado</option>
+                    <option value="En proceso">En proceso</option>
+                    <option value="Terminado">Terminado</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Fecha Programada Mantenimiento</label>
+                  <input 
+                    name="fecha_proximo_mantenimiento" 
+                    type="date"
+                    defaultValue={editingData?.fecha_proximo_mantenimiento || ''} 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
                 </div>
               </div>
               
