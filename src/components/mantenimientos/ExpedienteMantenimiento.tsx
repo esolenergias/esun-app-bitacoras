@@ -27,6 +27,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const [pendingPhotos, setPendingPhotos] = useState<{file: File, preview: string}[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [draggedPendingIndex, setDraggedPendingIndex] = useState<number | null>(null);
+  const [localPreviews, setLocalPreviews] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchVisitas();
@@ -99,6 +100,13 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
         const result = await response.json();
         if (result.success) {
           uploadedUrls.push(result.url);
+          const driveId = extractDriveId(result.url);
+          const localBlob = pendingPhotos[i].preview;
+          setLocalPreviews(prev => ({
+            ...prev,
+            [result.url]: localBlob,
+            ...(driveId ? { [driveId]: localBlob } : {})
+          }));
         } else {
           console.error("Error subiendo a Drive:", result.error);
         }
@@ -171,17 +179,29 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
     return new Date(`${fecha}T12:00:00`).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
+  const extractDriveId = (url: string): string | null => {
+    if (!url) return null;
+    if (url.startsWith('data:image') || url.startsWith('blob:')) return null;
+    const match = url.match(/(?:id=|\/d\/)([a-zA-Z0-9_-]{25,})/);
+    if (match && match[1]) return match[1];
+    if (/^[a-zA-Z0-9_-]{25,50}$/.test(url)) return url;
+    return null;
+  };
+
   const getDriveThumbnailUrl = (url: string) => {
     if (!url) return '';
-    if (url.startsWith('data:image')) return url; // base64 compatibility
+    if (url.startsWith('data:image') || url.startsWith('blob:')) return url; // local preview or base64
     
-    // Si ya es un enlace de thumbnail, lo dejamos
-    if (url.includes('drive.google.com/thumbnail')) return url;
+    // 1. Usar vista previa local en la sesión actual para renderizado inmediato
+    if (localPreviews[url]) return localPreviews[url];
+    const driveId = extractDriveId(url);
+    if (driveId && localPreviews[driveId]) return localPreviews[driveId];
     
-    const match = url.match(/(?:id=|\/d\/)([a-zA-Z0-9_-]{25,})/);
-    if (match && match[1]) {
-      return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
+    // 2. Enlace CDN directo de Google Drive (lh3.googleusercontent.com)
+    if (driveId) {
+      return `https://lh3.googleusercontent.com/d/${driveId}`;
     }
+    
     return url;
   };
 
@@ -430,15 +450,16 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none bg-dark-2" 
                           onError={(e) => {
                             const target = e.currentTarget;
-                            if (target.src.includes('/thumbnail?id=')) {
-                              let retries = parseInt(target.dataset.retries || '0');
-                              if (retries < 15) { // Intentar hasta por 30 segundos
-                                setTimeout(() => {
-                                  target.dataset.retries = (retries + 1).toString();
-                                  const url = new URL(target.src);
-                                  url.searchParams.set('retry', Date.now().toString());
-                                  target.src = url.toString();
-                                }, 2000);
+                            const currentSrc = target.src;
+                            const driveId = extractDriveId(foto) || extractDriveId(currentSrc);
+                            
+                            if (driveId && !target.dataset.failed) {
+                              if (currentSrc.includes('lh3.googleusercontent.com')) {
+                                target.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
+                              } else if (currentSrc.includes('drive.google.com/thumbnail')) {
+                                target.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
+                              } else {
+                                target.dataset.failed = 'true';
                               }
                             }
                           }}
