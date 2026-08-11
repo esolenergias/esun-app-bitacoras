@@ -18,7 +18,7 @@ import PresupuestosTab from './cotizador/PresupuestosTab';
 import GruposTab from './cotizador/GruposTab';
 import EsunPage from './esun/EsunPage';
 import BitacorasApp from './BitacorasApp';
-import MantenimientosApp from './MantenimientosApp';
+import MantenimientosApp from './mantenimientos/MantenimientosApp';
 import LegalTab from './legal/LegalTab';
 import ClientesTab from './crm/ClientesTab';
 

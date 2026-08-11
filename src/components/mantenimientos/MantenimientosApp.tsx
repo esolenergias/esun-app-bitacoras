@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Wrench, Shield, Search, Plus, HardHat, Calendar, Clock, RefreshCw } from 'lucide-react';
+import VisitasPendientesTab from './VisitasPendientesTab';
+import HistorialMantenimientosTab from './HistorialMantenimientosTab';
 
 export default function MantenimientosApp({ reporterName = 'ESOL Técnico' }: { reporterName?: string }) {
   const [activeTab, setActiveTab] = useState<'pendientes' | 'historial'>('pendientes');
@@ -59,12 +61,9 @@ export default function MantenimientosApp({ reporterName = 'ESOL Técnico' }: { 
       </div>
 
       {/* Content Area */}
-      <div className="border border-dark-4 bg-dark-2/40 p-16 rounded-2xl text-center space-y-4 select-none">
-        <Shield className="w-10 h-10 text-gold mx-auto opacity-50" />
-        <h4 className="font-display font-black text-base text-cream">Módulo en Construcción</h4>
-        <p className="text-xs text-cream-muted max-w-sm mx-auto font-body">
-          Este módulo de mantenimientos será operado de forma completamente independiente de las Bitácoras de Obra. Aquí el equipo de mantenimiento gestionará sus visitas, subirá evidencias y llenará el checklist de revisión de los equipos amparados bajo Póliza de Garantía.
-        </p>
+      <div className="mt-6">
+        {activeTab === 'pendientes' && <VisitasPendientesTab />}
+        {activeTab === 'historial' && <HistorialMantenimientosTab />}
       </div>
     </div>
   );
