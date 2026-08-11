@@ -175,8 +175,8 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
     if (!url) return '';
     if (url.startsWith('data:image')) return url; // base64 compatibility
     
-    // Si ya es un enlace uc, lo dejamos
-    if (url.includes('drive.google.com/uc')) return url;
+    // Si ya es un enlace de thumbnail, lo dejamos
+    if (url.includes('drive.google.com/thumbnail')) return url;
     
     const patterns = [
       /\/file\/d\/([a-zA-Z0-9_-]+)/,
@@ -186,7 +186,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
     for (const pattern of patterns) {
       const match = url.match(pattern);
       if (match && match[1]) {
-        return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
       }
     }
     return url;
@@ -434,6 +434,22 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                         src={getDriveThumbnailUrl(foto)} 
                         alt={`Evidencia ${idx+1}`} 
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none bg-dark-2" 
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          // Google Drive tarda un par de segundos/minutos en generar el thumbnail de nuevas imágenes.
+                          // Intentamos recargar el thumbnail automáticamente hasta 5 veces.
+                          if (target.src.includes('/thumbnail?id=')) {
+                            let retries = parseInt(target.dataset.retries || '0');
+                            if (retries < 5) {
+                              setTimeout(() => {
+                                target.dataset.retries = (retries + 1).toString();
+                                const url = new URL(target.src);
+                                url.searchParams.set('retry', Date.now().toString()); // cache buster
+                                target.src = url.toString();
+                              }, 2000);
+                            }
+                          }
+                        }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-1/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                       <div className="absolute bottom-1 left-1 bg-dark-1/80 px-1.5 py-0.5 rounded text-[8px] font-bold text-cream-muted pointer-events-none">
