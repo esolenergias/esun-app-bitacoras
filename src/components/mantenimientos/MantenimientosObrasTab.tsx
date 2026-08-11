@@ -299,7 +299,8 @@ export default function MantenimientosObrasTab() {
                 {filteredObras.map((obra) => (
                   <tr 
                     key={obra.id} 
-                    className="hover:bg-dark-3/50 transition-colors group"
+                    onClick={() => handleOpenEdit(obra)}
+                    className="hover:bg-dark-3/50 transition-colors group cursor-pointer"
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -370,13 +371,6 @@ export default function MantenimientosObrasTab() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleOpenEdit(obra); }}
-                          className="p-1.5 bg-dark-3 hover:bg-blue-500/20 hover:text-blue-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-blue-500/30"
-                          title="Editar Mantenimiento"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleDelete(obra); }}
                           className="p-1.5 bg-dark-3 hover:bg-red-500/20 hover:text-red-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-red-500/30"
