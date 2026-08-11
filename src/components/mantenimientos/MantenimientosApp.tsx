@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Wrench, Shield, Search, Plus, HardHat, Calendar, Clock, RefreshCw } from 'lucide-react';
-import VisitasPendientesTab from './VisitasPendientesTab';
+import MantenimientosObrasTab from './MantenimientosObrasTab';
 import HistorialMantenimientosTab from './HistorialMantenimientosTab';
 
 export default function MantenimientosApp({ reporterName = 'ESOL Técnico' }: { reporterName?: string }) {
-  const [activeTab, setActiveTab] = useState<'pendientes' | 'historial'>('pendientes');
+  const [activeTab, setActiveTab] = useState<'obras' | 'historial'>('obras');
 
   return (
     <div className="space-y-6 animate-fade-in pb-20">
@@ -16,18 +16,8 @@ export default function MantenimientosApp({ reporterName = 'ESOL Técnico' }: { 
             Mantenimientos (APP)
           </h2>
           <p className="text-cream-muted text-sm mt-1">
-            Gestión de bitácoras de mantenimientos preventivos y correctivos para pólizas.
+            Gestión de mantenimientos preventivos y correctivos para pólizas.
           </p>
-        </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20 hover:border-gold/50 rounded-xl transition-colors font-bold text-sm">
-            <RefreshCw className="w-4 h-4" />
-            Sincronizar
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gold text-dark-1 hover:bg-yellow-400 rounded-xl transition-colors font-bold text-sm">
-            <Plus className="w-4 h-4 stroke-[3]" />
-            Nueva Visita
-          </button>
         </div>
       </div>
 
@@ -35,15 +25,15 @@ export default function MantenimientosApp({ reporterName = 'ESOL Técnico' }: { 
       <div className="flex justify-between border-b border-dark-4 overflow-x-auto custom-scrollbar">
         <div className="flex space-x-1 min-w-max">
           <button
-            onClick={() => setActiveTab('pendientes')}
+            onClick={() => setActiveTab('obras')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'pendientes'
+              activeTab === 'obras'
                 ? 'border-gold text-gold bg-gold/5'
                 : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
             }`}
           >
             <Calendar className="w-4 h-4" />
-            Visitas Pendientes
+            Mantenimientos
           </button>
           
           <button
@@ -55,14 +45,14 @@ export default function MantenimientosApp({ reporterName = 'ESOL Técnico' }: { 
             }`}
           >
             <HardHat className="w-4 h-4" />
-            Historial de Mantenimientos
+            Historial de Bitácoras
           </button>
         </div>
       </div>
 
       {/* Content Area */}
       <div className="mt-6">
-        {activeTab === 'pendientes' && <VisitasPendientesTab />}
+        {activeTab === 'obras' && <MantenimientosObrasTab />}
         {activeTab === 'historial' && <HistorialMantenimientosTab />}
       </div>
     </div>
