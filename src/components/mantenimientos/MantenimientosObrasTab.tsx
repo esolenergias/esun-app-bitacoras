@@ -362,7 +362,7 @@ export default function MantenimientosObrasTab() {
                       {(() => {
                         const badgeData = getCostoBadge(obra);
                         return (
-                          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${badgeData.color}`}>
+                          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${badgeData.color}`}>
                             {badgeData.text}
                           </span>
                         );
