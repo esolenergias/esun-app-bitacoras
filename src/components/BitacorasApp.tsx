@@ -477,6 +477,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                                       <div key={idx} className="relative group/img h-[250px] rounded-lg overflow-hidden border border-dark-4">
                                         <img 
                                           src={getDriveImageUrl(uri)} 
+                                          referrerPolicy="no-referrer"
                                           alt={`Evidencia ${idx + 1}`} 
                                           className="w-full h-full object-cover"
                                           onError={(e) => {

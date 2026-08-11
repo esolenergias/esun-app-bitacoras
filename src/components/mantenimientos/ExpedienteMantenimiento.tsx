@@ -497,6 +497,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                       <a href={getPhotoDriveUrl(foto)} target="_blank" rel="noopener noreferrer" className="block w-full h-full pointer-events-auto">
                         <img 
                           src={getPhotoDisplayUrl(foto)} 
+                          referrerPolicy="no-referrer"
                           alt={`Evidencia ${idx+1}`} 
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none bg-dark-2" 
                           onError={(e) => {
