@@ -25,8 +25,8 @@ export interface PolizaGarantia {
 }
 
 const getAlertaMantenimiento = (obra: PolizaGarantia) => {
-  if (obra.estado_mantenimiento === 'Sin programar' || !obra.estado_mantenimiento) {
-    return { text: 'No programada', color: 'text-gray-400 bg-gray-400/10 border-gray-400/20' };
+  if (obra.estado_mantenimiento === 'Sin programar' || obra.estado_mantenimiento === 'No programada' || !obra.estado_mantenimiento) {
+    return { text: 'Pendiente', color: 'text-gray-400 bg-gray-400/10 border-gray-400/20' };
   }
   if (obra.estado_mantenimiento === 'Terminado') {
     return { text: 'Completado', color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30' };
@@ -332,13 +332,13 @@ export default function MantenimientosObrasTab() {
                     </td>
                     <td className="px-3 py-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
-                        obra.estado_mantenimiento === 'Sin programar' ? 'bg-dark-4 text-cream-muted' :
+                        (obra.estado_mantenimiento === 'Sin programar' || obra.estado_mantenimiento === 'No programada') ? 'bg-dark-4 text-cream-muted' :
                         obra.estado_mantenimiento === 'Programado' ? 'bg-blue-500/20 text-blue-400' :
                         obra.estado_mantenimiento === 'En proceso' ? 'bg-gold/20 text-gold' :
                         obra.estado_mantenimiento === 'Terminado' ? 'bg-emerald-500/20 text-emerald-400' :
                         'bg-dark-4 text-cream-muted'
                       }`}>
-                        {obra.estado_mantenimiento || 'Sin programar'}
+                        {(obra.estado_mantenimiento === 'Sin programar' || !obra.estado_mantenimiento) ? 'No programada' : obra.estado_mantenimiento}
                       </span>
                     </td>
                     <td className="px-3 py-3">
@@ -492,8 +492,8 @@ export default function MantenimientosObrasTab() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-cream-muted uppercase">Estatus de Mantenimiento</label>
-                  <select name="estado_mantenimiento" defaultValue={editingData?.estado_mantenimiento || 'Sin programar'} className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors appearance-none">
-                    <option value="Sin programar">Sin programar</option>
+                  <select name="estado_mantenimiento" defaultValue={editingData?.estado_mantenimiento === 'Sin programar' ? 'No programada' : (editingData?.estado_mantenimiento || 'No programada')} className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors appearance-none">
+                    <option value="No programada">No programada</option>
                     <option value="Programado">Programado</option>
                     <option value="En proceso">En proceso</option>
                     <option value="Terminado">Terminado</option>
