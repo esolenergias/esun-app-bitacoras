@@ -1713,6 +1713,20 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="border-t-2 border-dark-4 bg-dark-1 select-none">
+                <tr>
+                  <td colSpan={4} className="py-4 px-4 text-right font-display font-black text-[11px] text-cream-dim uppercase tracking-wider">
+                    Total Presupuestos:
+                  </td>
+                  <td className="py-4 px-4 text-right font-mono font-bold text-cream-muted">
+                    {formatCurrencyMXN(filteredPresupuestos.reduce((acc, b) => acc + (b.totals?.directCostTotal || 0), 0))}
+                  </td>
+                  <td className="py-4 px-4 text-right font-mono font-black text-gold">
+                    {formatCurrencyMXN(filteredPresupuestos.reduce((acc, b) => acc + (b.totals?.sellingPriceTotal || 0) * 1.16, 0))}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
