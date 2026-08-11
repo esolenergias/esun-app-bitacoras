@@ -283,16 +283,16 @@ export default function MantenimientosObrasTab() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-dark-3/50 border-b border-dark-4">
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Número de Póliza</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Nombre de Cliente</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Nombre de Obra</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Estatus</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Alerta</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Fecha / Frecuencia</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Dirección de Mantenimiento</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider bg-dark-3/30 border-l border-dark-4">Costo</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider bg-dark-3/30">Descripción</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider text-right">Acciones</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider">Folio</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider">Cliente</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider">Proyecto</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider">Estatus</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider">Alerta</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider">Fechas</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider">Dirección</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider bg-dark-3/30 border-l border-dark-4">Costo</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider bg-dark-3/30">Modalidad</th>
+                  <th className="px-3 py-3 text-[10px] font-black text-cream-muted uppercase tracking-wider text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-4">
@@ -302,26 +302,26 @@ export default function MantenimientosObrasTab() {
                     onClick={() => handleOpenEdit(obra)}
                     className="hover:bg-dark-3/50 transition-colors group cursor-pointer"
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-dark-3 rounded-lg border border-dark-4 group-hover:border-gold/30 transition-colors">
-                          <FileText className="w-4 h-4 text-gold" />
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-dark-3 rounded-lg border border-dark-4 group-hover:border-gold/30 transition-colors">
+                          <FileText className="w-3.5 h-3.5 text-gold" />
                         </div>
                         <span className="font-bold text-cream text-sm whitespace-nowrap">{obra.folio}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-cream-muted flex items-center gap-2 whitespace-nowrap">
-                        <User className="w-3.5 h-3.5 text-cream-dim" />
+                    <td className="px-3 py-3">
+                      <span className="text-sm text-cream-muted flex items-center gap-1.5 whitespace-nowrap">
+                        <User className="w-3 h-3 text-cream-dim" />
                         {obra.cliente_nombre || '-'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-cream font-medium">
+                    <td className="px-3 py-3">
+                      <span className="text-sm text-cream font-medium line-clamp-1 max-w-[150px]">
                         {obra.nombre_obra || '-'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
                         obra.estado_mantenimiento === 'Sin programar' ? 'bg-dark-4 text-cream-muted' :
                         obra.estado_mantenimiento === 'Programado' ? 'bg-blue-500/20 text-blue-400' :
@@ -332,44 +332,44 @@ export default function MantenimientosObrasTab() {
                         {obra.estado_mantenimiento || 'Sin programar'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       {(() => {
                         const alertData = getAlertaMantenimiento(obra.fecha_proximo_mantenimiento);
                         return (
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-bold whitespace-nowrap ${alertData.color}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-lg border text-[10px] font-bold whitespace-nowrap ${alertData.color}`}>
                             {alertData.text}
                           </span>
                         );
                       })()}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       <div className="flex flex-col">
-                        <span className="text-sm text-cream-muted whitespace-nowrap">{obra.fecha_proximo_mantenimiento || obra.fecha_inicio}</span>
-                        <span className="text-[10px] font-black uppercase text-blue-400 mt-0.5">{obra.periodicidad}</span>
+                        <span className="text-xs text-cream-muted whitespace-nowrap">{obra.fecha_proximo_mantenimiento || obra.fecha_inicio}</span>
+                        <span className="text-[9px] font-black uppercase text-blue-400 mt-0.5">{obra.periodicidad}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-cream-muted flex items-center gap-2 max-w-[200px] truncate" title={obra.cliente_direccion}>
-                        <MapPin className="w-3.5 h-3.5 text-cream-dim shrink-0" />
+                    <td className="px-3 py-3">
+                      <span className="text-xs text-cream-muted flex items-center gap-1.5 max-w-[120px] truncate" title={obra.cliente_direccion}>
+                        <MapPin className="w-3 h-3 text-cream-dim shrink-0" />
                         <span className="truncate">{obra.cliente_direccion || '-'}</span>
                       </span>
                     </td>
-                    <td className="px-6 py-4 bg-dark-3/30 border-l border-dark-4/50">
+                    <td className="px-3 py-3 bg-dark-3/30 border-l border-dark-4/50">
                       <span className="text-sm font-black text-cream whitespace-nowrap">
                         {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(obra.monto_total || 0)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 bg-dark-3/30">
+                    <td className="px-3 py-3 bg-dark-3/30">
                       {(() => {
                         const badgeData = getCostoBadge(obra);
                         return (
-                          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${badgeData.color}`}>
+                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border whitespace-nowrap ${badgeData.color}`}>
                             {badgeData.text}
                           </span>
                         );
                       })()}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-3 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleDelete(obra); }}
