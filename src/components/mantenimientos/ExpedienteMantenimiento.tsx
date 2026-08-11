@@ -23,6 +23,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const [evidenciaFotos, setEvidenciaFotos] = useState<string[]>([]);
   const [notasVisita, setNotasVisita] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   useEffect(() => {
     fetchVisitas();
@@ -49,14 +50,45 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
     setNotasVisita(visita.notas_visita || '');
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEvidenciaFotos(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
+      const response = await fetch('https://script.google.com/macros/s/AKfycbwm5qwhrgsD37Hd8tFTZkECfKv-rYUoF3omNjm_GX0hZKeDyxC5tQTdXTPLUWEUUT5s/exec', {
+        method: 'POST',
+        body: JSON.stringify({
+          filename: `mtto_${obra.folio}_visita${selectedVisita.numero_visita}_${Date.now()}_${file.name}`,
+          mimeType: file.type,
+          base64: base64,
+          folderName: `Mantenimiento - ${obra.nombre_obra}` // Opcional, depende de si tu Google Script lo procesa
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        let finalUrl = result.url;
+        const match = result.url.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          finalUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
+        }
+        setEvidenciaFotos(prev => [...prev, finalUrl]);
+      } else {
+        throw new Error("No se pudo obtener el link de Google Drive");
+      }
+    } catch (err: any) {
+      console.error('Error uploading photo to Drive:', err);
+      alert('Hubo un error subiendo la foto a Google Drive: ' + err.message);
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -242,10 +274,14 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                   </div>
                   Evidencia Fotográfica
                 </h3>
-                <label className="bg-dark-3 hover:bg-purple-500/20 text-purple-400 px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 text-sm font-bold transition-all border border-purple-500/20 hover:border-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.15)]">
-                  <Upload className="w-4 h-4" />
-                  Subir Fotografía
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                <label className={`bg-dark-3 hover:bg-purple-500/20 text-purple-400 px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 text-sm font-bold transition-all border border-purple-500/20 hover:border-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.15)] ${isUploadingPhoto ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {isUploadingPhoto ? (
+                    <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                  {isUploadingPhoto ? 'Subiendo a Drive...' : 'Subir Fotografía'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
                 </label>
               </div>
               
