@@ -23,14 +23,22 @@ export interface PolizaGarantia {
   created_at?: string;
 }
 
-const getAlertaMantenimiento = (fechaProximo?: string) => {
-  if (!fechaProximo) return { text: 'No programada', color: 'text-gray-400 bg-gray-400/10 border-gray-400/20' };
+const getAlertaMantenimiento = (obra: PolizaGarantia) => {
+  if (obra.estado_mantenimiento === 'Sin programar' || !obra.estado_mantenimiento) {
+    return { text: 'No programada', color: 'text-gray-400 bg-gray-400/10 border-gray-400/20' };
+  }
+  if (obra.estado_mantenimiento === 'Terminado') {
+    return { text: 'Completado', color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30' };
+  }
+  if (!obra.fecha_proximo_mantenimiento) {
+    return { text: 'Falta fecha', color: 'text-gray-400 bg-gray-400/10 border-gray-400/20' };
+  }
   
   const today = new Date();
   today.setHours(0,0,0,0);
   
   // Appending T00:00:00 avoids time zone shifts with string dates like YYYY-MM-DD
-  const scheduledDate = new Date(`${fechaProximo}T00:00:00`);
+  const scheduledDate = new Date(`${obra.fecha_proximo_mantenimiento}T00:00:00`);
   scheduledDate.setHours(0,0,0,0); 
 
   const diffTime = scheduledDate.getTime() - today.getTime();
@@ -43,7 +51,7 @@ const getAlertaMantenimiento = (fechaProximo?: string) => {
   } else if (diffDays <= 14) {
     return { text: 'Próximamente', color: 'text-gold bg-gold/10 border-gold/20' };
   } else {
-    return { text: 'A tiempo', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' };
+    return { text: 'A tiempo', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' };
   }
 };
 
@@ -334,7 +342,7 @@ export default function MantenimientosObrasTab() {
                     </td>
                     <td className="px-3 py-3">
                       {(() => {
-                        const alertData = getAlertaMantenimiento(obra.fecha_proximo_mantenimiento);
+                        const alertData = getAlertaMantenimiento(obra);
                         return (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-lg border text-[10px] font-bold whitespace-nowrap ${alertData.color}`}>
                             {alertData.text}
