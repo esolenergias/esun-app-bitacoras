@@ -109,15 +109,55 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
     return new Date(`${fecha}T12:00:00`).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  // Plantilla de Checklist para HVAC/Solar general
-  const defaultChecklistItems = [
-    { id: 'limpieza_general', label: 'Limpieza general de equipos y componentes' },
-    { id: 'revision_conexiones', label: 'Revisión y reapriete de conexiones eléctricas' },
-    { id: 'medicion_parametros', label: 'Medición de voltaje, amperaje y comprobación de parámetros' },
-    { id: 'inspeccion_fisica', label: 'Inspección visual exhaustiva de daños físicos o desgaste' },
-    { id: 'pruebas_arranque', label: 'Pruebas de arranque, paro y funcionamiento general' },
-    { id: 'lubricacion', label: 'Lubricación de partes móviles y rodamientos (si aplica)' }
-  ];
+  const isHVAC = Array.isArray(obra.conceptos_incluidos) 
+    ? obra.conceptos_incluidos.includes('mtto_aires') || obra.conceptos_incluidos.some((c: any) => typeof c === 'string' && c.toLowerCase().includes('aire'))
+    : false;
+
+  const getChecklistTemplate = () => {
+    // Si incluye Aires Acondicionados o si es un arreglo genérico por defecto usamos la plantilla HVAC
+    if (isHVAC || true) {
+      return [
+        {
+          title: "Unidad Evaporadora (Interior)",
+          items: [
+            { id: 'evap_desarmado', label: 'Desarmado de cubiertas externas para lavado profundo.' },
+            { id: 'evap_desincrustante', label: 'Aplicación de desincrustante químico biodegradable y antibacterial en serpentín.' },
+            { id: 'evap_lavado_alta_presion', label: 'Limpieza a alta presión de turbina y filtros de aire.' },
+            { id: 'evap_charola_drenajes', label: 'Lavado de charola de condensados y desobstrucción de drenajes.' },
+            { id: 'evap_tabletas_cloro', label: 'Colocación de tabletas de cloro de disolución lenta.' }
+          ]
+        },
+        {
+          title: "Unidad Condensadora (Exterior)",
+          items: [
+            { id: 'cond_hidrolavado', label: 'Retiro de suciedad ambiental de serpentines mediante hidrolavado a presión controlada.' },
+            { id: 'cond_peinado_aletas', label: 'Peinado manual de aletas de aluminio dañadas para restaurar flujo de aire.' },
+            { id: 'cond_soportes', label: 'Revisión de soportes metálicos y anclajes antivibración.' },
+            { id: 'cond_inspeccion_acustica', label: 'Inspección acústica y de vibración del compresor y aspas.' }
+          ]
+        },
+        {
+          title: "Diagnóstico Eléctrico y Operativo",
+          items: [
+            { id: 'elec_medicion_voltaje', label: 'Medición y registro de voltaje de línea y consumo de corriente (amperaje de arranque y trabajo).' },
+            { id: 'elec_capacitores', label: 'Verificación de estado de capacitores de marcha y contactores.' },
+            { id: 'elec_ajuste_mecanico', label: 'Ajuste mecánico y reapriete de terminales eléctricas de fuerza y control.' },
+            { id: 'elec_presiones_gas', label: 'Monitoreo de presiones de gas refrigerante (R-410A o R-22).' }
+          ]
+        },
+        {
+          title: "Reporte Digital y Gestión de Activos",
+          items: [
+            { id: 'rep_identificacion', label: 'Identificación única de cada equipo en base de datos.' },
+            { id: 'rep_fotografico', label: 'Registro fotográfico georreferenciado (antes y después del servicio).' },
+            { id: 'rep_acceso_nube', label: 'Acceso inmediato del Poder Judicial a la nube de reportes para validar conformidad.' }
+          ]
+        }
+      ];
+    }
+  };
+
+  const checklistCategories = getChecklistTemplate();
 
   if (selectedVisita) {
     return (
@@ -164,22 +204,31 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                 Checklist Operativo
               </h3>
               
-              <div className="space-y-3 relative z-10">
-                {defaultChecklistItems.map(item => (
-                  <label key={item.id} className="flex items-center gap-4 p-4 bg-dark-3/50 hover:bg-dark-3 rounded-xl cursor-pointer transition-all border border-transparent hover:border-white/5">
-                    <div className="relative flex items-center justify-center">
-                      <input 
-                        type="checkbox"
-                        checked={checklist[item.id] || false}
-                        onChange={() => toggleChecklist(item.id)}
-                        className="peer w-6 h-6 rounded-md border-dark-4 text-gold focus:ring-gold bg-dark-1 transition-all cursor-pointer appearance-none checked:bg-gold checked:border-gold"
-                      />
-                      <CheckSquare className="w-4 h-4 text-dark-1 absolute pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" />
+              <div className="space-y-8 relative z-10">
+                {checklistCategories?.map((category, catIdx) => (
+                  <div key={catIdx} className="space-y-4">
+                    <h4 className="text-sm font-black text-gold uppercase tracking-widest border-b border-white/5 pb-2">
+                      {category.title}
+                    </h4>
+                    <div className="space-y-2">
+                      {category.items.map(item => (
+                        <label key={item.id} className="flex items-start gap-4 p-3 bg-dark-3/50 hover:bg-dark-3 rounded-xl cursor-pointer transition-all border border-transparent hover:border-white/5">
+                          <div className="relative flex items-center justify-center mt-0.5 shrink-0">
+                            <input 
+                              type="checkbox"
+                              checked={checklist[item.id] || false}
+                              onChange={() => toggleChecklist(item.id)}
+                              className="peer w-5 h-5 rounded-md border-dark-4 text-gold focus:ring-gold bg-dark-1 transition-all cursor-pointer appearance-none checked:bg-gold checked:border-gold"
+                            />
+                            <CheckSquare className="w-3.5 h-3.5 text-dark-1 absolute pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" />
+                          </div>
+                          <span className={`text-sm leading-snug transition-colors ${checklist[item.id] ? 'text-cream font-medium' : 'text-cream-muted'}`}>
+                            {item.label}
+                          </span>
+                        </label>
+                      ))}
                     </div>
-                    <span className={`text-sm transition-colors ${checklist[item.id] ? 'text-cream font-medium' : 'text-cream-muted'}`}>
-                      {item.label}
-                    </span>
-                  </label>
+                  </div>
                 ))}
               </div>
             </div>
