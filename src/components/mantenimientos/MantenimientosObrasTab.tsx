@@ -47,6 +47,22 @@ const getAlertaMantenimiento = (fechaProximo?: string) => {
   }
 };
 
+const getCostoBadge = (obra: PolizaGarantia) => {
+  if (obra.periodicidad === 'Por evento') {
+    return { text: 'Cobro por Evento', color: 'text-blue-400 bg-blue-500/20 border-blue-500/30' };
+  } else {
+    let visitas = 1;
+    switch (obra.periodicidad) {
+      case 'Mensual': visitas = 12; break;
+      case 'Bimestral': visitas = 6; break;
+      case 'Trimestral': visitas = 4; break;
+      case 'Semestral': visitas = 2; break;
+      case 'Anual': visitas = 1; break;
+    }
+    return { text: `Póliza - ${visitas} Visita${visitas > 1 ? 's' : ''}`, color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30' };
+  }
+};
+
 const generarFolioProtocolo = (nombreObra: string = '', clienteFinal: string = '', consecutivo: number = 1) => {
   const d = new Date();
   const yy = d.getFullYear().toString().slice(-2);
@@ -273,6 +289,7 @@ export default function MantenimientosObrasTab() {
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Estatus</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Alerta</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Fecha / Frecuencia</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Costo</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Dirección de Mantenimiento</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider text-right">Acciones</th>
                 </tr>
@@ -327,6 +344,21 @@ export default function MantenimientosObrasTab() {
                       <div className="flex flex-col">
                         <span className="text-sm text-cream-muted whitespace-nowrap">{obra.fecha_proximo_mantenimiento || obra.fecha_inicio}</span>
                         <span className="text-[10px] font-black uppercase text-blue-400 mt-0.5">{obra.periodicidad}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-cream whitespace-nowrap">
+                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(obra.monto_total || 0)}
+                        </span>
+                        {(() => {
+                          const badgeData = getCostoBadge(obra);
+                          return (
+                            <span className={`inline-flex items-center justify-center px-2 py-0.5 mt-1 rounded text-[9px] font-black uppercase tracking-wider border ${badgeData.color}`}>
+                              {badgeData.text}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -443,6 +475,7 @@ export default function MantenimientosObrasTab() {
                     <option value="Trimestral">Trimestral</option>
                     <option value="Semestral">Semestral</option>
                     <option value="Anual">Anual</option>
+                    <option value="Por evento">Por evento (Única Vez)</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -468,6 +501,17 @@ export default function MantenimientosObrasTab() {
                     name="fecha_proximo_mantenimiento" 
                     type="date"
                     defaultValue={editingData?.fecha_proximo_mantenimiento || ''} 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Costo Total ($ MXN)</label>
+                  <input 
+                    name="monto_total" 
+                    type="number"
+                    step="0.01"
+                    defaultValue={editingData?.monto_total || '0'} 
+                    placeholder="Ej: 15000" 
                     className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
                   />
                 </div>
