@@ -75,12 +75,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
       
       const result = await response.json();
       if (result.success) {
-        let finalUrl = result.url;
-        const match = result.url.match(/id=([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-          finalUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
-        }
-        setEvidenciaFotos(prev => [...prev, finalUrl]);
+        setEvidenciaFotos(prev => [...prev, result.url]);
       } else {
         throw new Error("No se pudo obtener el link de Google Drive");
       }
@@ -139,6 +134,25 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const formatFecha = (fecha: string) => {
     if (!fecha) return 'Sin fecha';
     return new Date(`${fecha}T12:00:00`).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const getDriveThumbnailUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('data:image')) return url; // base64 compatibility
+    if (url.includes('drive.google.com/thumbnail')) return url; // already thumbnail
+    
+    const patterns = [
+      /\/file\/d\/([a-zA-Z0-9_-]+)/,
+      /[?&]id=([a-zA-Z0-9_-]+)/,
+      /\/open\?id=([a-zA-Z0-9_-]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
+      }
+    }
+    return url;
   };
 
   const isHVAC = Array.isArray(obra.conceptos_incluidos) 
@@ -297,7 +311,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {evidenciaFotos.map((foto, idx) => (
                     <div key={idx} className="relative group rounded-xl overflow-hidden border border-white/5 shadow-lg aspect-square">
-                      <img src={foto} alt={`Evidencia ${idx+1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                      <img src={getDriveThumbnailUrl(foto)} alt={`Evidencia ${idx+1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-1/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                       <button 
                         onClick={() => removePhoto(idx)}
