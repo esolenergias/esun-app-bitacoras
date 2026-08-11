@@ -285,6 +285,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
   const [savedPolicies, setSavedPolicies] = useState<any[]>([]);
   const [activeTabMode, setActiveTabMode] = useState<'crear' | 'historial'>('crear');
   const [selectedPolicyDetail, setSelectedPolicyDetail] = useState<any | null>(null);
+  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -305,6 +306,56 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
     representanteEmpresa: 'Gustavo Corona Cervantes',
     airesAcondicionados: [] as Array<{ id: string; modelo: string; tonelaje: string; cantidad: number }>
   });
+
+  const resetForm = () => {
+    setEditingPolicyId(null);
+    setSelectedBudget('');
+    setFormData({
+      tipoCobertura: 'Preventiva',
+      folio: generarFolioProtocolo(),
+      conceptosSeleccionados: [],
+      clienteFinal: '',
+      clienteTelefono: '',
+      clienteEmail: '',
+      direccionInstalacion: '',
+      nombreObra: '',
+      periodicidad: 'Trimestral',
+      duracionAnos: 1,
+      fechaInicio: new Date().toISOString().split('T')[0],
+      montoTotal: 0,
+      montoVisita: 0,
+      observaciones: '',
+      representanteEmpresa: 'Gustavo Corona Cervantes',
+      airesAcondicionados: []
+    });
+  };
+
+  const handleEditPolicy = (poliza: any) => {
+    setEditingPolicyId(poliza.id);
+    setSelectedBudget(poliza.presupuesto_id || '');
+    
+    setFormData({
+      tipoCobertura: poliza.tipo_cobertura || 'Preventiva',
+      folio: poliza.folio,
+      conceptosSeleccionados: poliza.conceptos_incluidos || [],
+      clienteFinal: poliza.cliente_nombre || '',
+      clienteTelefono: poliza.cliente_telefono || '',
+      clienteEmail: poliza.cliente_email || '',
+      direccionInstalacion: poliza.cliente_direccion || '',
+      nombreObra: poliza.nombre_obra || '',
+      periodicidad: poliza.periodicidad || 'Trimestral',
+      duracionAnos: poliza.duracion_anos || 1,
+      fechaInicio: poliza.fecha_inicio || new Date().toISOString().split('T')[0],
+      montoTotal: poliza.monto_total || 0,
+      montoVisita: poliza.monto_visita || 0,
+      observaciones: poliza.observaciones || '',
+      representanteEmpresa: 'Gustavo Corona Cervantes',
+      airesAcondicionados: []
+    });
+
+    setActiveTabMode('crear');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const agregarAire = () => {
     setFormData(prev => ({
@@ -1282,11 +1333,27 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
         observaciones: formData.observaciones
       };
 
-      const { data: polizaRes, error: polizaErr } = await supabase
-        .from('polizas_garantia')
-        .insert([payloadPoliza])
-        .select()
-        .single();
+      let polizaRes;
+      let polizaErr;
+
+      if (editingPolicyId) {
+        const { data, error } = await supabase
+          .from('polizas_garantia')
+          .update(payloadPoliza)
+          .eq('id', editingPolicyId)
+          .select()
+          .single();
+        polizaRes = data;
+        polizaErr = error;
+      } else {
+        const { data, error } = await supabase
+          .from('polizas_garantia')
+          .insert([payloadPoliza])
+          .select()
+          .single();
+        polizaRes = data;
+        polizaErr = error;
+      }
 
       if (polizaErr) {
         if (polizaErr.code === '42P01') {
@@ -1297,6 +1364,11 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
       }
 
       if (polizaRes && visitasCalculadas.length > 0) {
+        if (editingPolicyId) {
+          // If editing, delete all previous visits and recreate them to match the new dates/periods
+          await supabase.from('visitas_mantenimiento_poliza').delete().eq('poliza_id', polizaRes.id);
+        }
+
         const payloadVisitas = visitasCalculadas.map(v => ({
           poliza_id: polizaRes.id,
           numero_visita: v.numero,
@@ -1308,8 +1380,8 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
         await supabase.from('visitas_mantenimiento_poliza').insert(payloadVisitas);
       }
 
-      alert(`¡Póliza ${formData.folio} y ${visitasCalculadas.length} visitas de mantenimiento guardadas con éxito en la base de datos!`);
-      setFormData(prev => ({ ...prev, folio: generarFolioProtocolo() }));
+      alert(editingPolicyId ? `¡Póliza ${formData.folio} actualizada con éxito!` : `¡Póliza ${formData.folio} y ${visitasCalculadas.length} visitas de mantenimiento guardadas con éxito!`);
+      resetForm();
       fetchSavedPolicies();
 
     } catch (err: any) {
@@ -1334,13 +1406,13 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
       <div className="flex justify-between items-center bg-dark-2 p-2 rounded-xl border border-dark-4">
         <div className="flex gap-2">
           <button
-            onClick={() => setActiveTabMode('crear')}
+            onClick={() => { resetForm(); setActiveTabMode('crear'); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
               activeTabMode === 'crear' ? 'bg-gold text-dark-1 font-semibold' : 'text-cream-muted hover:text-cream hover:bg-dark-3'
             }`}
           >
             <Shield className="w-4 h-4" />
-            Emisión de Póliza
+            {editingPolicyId ? 'Editar Póliza' : 'Emisión de Póliza'}
           </button>
 
           <button
@@ -1365,7 +1437,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
           <div className="border-b border-dark-4 pb-4">
             <h3 className="text-xl font-light text-cream flex items-center gap-2">
               <Shield className="w-5 h-5 text-gold" />
-              Generador de Pólizas de Garantía y Mantenimiento Multidisciplinario
+              {editingPolicyId ? 'Edición de Póliza de Garantía' : 'Generador de Pólizas de Garantía y Mantenimiento Multidisciplinario'}
             </h3>
             <p className="text-sm text-cream-muted mt-1">
               Configura garantías respaldadas legalmente bajo NOM-001-SEDE, Código de Red y PROFECO para instalaciones eléctricas, solares, climatización y respaldos.
@@ -1709,13 +1781,21 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
 
           {/* Acciones */}
           <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-dark-4">
+            {editingPolicyId && (
+              <button
+                onClick={resetForm}
+                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors border border-red-500/20"
+              >
+                Cancelar Edición
+              </button>
+            )}
             <button
               onClick={handleSavePolicyToSupabase}
               disabled={isSavingSupabase}
               className="bg-dark-3 hover:bg-dark-4 text-cream px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border border-dark-4"
             >
               <Save className="w-4 h-4 text-gold" />
-              {isSavingSupabase ? 'Guardando en BD...' : 'Guardar Póliza y Programar Visitas'}
+              {isSavingSupabase ? 'Guardando en BD...' : editingPolicyId ? 'Actualizar Póliza y Visitas' : 'Guardar Póliza y Programar Visitas'}
             </button>
 
             <button
@@ -1783,9 +1863,17 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
                       <p className="text-xs text-cream-muted">{poliza.cliente_direccion || 'Sin dirección'}</p>
                     </div>
 
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-gold">{formatCurrency(poliza.monto_total || 0)}</div>
-                      <div className="text-xs text-cream-muted">Vigencia: {parseFechaText(poliza.fecha_inicio)} al {parseFechaText(poliza.fecha_fin)}</div>
+                    <div className="text-right flex flex-col items-end gap-2">
+                      <div>
+                        <div className="text-sm font-semibold text-gold">{formatCurrency(poliza.monto_total || 0)}</div>
+                        <div className="text-xs text-cream-muted">Vigencia: {parseFechaText(poliza.fecha_inicio)} al {parseFechaText(poliza.fecha_fin)}</div>
+                      </div>
+                      <button 
+                        onClick={() => handleEditPolicy(poliza)}
+                        className="bg-dark-3 hover:bg-gold/20 text-cream hover:text-gold border border-dark-4 px-3 py-1 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        Editar Póliza
+                      </button>
                     </div>
                   </div>
 
