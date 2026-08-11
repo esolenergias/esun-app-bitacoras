@@ -176,13 +176,19 @@ export default function MantenimientosObrasTab() {
     // Auto-fill dates if empty to avoid DB errors
     const today = new Date().toISOString().split('T')[0];
     let dInicio = formData.get('fecha_inicio') as string;
-    if (!dInicio) dInicio = today;
+    if (!dInicio) {
+      dInicio = editingData ? editingData.fecha_inicio : today;
+    }
     
     let dFin = formData.get('fecha_fin') as string;
     if (!dFin) {
-      const endD = new Date();
-      endD.setFullYear(endD.getFullYear() + 1);
-      dFin = endD.toISOString().split('T')[0];
+      if (editingData) {
+        dFin = editingData.fecha_fin;
+      } else {
+        const endD = new Date();
+        endD.setFullYear(endD.getFullYear() + 1);
+        dFin = endD.toISOString().split('T')[0];
+      }
     }
 
     const data: Partial<PolizaGarantia> = {
@@ -488,6 +494,24 @@ export default function MantenimientosObrasTab() {
                     type="email"
                     defaultValue={editingData?.cliente_email || ''} 
                     placeholder="cliente@correo.com" 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Fecha de Inicio</label>
+                  <input 
+                    name="fecha_inicio" 
+                    type="date"
+                    defaultValue={editingData?.fecha_inicio || ''} 
+                    className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-cream-muted uppercase">Fecha de Término</label>
+                  <input 
+                    name="fecha_fin" 
+                    type="date"
+                    defaultValue={editingData?.fecha_fin || ''} 
                     className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-3 text-sm text-cream focus:border-gold outline-none transition-colors" 
                   />
                 </div>
