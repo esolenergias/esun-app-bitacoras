@@ -191,8 +191,8 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6">
+          <div className="space-y-6">
             {/* Checklist */}
             <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-2xl p-6 lg:p-8 shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl group-hover:bg-blue-500/10 transition-colors"></div>
@@ -204,7 +204,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                 Checklist Operativo
               </h3>
               
-              <div className="space-y-8 relative z-10">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
                 {checklistCategories?.map((category, catIdx) => (
                   <div key={catIdx} className="space-y-4">
                     <h4 className="text-sm font-black text-gold uppercase tracking-widest border-b border-white/5 pb-2">
@@ -277,9 +277,9 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="w-full">
             {/* Detalles Visita */}
-            <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-2xl p-6 lg:p-8 shadow-xl sticky top-24">
+            <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-2xl p-6 lg:p-8 shadow-xl">
               <h3 className="text-xl font-bold text-cream mb-6 flex items-center gap-3">
                 <div className="p-2 bg-emerald-500/10 rounded-lg">
                   <FileText className="w-5 h-5 text-emerald-400" />
