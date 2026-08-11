@@ -4,7 +4,7 @@ import type { PolizaGarantia } from './MantenimientosObrasTab';
 import { 
   ArrowLeft, Calendar, FileText, Camera, CheckSquare, Zap, 
   MapPin, Phone, Shield, FileCheck, Upload, Save, User, Clock, 
-  PlayCircle, AlertCircle, Activity
+  PlayCircle, AlertCircle, Activity, Cloud, CheckCircle
 } from 'lucide-react';
 
 interface ExpedienteProps {
@@ -24,6 +24,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const [notasVisita, setNotasVisita] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [pendingPhotos, setPendingPhotos] = useState<{file: File, preview: string}[]>([]);
 
   useEffect(() => {
     fetchVisitas();
@@ -48,40 +49,72 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
     setChecklist(visita.checklist_data || {});
     setEvidenciaFotos(visita.evidencia_fotos || []);
     setNotasVisita(visita.notas_visita || '');
+    setPendingPhotos([]);
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
+    const newPending = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+    
+    setPendingPhotos(prev => [...prev, ...newPending]);
+  };
+
+  const removePendingPhoto = (index: number) => {
+    setPendingPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadPending = async () => {
+    if (pendingPhotos.length === 0) return;
+    
     setIsUploadingPhoto(true);
+    let uploadedUrls: string[] = [];
+
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      
-      const response = await fetch('https://script.google.com/macros/s/AKfycbx2I7-77T-EUv-3DCK7ueL9eGn4871nv-EJY_qBJxRu5TFQ3IWNcXOjEE89ghI4UbLa2w/exec', {
-        method: 'POST',
-        body: JSON.stringify({
-          filename: `mtto_${obra.folio}_visita${selectedVisita.numero_visita}_${Date.now()}_${file.name}`,
-          mimeType: file.type,
-          base64: base64,
-          folderName: `Mantenimiento - ${obra.nombre_obra}` // Opcional, depende de si tu Google Script lo procesa
-        })
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        setEvidenciaFotos(prev => [...prev, result.url]);
-      } else {
-        throw new Error("No se pudo obtener el link de Google Drive");
+      for (let i = 0; i < pendingPhotos.length; i++) {
+        const file = pendingPhotos[i].file;
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        
+        const response = await fetch('https://script.google.com/macros/s/AKfycbx2I7-77T-EUv-3DCK7ueL9eGn4871nv-EJY_qBJxRu5TFQ3IWNcXOjEE89ghI4UbLa2w/exec', {
+          method: 'POST',
+          body: JSON.stringify({
+            filename: `mtto_${obra.folio}_visita${selectedVisita.numero_visita}_${Date.now()}_${file.name}`,
+            mimeType: file.type,
+            base64: base64,
+            folderName: `Mantenimiento - ${obra.nombre_obra}`
+          })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+          uploadedUrls.push(result.url);
+        } else {
+          console.error("Error subiendo a Drive:", result.error);
+        }
       }
+      
+      if (uploadedUrls.length > 0) {
+        setEvidenciaFotos(prev => [...prev, ...uploadedUrls]);
+        setPendingPhotos([]);
+        // Auto-guardar en base de datos para no perder las URLs si se salen
+        await supabase
+          .from('visitas_mantenimiento_poliza')
+          .update({ evidencia_fotos: [...evidenciaFotos, ...uploadedUrls] })
+          .eq('id', selectedVisita.id);
+      }
+
     } catch (err: any) {
-      console.error('Error uploading photo to Drive:', err);
-      alert('Hubo un error subiendo la foto a Google Drive: ' + err.message);
+      console.error('Error al subir fotos a Drive:', err);
+      alert('Hubo un error subiendo algunas fotos a Google Drive: ' + err.message);
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -288,18 +321,31 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                   </div>
                   Evidencia Fotográfica
                 </h3>
-                <label className={`bg-dark-3 hover:bg-purple-500/20 text-purple-400 px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 text-sm font-bold transition-all border border-purple-500/20 hover:border-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.15)] ${isUploadingPhoto ? 'opacity-50 pointer-events-none' : ''}`}>
-                  {isUploadingPhoto ? (
-                    <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <Upload className="w-4 h-4" />
+                <div className="flex items-center gap-4">
+                  {pendingPhotos.length > 0 && (
+                    <button 
+                      onClick={handleUploadPending}
+                      disabled={isUploadingPhoto}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isUploadingPhoto ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Cloud className="w-4 h-4" />
+                      )}
+                      {isUploadingPhoto ? `Subiendo a Drive (${pendingPhotos.length})...` : `Subir a Drive (${pendingPhotos.length})`}
+                    </button>
                   )}
-                  {isUploadingPhoto ? 'Subiendo a Drive...' : 'Subir Fotografía'}
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
-                </label>
+                  
+                  <label className={`bg-dark-3 hover:bg-purple-500/20 text-purple-400 px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 text-sm font-bold transition-all border border-purple-500/20 hover:border-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.15)] ${isUploadingPhoto ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <Upload className="w-4 h-4" />
+                    Seleccionar Imágenes
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoSelect} disabled={isUploadingPhoto} />
+                  </label>
+                </div>
               </div>
               
-              {evidenciaFotos.length === 0 ? (
+              {evidenciaFotos.length === 0 && pendingPhotos.length === 0 ? (
                 <div className="text-center p-12 border-2 border-dashed border-dark-4 hover:border-purple-500/30 rounded-2xl transition-colors bg-dark-3/20">
                   <div className="w-16 h-16 bg-dark-3 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <Camera className="w-8 h-8 text-cream-muted opacity-50" />
@@ -309,8 +355,28 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {/* Pending Photos */}
+                  {pendingPhotos.map((photo, idx) => (
+                    <div key={`pending-${idx}`} className="relative group rounded-xl overflow-hidden border-2 border-dashed border-blue-500/50 shadow-lg aspect-square opacity-80">
+                      <img src={photo.preview} alt={`Pendiente ${idx+1}`} className="w-full h-full object-cover grayscale" />
+                      <div className="absolute inset-0 bg-dark-1/50 flex flex-col items-center justify-center">
+                         <Cloud className="w-6 h-6 text-blue-400 mb-1" />
+                         <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest px-2 text-center">Pendiente de Subir</span>
+                      </div>
+                      <button 
+                        onClick={() => removePendingPhoto(idx)}
+                        disabled={isUploadingPhoto}
+                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-lg transition-all hover:scale-110 shadow-lg z-10"
+                        title="Quitar"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Uploaded Photos */}
                   {evidenciaFotos.map((foto, idx) => (
-                    <div key={idx} className="relative group rounded-xl overflow-hidden border border-white/5 shadow-lg aspect-square">
+                    <div key={`uploaded-${idx}`} className="relative group rounded-xl overflow-hidden border border-white/5 shadow-lg aspect-square">
                       <img src={getDriveThumbnailUrl(foto)} alt={`Evidencia ${idx+1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-1/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                       <button 
