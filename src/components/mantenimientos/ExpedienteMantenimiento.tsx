@@ -25,6 +25,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [pendingPhotos, setPendingPhotos] = useState<{file: File, preview: string}[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchVisitas();
@@ -354,19 +355,19 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                   <p className="text-xs text-cream-muted">Sube fotos del "Antes" y "Después" del servicio.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3">
                   {/* Pending Photos */}
                   {pendingPhotos.map((photo, idx) => (
                     <div key={`pending-${idx}`} className="relative group rounded-xl overflow-hidden border-2 border-dashed border-blue-500/50 shadow-lg aspect-square opacity-80">
                       <img src={photo.preview} alt={`Pendiente ${idx+1}`} className="w-full h-full object-cover grayscale" />
                       <div className="absolute inset-0 bg-dark-1/50 flex flex-col items-center justify-center">
-                         <Cloud className="w-6 h-6 text-blue-400 mb-1" />
-                         <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest px-2 text-center">Pendiente de Subir</span>
+                         <Cloud className="w-4 h-4 text-blue-400 mb-1" />
+                         <span className="text-[8px] font-bold text-blue-300 uppercase tracking-widest px-1 text-center leading-tight">Pendiente</span>
                       </div>
                       <button 
                         onClick={() => removePendingPhoto(idx)}
                         disabled={isUploadingPhoto}
-                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-lg transition-all hover:scale-110 shadow-lg z-10"
+                        className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-lg transition-all hover:scale-110 shadow-lg z-10"
                         title="Quitar"
                       >
                         <TrashIcon />
@@ -376,12 +377,37 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
 
                   {/* Uploaded Photos */}
                   {evidenciaFotos.map((foto, idx) => (
-                    <div key={`uploaded-${idx}`} className="relative group rounded-xl overflow-hidden border border-white/5 shadow-lg aspect-square">
-                      <img src={getDriveThumbnailUrl(foto)} alt={`Evidencia ${idx+1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-dark-1/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div 
+                      key={`uploaded-${idx}`} 
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedIndex(idx);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedIndex === null || draggedIndex === idx) return;
+                        const newFotos = [...evidenciaFotos];
+                        const [removed] = newFotos.splice(draggedIndex, 1);
+                        newFotos.splice(idx, 0, removed);
+                        setEvidenciaFotos(newFotos);
+                        setDraggedIndex(null);
+                      }}
+                      onDragEnd={() => setDraggedIndex(null)}
+                      className={`relative group rounded-xl overflow-hidden border border-white/5 shadow-lg aspect-square cursor-move transition-all ${draggedIndex === idx ? 'opacity-50 scale-95 border-gold' : 'hover:border-gold/50'}`}
+                    >
+                      <img src={getDriveThumbnailUrl(foto)} alt={`Evidencia ${idx+1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-dark-1/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                      <div className="absolute bottom-1 left-1 bg-dark-1/80 px-1.5 py-0.5 rounded text-[8px] font-bold text-cream-muted pointer-events-none">
+                        {idx + 1}
+                      </div>
                       <button 
                         onClick={() => removePhoto(idx)}
-                        className="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
+                        className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
                         title="Eliminar foto"
                       >
                         <TrashIcon />
