@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../context/supabase';
-import { PolizaGarantia } from './MantenimientosObrasTab';
+import type { PolizaGarantia } from './MantenimientosObrasTab';
 import { 
   ArrowLeft, Calendar, FileText, Camera, CheckSquare, Zap, 
   MapPin, Phone, Shield, FileCheck, Upload, Save, User, Clock 
