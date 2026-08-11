@@ -10,7 +10,7 @@ import {
   RefreshCw, Sliders, Edit, Save, 
   ArrowRight, Sun, Moon, Zap, Leaf, 
   DollarSign, MessageSquare, Package, Truck, Users, Activity,
-  Settings, Trash2, ChevronDown, ChevronRight, ChevronUp, Store, LayoutTemplate
+  Settings, Trash2, ChevronDown, ChevronRight, ChevronUp, Store, LayoutTemplate, Wrench
 } from 'lucide-react';
 import InsumosTab from './cotizador/InsumosTab';
 import MatricesTab from './cotizador/MatricesTab';
@@ -18,6 +18,7 @@ import PresupuestosTab from './cotizador/PresupuestosTab';
 import GruposTab from './cotizador/GruposTab';
 import EsunPage from './esun/EsunPage';
 import BitacorasApp from './BitacorasApp';
+import MantenimientosApp from './MantenimientosApp';
 import LegalTab from './legal/LegalTab';
 import ClientesTab from './crm/ClientesTab';
 
@@ -656,6 +657,17 @@ export function Portal() {
                         >
                           <Layers className="w-4 h-4 stroke-[2]" />
                           {!sidebarCollapsed && <span>Bitácoras (App)</span>}
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('mantenimientos')}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'mantenimientos'
+                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <Wrench className="w-4 h-4 stroke-[2]" />
+                          {!sidebarCollapsed && <span>Mantenimientos (App)</span>}
                         </button>
                       </div>
 
@@ -2038,6 +2050,12 @@ export function Portal() {
               {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'bitacoras' && (
                 <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
                   <BitacorasApp reporterName={currentUser.name} />
+                </div>
+              )}
+
+              {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'mantenimientos' && (
+                <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+                  <MantenimientosApp reporterName={currentUser.name} />
                 </div>
               )}
 
