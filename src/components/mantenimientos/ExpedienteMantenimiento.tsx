@@ -3,7 +3,8 @@ import { supabase } from '../../context/supabase';
 import type { PolizaGarantia } from './MantenimientosObrasTab';
 import { 
   ArrowLeft, Calendar, FileText, Camera, CheckSquare, Zap, 
-  MapPin, Phone, Shield, FileCheck, Upload, Save, User, Clock 
+  MapPin, Phone, Shield, FileCheck, Upload, Save, User, Clock, 
+  PlayCircle, AlertCircle, Activity
 } from 'lucide-react';
 
 interface ExpedienteProps {
@@ -110,80 +111,113 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
 
   // Plantilla de Checklist para HVAC/Solar general
   const defaultChecklistItems = [
-    { id: 'limpieza_general', label: 'Limpieza general de equipos' },
-    { id: 'revision_conexiones', label: 'Revisión de conexiones eléctricas y reapriete' },
-    { id: 'medicion_parametros', label: 'Medición de voltaje, amperaje y parámetros' },
-    { id: 'inspeccion_fisica', label: 'Inspección visual de daños físicos o desgaste' },
-    { id: 'pruebas_arranque', label: 'Pruebas de arranque y funcionamiento' },
-    { id: 'lubricacion', label: 'Lubricación de partes móviles (si aplica)' }
+    { id: 'limpieza_general', label: 'Limpieza general de equipos y componentes' },
+    { id: 'revision_conexiones', label: 'Revisión y reapriete de conexiones eléctricas' },
+    { id: 'medicion_parametros', label: 'Medición de voltaje, amperaje y comprobación de parámetros' },
+    { id: 'inspeccion_fisica', label: 'Inspección visual exhaustiva de daños físicos o desgaste' },
+    { id: 'pruebas_arranque', label: 'Pruebas de arranque, paro y funcionamiento general' },
+    { id: 'lubricacion', label: 'Lubricación de partes móviles y rodamientos (si aplica)' }
   ];
 
   if (selectedVisita) {
     return (
       <div className="space-y-6 animate-fade-in pb-20">
-        <div className="flex items-center gap-4 bg-dark-2 p-4 rounded-xl border border-dark-4">
-          <button 
-            onClick={() => setSelectedVisita(null)}
-            className="p-2 hover:bg-dark-3 rounded-lg text-cream transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h2 className="text-xl font-bold text-cream">Ejecución de Visita #{selectedVisita.numero_visita}</h2>
-            <p className="text-sm text-cream-muted">Folio de Póliza: {obra.folio}</p>
+        {/* HEADER DE EJECUCIÓN (FROSTED GLASS) */}
+        <div className="relative overflow-hidden rounded-2xl bg-dark-2/40 backdrop-blur-xl border border-white/5 shadow-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gold/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3"></div>
+          
+          <div className="flex items-center gap-6 z-10 w-full">
+            <button 
+              onClick={() => setSelectedVisita(null)}
+              className="p-3 bg-dark-3/50 hover:bg-gold/20 text-cream hover:text-gold rounded-xl transition-all border border-white/5 hover:border-gold/30 hover:-translate-x-1"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cream to-cream-muted">
+                  Bitácora de Visita #{selectedVisita.numero_visita}
+                </h2>
+                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                  selectedVisita.estado === 'completada' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-gold/20 text-gold border border-gold/30'
+                }`}>
+                  {selectedVisita.estado}
+                </span>
+              </div>
+              <p className="text-sm text-cream-muted mt-1 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gold" /> Fecha Programada: {formatFecha(selectedVisita.fecha_programada)}
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {/* Checklist */}
-            <div className="bg-dark-2 border border-dark-4 rounded-xl p-6">
-              <h3 className="text-lg font-bold text-cream mb-4 flex items-center gap-2">
-                <CheckSquare className="w-5 h-5 text-gold" />
-                Checklist de Mantenimiento
+            <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-2xl p-6 lg:p-8 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl group-hover:bg-blue-500/10 transition-colors"></div>
+              
+              <h3 className="text-xl font-bold text-cream mb-6 flex items-center gap-3 relative z-10">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <CheckSquare className="w-5 h-5 text-blue-400" />
+                </div>
+                Checklist Operativo
               </h3>
-              <div className="space-y-3">
+              
+              <div className="space-y-3 relative z-10">
                 {defaultChecklistItems.map(item => (
-                  <label key={item.id} className="flex items-center gap-3 p-3 bg-dark-3 rounded-lg cursor-pointer hover:bg-dark-4 transition-colors">
-                    <input 
-                      type="checkbox"
-                      checked={checklist[item.id] || false}
-                      onChange={() => toggleChecklist(item.id)}
-                      className="w-5 h-5 rounded border-dark-4 text-gold focus:ring-gold bg-dark-1"
-                    />
-                    <span className="text-sm text-cream">{item.label}</span>
+                  <label key={item.id} className="flex items-center gap-4 p-4 bg-dark-3/50 hover:bg-dark-3 rounded-xl cursor-pointer transition-all border border-transparent hover:border-white/5">
+                    <div className="relative flex items-center justify-center">
+                      <input 
+                        type="checkbox"
+                        checked={checklist[item.id] || false}
+                        onChange={() => toggleChecklist(item.id)}
+                        className="peer w-6 h-6 rounded-md border-dark-4 text-gold focus:ring-gold bg-dark-1 transition-all cursor-pointer appearance-none checked:bg-gold checked:border-gold"
+                      />
+                      <CheckSquare className="w-4 h-4 text-dark-1 absolute pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" />
+                    </div>
+                    <span className={`text-sm transition-colors ${checklist[item.id] ? 'text-cream font-medium' : 'text-cream-muted'}`}>
+                      {item.label}
+                    </span>
                   </label>
                 ))}
               </div>
             </div>
 
             {/* Evidencia Fotográfica */}
-            <div className="bg-dark-2 border border-dark-4 rounded-xl p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-cream flex items-center gap-2">
-                  <Camera className="w-5 h-5 text-gold" />
+            <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-2xl p-6 lg:p-8 shadow-xl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <h3 className="text-xl font-bold text-cream flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <Camera className="w-5 h-5 text-purple-400" />
+                  </div>
                   Evidencia Fotográfica
                 </h3>
-                <label className="bg-gold/10 hover:bg-gold/20 text-gold px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-sm font-semibold transition-colors border border-gold/30">
+                <label className="bg-dark-3 hover:bg-purple-500/20 text-purple-400 px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 text-sm font-bold transition-all border border-purple-500/20 hover:border-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.15)]">
                   <Upload className="w-4 h-4" />
-                  Subir Foto
+                  Subir Fotografía
                   <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
                 </label>
               </div>
               
               {evidenciaFotos.length === 0 ? (
-                <div className="text-center p-8 border-2 border-dashed border-dark-4 rounded-xl">
-                  <Camera className="w-8 h-8 text-cream-muted mx-auto mb-2 opacity-50" />
-                  <p className="text-sm text-cream-muted">No hay fotografías cargadas.</p>
+                <div className="text-center p-12 border-2 border-dashed border-dark-4 hover:border-purple-500/30 rounded-2xl transition-colors bg-dark-3/20">
+                  <div className="w-16 h-16 bg-dark-3 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Camera className="w-8 h-8 text-cream-muted opacity-50" />
+                  </div>
+                  <p className="text-sm font-medium text-cream mb-1">Sin evidencia fotográfica</p>
+                  <p className="text-xs text-cream-muted">Sube fotos del "Antes" y "Después" del servicio.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {evidenciaFotos.map((foto, idx) => (
-                    <div key={idx} className="relative group rounded-lg overflow-hidden border border-dark-4">
-                      <img src={foto} alt={`Evidencia ${idx+1}`} className="w-full h-32 object-cover" />
+                    <div key={idx} className="relative group rounded-xl overflow-hidden border border-white/5 shadow-lg aspect-square">
+                      <img src={foto} alt={`Evidencia ${idx+1}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-dark-1/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                       <button 
                         onClick={() => removePhoto(idx)}
-                        className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
+                        title="Eliminar foto"
                       >
                         <TrashIcon />
                       </button>
@@ -196,32 +230,33 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
 
           <div className="space-y-6">
             {/* Detalles Visita */}
-            <div className="bg-dark-2 border border-dark-4 rounded-xl p-6">
-              <h3 className="text-lg font-bold text-cream mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-gold" />
-                Resumen de Visita
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-cream-muted font-bold uppercase block mb-1">Fecha Programada</label>
-                  <p className="text-sm text-cream">{formatFecha(selectedVisita.fecha_programada)}</p>
+            <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-2xl p-6 lg:p-8 shadow-xl sticky top-24">
+              <h3 className="text-xl font-bold text-cream mb-6 flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 rounded-lg">
+                  <FileText className="w-5 h-5 text-emerald-400" />
                 </div>
+                Cierre de Visita
+              </h3>
+              
+              <div className="space-y-6">
                 <div>
-                  <label className="text-xs text-cream-muted font-bold uppercase block mb-1">Notas de Servicio / Observaciones</label>
+                  <label className="text-[11px] text-cream-muted font-black tracking-widest uppercase block mb-2">Observaciones / Trabajos Realizados</label>
                   <textarea 
                     value={notasVisita}
                     onChange={e => setNotasVisita(e.target.value)}
-                    className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-sm text-cream focus:border-gold outline-none h-32 resize-none"
-                    placeholder="Describe cualquier anomalía, refacción utilizada o comentario relevante..."
+                    className="w-full bg-dark-3/50 border border-white/5 hover:border-white/10 rounded-xl p-4 text-sm text-cream focus:border-gold outline-none h-40 resize-none transition-colors"
+                    placeholder="Describe los trabajos realizados, refacciones utilizadas, o anomalías encontradas..."
                   />
                 </div>
+                
                 <button 
                   onClick={handleSaveVisita}
                   disabled={isSaving}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                  className="w-full relative group overflow-hidden bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)]"
                 >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                   <Save className="w-5 h-5" />
-                  {isSaving ? 'Guardando...' : 'Guardar y Completar Visita'}
+                  {isSaving ? 'Guardando y Sellando...' : 'Guardar y Completar Visita'}
                 </button>
               </div>
             </div>
@@ -233,155 +268,242 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      {/* HEADER EXPEDIENTE */}
-      <div className="bg-gradient-to-r from-dark-2 to-dark-3 border border-dark-4 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gold/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-        <div className="flex items-center gap-4 z-10">
-          <button 
-            onClick={onBack}
-            className="p-3 bg-dark-4 hover:bg-gold/20 text-cream hover:text-gold rounded-xl transition-colors border border-transparent hover:border-gold/30"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold text-cream">{obra.nombre_obra}</h1>
-              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                obra.modalidad_contratacion === 'Cobro por Evento' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-              }`}>
-                {obra.modalidad_contratacion || 'Póliza Prepagada'}
-              </span>
+      {/* HEADER EXPEDIENTE (PREMIUM HERO) */}
+      <div className="relative overflow-hidden bg-dark-2 border border-white/5 rounded-3xl p-8 lg:p-10 shadow-2xl">
+        {/* Animated Background Gradients */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gold/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] translate-y-1/3 -translate-x-1/3 pointer-events-none"></div>
+        
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
+          <div className="space-y-6">
+            <button 
+              onClick={onBack}
+              className="group flex items-center gap-2 text-sm font-bold text-cream-muted hover:text-gold transition-colors"
+            >
+              <div className="p-1.5 bg-dark-3 rounded-lg border border-white/5 group-hover:border-gold/30 transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+              </div>
+              Regresar al Tablero
+            </button>
+            
+            <div>
+              <div className="flex flex-wrap items-center gap-3 mb-2">
+                <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">
+                  {obra.nombre_obra}
+                </h1>
+                <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg ${
+                  obra.modalidad_contratacion === 'Cobro por Evento' 
+                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 shadow-blue-500/10' 
+                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-emerald-500/10'
+                }`}>
+                  {obra.modalidad_contratacion || 'Póliza Prepagada'}
+                </span>
+              </div>
+              <p className="text-cream-muted font-mono flex items-center gap-2">
+                <Shield className="w-4 h-4 text-gold" /> Folio de Contrato: <span className="text-cream">{obra.folio}</span>
+              </p>
             </div>
-            <p className="text-cream-muted text-sm font-mono flex items-center gap-2">
-              <Shield className="w-4 h-4 text-gold" /> Folio: {obra.folio}
-            </p>
           </div>
-        </div>
 
-        <div className="flex gap-2 w-full md:w-auto z-10">
-          <button 
-            onClick={() => setActiveTab('resumen')}
-            className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'resumen' ? 'bg-gold text-dark-1 shadow-lg shadow-gold/20' : 'bg-dark-4 text-cream-muted hover:text-cream'
-            }`}
-          >
-            Resumen
-          </button>
-          <button 
-            onClick={() => setActiveTab('calendario')}
-            className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'calendario' ? 'bg-gold text-dark-1 shadow-lg shadow-gold/20' : 'bg-dark-4 text-cream-muted hover:text-cream'
-            }`}
-          >
-            Bitácoras
-          </button>
+          {/* Nav Pills */}
+          <div className="flex bg-dark-3/50 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md self-stretch lg:self-auto">
+            <button 
+              onClick={() => setActiveTab('resumen')}
+              className={`flex-1 lg:flex-none px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'resumen' 
+                  ? 'bg-gold text-dark-1 shadow-[0_4px_15px_rgba(255,215,0,0.2)]' 
+                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+              }`}
+            >
+              <Activity className="w-4 h-4" />
+              Resumen
+            </button>
+            <button 
+              onClick={() => setActiveTab('calendario')}
+              className={`flex-1 lg:flex-none px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'calendario' 
+                  ? 'bg-gold text-dark-1 shadow-[0_4px_15px_rgba(255,215,0,0.2)]' 
+                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              Bitácoras
+            </button>
+          </div>
         </div>
       </div>
 
       {activeTab === 'resumen' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
-            <div className="bg-dark-2 border border-dark-4 rounded-xl p-6">
-              <h3 className="text-lg font-bold text-cream mb-6 flex items-center gap-2 border-b border-dark-4 pb-4">
-                <FileCheck className="w-5 h-5 text-gold" />
+            <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-3xl p-8 shadow-xl">
+              <h3 className="text-xl font-bold text-cream mb-8 flex items-center gap-3">
+                <div className="p-2 bg-gold/10 rounded-lg">
+                  <FileCheck className="w-5 h-5 text-gold" />
+                </div>
                 Información de Póliza
               </h3>
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <p className="text-xs text-cream-muted font-bold uppercase mb-1">Cliente / Titular</p>
-                  <p className="text-sm text-cream flex items-center gap-2"><User className="w-4 h-4 text-gold" /> {obra.cliente_nombre}</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
+                <div className="bg-dark-3/30 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-cream-muted font-black uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <User className="w-3.5 h-3.5" /> Cliente / Titular
+                  </p>
+                  <p className="text-base font-semibold text-cream">{obra.cliente_nombre}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-cream-muted font-bold uppercase mb-1">Contacto</p>
-                  <p className="text-sm text-cream flex items-center gap-2"><Phone className="w-4 h-4 text-gold" /> {obra.cliente_telefono || 'N/A'}</p>
+                
+                <div className="bg-dark-3/30 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-cream-muted font-black uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5" /> Contacto
+                  </p>
+                  <p className="text-base font-semibold text-cream">{obra.cliente_telefono || 'No registrado'}</p>
                 </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-cream-muted font-bold uppercase mb-1">Dirección Física</p>
-                  <p className="text-sm text-cream flex items-center gap-2"><MapPin className="w-4 h-4 text-gold" /> {obra.cliente_direccion || 'N/A'}</p>
+                
+                <div className="sm:col-span-2 bg-dark-3/30 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-cream-muted font-black uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5" /> Dirección Física de Instalación
+                  </p>
+                  <p className="text-base font-semibold text-cream">{obra.cliente_direccion || 'No registrada'}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-cream-muted font-bold uppercase mb-1">Vigencia</p>
-                  <p className="text-sm text-cream flex items-center gap-2"><Calendar className="w-4 h-4 text-gold" /> {formatFecha(obra.fecha_inicio)} al {formatFecha(obra.fecha_fin)}</p>
+                
+                <div className="bg-dark-3/30 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-cream-muted font-black uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <Calendar className="w-3.5 h-3.5" /> Periodo de Vigencia
+                  </p>
+                  <p className="text-sm font-semibold text-cream">{formatFecha(obra.fecha_inicio)} <span className="text-cream-muted mx-1">al</span> {formatFecha(obra.fecha_fin)}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-cream-muted font-bold uppercase mb-1">Frecuencia</p>
-                  <p className="text-sm text-cream flex items-center gap-2"><Clock className="w-4 h-4 text-gold" /> {obra.periodicidad}</p>
+                
+                <div className="bg-dark-3/30 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-cream-muted font-black uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5" /> Frecuencia de Visitas
+                  </p>
+                  <p className="text-sm font-semibold text-cream">{obra.periodicidad}</p>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="space-y-6">
-             <div className="bg-dark-2 border border-dark-4 rounded-xl p-6">
-                <h3 className="text-sm font-bold text-cream mb-4">Progreso de Póliza</h3>
-                <div className="space-y-4">
+             <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-3xl p-8 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gold/10 rounded-full blur-2xl"></div>
+                
+                <h3 className="text-lg font-bold text-cream mb-6 flex items-center gap-2 relative z-10">
+                  <Activity className="w-5 h-5 text-gold" /> Progreso Global
+                </h3>
+                
+                <div className="space-y-4 relative z-10">
                   <div className="flex justify-between items-end">
-                    <p className="text-3xl font-black text-gold">{visitas.filter(v => v.estado === 'completada').length}</p>
-                    <p className="text-sm text-cream-muted mb-1">de {visitas.length} visitas</p>
+                    <div>
+                      <p className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gold to-yellow-200 leading-none">
+                        {visitas.filter(v => v.estado === 'completada').length}
+                      </p>
+                      <p className="text-xs text-cream-muted font-black uppercase tracking-widest mt-2">Visitas Hechas</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-cream-muted leading-none">{visitas.length}</p>
+                      <p className="text-[10px] text-cream-muted font-black uppercase tracking-widest mt-2">Total</p>
+                    </div>
                   </div>
-                  <div className="w-full bg-dark-4 rounded-full h-2">
+                  
+                  <div className="w-full bg-dark-4 rounded-full h-3 overflow-hidden shadow-inner relative">
+                    <div className="absolute inset-0 bg-dark-4"></div>
                     <div 
-                      className="bg-gold h-2 rounded-full transition-all duration-1000" 
+                      className="relative h-full bg-gradient-to-r from-gold to-yellow-300 rounded-full shadow-[0_0_10px_rgba(255,215,0,0.5)] transition-all duration-1000 ease-out" 
                       style={{ width: `${visitas.length ? (visitas.filter(v => v.estado === 'completada').length / visitas.length) * 100 : 0}%` }}
-                    ></div>
+                    >
+                      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1vcGFjaXR5PSIwLjEiPjxwYXRoIGQ9Ik0wIDQwbDQwLTQwIi8+PHBhdGggZD0iTS0xMCAxMGwyMC0yMCIvPjxwYXRoIGQ9Ik0zMCA1MGwyMC0yMCIvPjwvZz48L3N2Zz4=')] opacity-30 animate-pulse"></div>
+                    </div>
                   </div>
                 </div>
+             </div>
+
+             <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex items-start gap-4">
+               <div className="p-3 bg-blue-500/10 rounded-xl">
+                 <AlertCircle className="w-6 h-6 text-blue-400" />
+               </div>
+               <div>
+                 <h4 className="text-sm font-bold text-cream mb-1">Próxima Acción</h4>
+                 <p className="text-xs text-cream-muted leading-relaxed">
+                   {visitas.find(v => v.estado !== 'completada') 
+                     ? `Tienes una visita programada para el ${formatFecha(visitas.find(v => v.estado !== 'completada').fecha_programada)}.`
+                     : "Todas las visitas de esta póliza han sido completadas."}
+                 </p>
+               </div>
              </div>
           </div>
         </div>
       )}
 
       {activeTab === 'calendario' && (
-        <div className="bg-dark-2 border border-dark-4 rounded-xl p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-cream flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-gold" />
-              Calendario de Bitácoras
+        <div className="bg-dark-2/50 backdrop-blur-md border border-white/5 rounded-3xl p-8 shadow-xl">
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-2xl font-bold text-cream flex items-center gap-3">
+              <div className="p-2 bg-gold/10 rounded-lg">
+                <Calendar className="w-6 h-6 text-gold" />
+              </div>
+              Calendario de Servicios
             </h3>
           </div>
 
           {isLoading ? (
-            <div className="text-center py-10 text-cream-muted">Cargando bitácoras...</div>
+            <div className="flex flex-col items-center justify-center py-20 text-cream-muted">
+              <div className="w-10 h-10 border-4 border-dark-4 border-t-gold rounded-full animate-spin mb-4"></div>
+              <p className="font-medium">Cargando bitácoras programadas...</p>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visitas.map((visita) => (
-                <div 
-                  key={visita.id} 
-                  onClick={() => handleOpenVisita(visita)}
-                  className={`relative p-5 rounded-xl border cursor-pointer transition-all hover:-translate-y-1 ${
-                    visita.estado === 'completada' 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 hover:border-emerald-500/50' 
-                      : 'bg-dark-3 border-dark-4 hover:border-gold/50'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="bg-dark-1 px-3 py-1 rounded-lg border border-dark-4 text-gold font-black text-sm">
-                      VISITA #{visita.numero_visita}
-                    </div>
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${
-                      visita.estado === 'completada' ? 'bg-emerald-500 text-white' : 'bg-dark-4 text-cream-muted'
-                    }`}>
-                      {visita.estado}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <p className="text-xs text-cream-muted uppercase font-bold">Fecha Programada</p>
-                    <p className="text-sm font-medium text-cream flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gold" />
-                      {formatFecha(visita.fecha_programada)}
-                    </p>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {visitas.map((visita) => {
+                const isCompleted = visita.estado === 'completada';
+                return (
+                  <div 
+                    key={visita.id} 
+                    onClick={() => handleOpenVisita(visita)}
+                    className={`relative p-6 rounded-2xl border cursor-pointer transition-all duration-300 group overflow-hidden ${
+                      isCompleted 
+                        ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-[0_8px_30px_rgba(16,185,129,0.1)]' 
+                        : 'bg-dark-3/30 border-white/5 hover:border-gold/40 hover:shadow-[0_8px_30px_rgba(255,215,0,0.1)]'
+                    }`}
+                  >
+                    {/* Hover Glow Effect */}
+                    <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isCompleted ? 'bg-gradient-to-br from-emerald-500/5 to-transparent' : 'bg-gradient-to-br from-gold/5 to-transparent'}`}></div>
 
-                  {visita.estado === 'completada' && (
-                    <div className="mt-4 pt-4 border-t border-emerald-500/20">
-                      <p className="text-xs text-emerald-400 font-medium flex items-center gap-1">
-                        <CheckSquare className="w-3 h-3" /> Realizada el {formatFecha(visita.fecha_realizada)}
+                    <div className="relative z-10 flex justify-between items-start mb-6">
+                      <div className={`px-4 py-1.5 rounded-xl border font-black text-sm shadow-sm ${
+                        isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-dark-4 border-dark-3 text-gold'
+                      }`}>
+                        VISITA #{visita.numero_visita}
+                      </div>
+                      <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
+                        isCompleted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-dark-4 text-cream-muted'
+                      }`}>
+                        {isCompleted && <CheckSquare className="w-3 h-3" />}
+                        {visita.estado}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-3 relative z-10">
+                      <p className="text-[11px] text-cream-muted font-black tracking-widest uppercase">Fecha Programada</p>
+                      <p className="text-lg font-bold text-cream flex items-center gap-2">
+                        <Calendar className={`w-5 h-5 ${isCompleted ? 'text-emerald-400' : 'text-gold'}`} />
+                        {formatFecha(visita.fecha_programada)}
                       </p>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {isCompleted ? (
+                      <div className="mt-6 pt-4 border-t border-emerald-500/20 relative z-10">
+                        <p className="text-xs text-emerald-400 font-bold flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4" /> Realizada el {formatFecha(visita.fecha_realizada)}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-6 pt-4 border-t border-white/5 relative z-10 flex items-center justify-between text-cream-muted group-hover:text-gold transition-colors">
+                        <span className="text-xs font-bold uppercase tracking-widest">Ejecutar Visita</span>
+                        <PlayCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
