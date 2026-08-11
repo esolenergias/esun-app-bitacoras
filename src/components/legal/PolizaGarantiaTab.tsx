@@ -1334,6 +1334,8 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
         monto_total: Number(formData.montoTotal),
         monto_visita: Number(formData.montoVisita || (formData.montoTotal / (visitasCalculadas.length || 1))),
         estado: 'activa',
+        estado_mantenimiento: 'Programado',
+        fecha_proximo_mantenimiento: visitasCalculadas.length > 0 ? visitasCalculadas[0].fechaProgramada : formData.fechaInicio,
         observaciones: formData.observaciones
       };
 
