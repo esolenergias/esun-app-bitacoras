@@ -240,6 +240,12 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
   const fetchInitialData = async () => {
     setLoading(true);
     setError(null);
+    
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setError('La conexión con la base de datos está tardando demasiado. Por favor recarga la página.');
+    }, 10000);
+
     try {
       const [matricesData, insumosData] = await Promise.all([
         getMatrices(),
@@ -252,6 +258,8 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
       console.error('Error fetching initial data:', err);
       setError('Error al cargar la información inicial. Por favor intenta de nuevo.');
       setLoading(false);
+    } finally {
+      clearTimeout(timeout);
     }
   };
 

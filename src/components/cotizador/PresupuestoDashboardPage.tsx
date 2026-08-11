@@ -264,6 +264,12 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
   const fetchBudgetDetails = async () => {
     setLoading(true);
     setError(null);
+    
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setError('La conexión con la base de datos está tardando demasiado. Por favor recarga la página.');
+    }, 10000);
+
     try {
       const [data, matricesData, insumosData] = await Promise.all([
         getPresupuestoDetails(id),
@@ -309,6 +315,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
       console.error('Error fetching budget details:', err);
       setError('No se pudo encontrar el presupuesto o no tienes permisos para acceder a él.');
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   };
