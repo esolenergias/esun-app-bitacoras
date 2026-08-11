@@ -26,6 +26,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [pendingPhotos, setPendingPhotos] = useState<{file: File, preview: string}[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [draggedPendingIndex, setDraggedPendingIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchVisitas();
@@ -358,16 +359,42 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                 <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3">
                   {/* Pending Photos */}
                   {pendingPhotos.map((photo, idx) => (
-                    <div key={`pending-${idx}`} className="relative group rounded-xl overflow-hidden border-2 border-dashed border-blue-500/50 shadow-lg aspect-square opacity-80">
-                      <img src={photo.preview} alt={`Pendiente ${idx+1}`} className="w-full h-full object-cover grayscale" />
-                      <div className="absolute inset-0 bg-dark-1/50 flex flex-col items-center justify-center">
+                    <div 
+                      key={`pending-${idx}`} 
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedPendingIndex(idx);
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', idx.toString());
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedPendingIndex === null || draggedPendingIndex === idx) return;
+                        const newPending = [...pendingPhotos];
+                        const [removed] = newPending.splice(draggedPendingIndex, 1);
+                        newPending.splice(idx, 0, removed);
+                        setPendingPhotos(newPending);
+                        setDraggedPendingIndex(null);
+                      }}
+                      onDragEnd={() => setDraggedPendingIndex(null)}
+                      className={`relative group rounded-xl overflow-hidden border-2 border-dashed shadow-lg aspect-square cursor-move transition-all ${draggedPendingIndex === idx ? 'opacity-50 scale-95 border-gold' : 'border-blue-500/50 hover:border-gold/50'}`}
+                    >
+                      <img src={photo.preview} alt={`Pendiente ${idx+1}`} className="w-full h-full object-cover grayscale pointer-events-none" />
+                      <div className="absolute inset-0 bg-dark-1/50 flex flex-col items-center justify-center pointer-events-none">
                          <Cloud className="w-4 h-4 text-blue-400 mb-1" />
                          <span className="text-[8px] font-bold text-blue-300 uppercase tracking-widest px-1 text-center leading-tight">Pendiente</span>
+                      </div>
+                      <div className="absolute bottom-1 left-1 bg-blue-500/80 px-1.5 py-0.5 rounded text-[8px] font-bold text-white pointer-events-none">
+                        {idx + 1}
                       </div>
                       <button 
                         onClick={() => removePendingPhoto(idx)}
                         disabled={isUploadingPhoto}
-                        className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-lg transition-all hover:scale-110 shadow-lg z-10"
+                        className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-lg transition-all hover:scale-110 shadow-lg z-10 opacity-0 group-hover:opacity-100"
                         title="Quitar"
                       >
                         <TrashIcon />
