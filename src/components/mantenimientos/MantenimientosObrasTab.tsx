@@ -289,8 +289,9 @@ export default function MantenimientosObrasTab() {
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Estatus</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Alerta</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Fecha / Frecuencia</th>
-                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Costo</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Dirección de Mantenimiento</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider bg-dark-3/30 border-l border-dark-4">Costo</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider bg-dark-3/30">Descripción</th>
                   <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider text-right">Acciones</th>
                 </tr>
               </thead>
@@ -347,25 +348,25 @@ export default function MantenimientosObrasTab() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-black text-cream whitespace-nowrap">
-                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(obra.monto_total || 0)}
-                        </span>
-                        {(() => {
-                          const badgeData = getCostoBadge(obra);
-                          return (
-                            <span className={`inline-flex items-center justify-center px-2 py-0.5 mt-1 rounded text-[9px] font-black uppercase tracking-wider border ${badgeData.color}`}>
-                              {badgeData.text}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
                       <span className="text-sm text-cream-muted flex items-center gap-2 max-w-[200px] truncate" title={obra.cliente_direccion}>
                         <MapPin className="w-3.5 h-3.5 text-cream-dim shrink-0" />
                         <span className="truncate">{obra.cliente_direccion || '-'}</span>
                       </span>
+                    </td>
+                    <td className="px-6 py-4 bg-dark-3/30 border-l border-dark-4/50">
+                      <span className="text-sm font-black text-cream whitespace-nowrap">
+                        {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(obra.monto_total || 0)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 bg-dark-3/30">
+                      {(() => {
+                        const badgeData = getCostoBadge(obra);
+                        return (
+                          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${badgeData.color}`}>
+                            {badgeData.text}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
