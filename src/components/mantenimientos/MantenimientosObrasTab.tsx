@@ -234,59 +234,79 @@ export default function MantenimientosObrasTab() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredObras.map((obra) => (
-            <div 
-              key={obra.id} 
-              className="bg-dark-2 border border-dark-4 rounded-2xl p-5 hover:border-gold/50 hover:bg-dark-3 transition-all cursor-pointer shadow-lg relative overflow-hidden group"
-            >
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500/50 to-blue-400 opacity-50 group-hover:opacity-100 transition-opacity"></div>
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-dark-3 rounded-xl border border-dark-4">
-                    <FileText className="w-6 h-6 text-gold" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-cream text-base line-clamp-1">{obra.folio}</h3>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mt-1">{obra.periodicidad}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleOpenEdit(obra); }}
-                    className="p-1.5 bg-dark-3 hover:bg-blue-500/20 hover:text-blue-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-blue-500/30"
-                    title="Editar Mantenimiento"
+        <div className="bg-dark-2 border border-dark-4 rounded-2xl overflow-hidden shadow-xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-dark-3/50 border-b border-dark-4">
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Número de Póliza</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Nombre de Cliente</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Nombre de Obra</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Fecha / Frecuencia</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider">Dirección de Mantenimiento</th>
+                  <th className="px-6 py-4 text-xs font-black text-cream-muted uppercase tracking-wider text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-4">
+                {filteredObras.map((obra) => (
+                  <tr 
+                    key={obra.id} 
+                    className="hover:bg-dark-3/50 transition-colors group"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleDelete(obra); }}
-                    className="p-1.5 bg-dark-3 hover:bg-red-500/20 hover:text-red-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-red-500/30"
-                    title="Eliminar Mantenimiento"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-2 mt-2">
-                <p className="text-sm font-bold text-cream-muted line-clamp-1">
-                  {obra.nombre_obra}
-                </p>
-                {obra.cliente_nombre && (
-                  <p className="text-xs text-cream-dim flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 shrink-0" />
-                    <span className="line-clamp-1">{obra.cliente_nombre}</span>
-                  </p>
-                )}
-                {obra.cliente_direccion && (
-                  <p className="text-xs text-cream-dim flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 shrink-0" />
-                    <span className="line-clamp-1">{obra.cliente_direccion}</span>
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-dark-3 rounded-lg border border-dark-4 group-hover:border-gold/30 transition-colors">
+                          <FileText className="w-4 h-4 text-gold" />
+                        </div>
+                        <span className="font-bold text-cream text-sm whitespace-nowrap">{obra.folio}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-cream-muted flex items-center gap-2 whitespace-nowrap">
+                        <User className="w-3.5 h-3.5 text-cream-dim" />
+                        {obra.cliente_nombre || '-'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-cream font-medium">
+                        {obra.nombre_obra || '-'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-cream-muted whitespace-nowrap">{obra.fecha_inicio}</span>
+                        <span className="text-[10px] font-black uppercase text-blue-400 mt-0.5">{obra.periodicidad}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-cream-muted flex items-center gap-2 max-w-[200px] truncate" title={obra.cliente_direccion}>
+                        <MapPin className="w-3.5 h-3.5 text-cream-dim shrink-0" />
+                        <span className="truncate">{obra.cliente_direccion || '-'}</span>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleOpenEdit(obra); }}
+                          className="p-1.5 bg-dark-3 hover:bg-blue-500/20 hover:text-blue-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-blue-500/30"
+                          title="Editar Mantenimiento"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDelete(obra); }}
+                          className="p-1.5 bg-dark-3 hover:bg-red-500/20 hover:text-red-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-red-500/30"
+                          title="Eliminar Mantenimiento"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
