@@ -71,60 +71,99 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
     setPendingPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
+  const compressImage = (file: File, maxWidth = 1000, quality = 0.75): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          } else {
+            resolve(e.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleUploadPending = async () => {
     if (pendingPhotos.length === 0) return;
     
     setIsUploadingPhoto(true);
-    let uploadedUrls: string[] = [];
+    let newItems: any[] = [];
 
     try {
       for (let i = 0; i < pendingPhotos.length; i++) {
         const file = pendingPhotos[i].file;
-        const base64 = await new Promise<string>((resolve, reject) => {
+        
+        // 1. Renderizado ultrarrápido y confiable (Compresión a ~60KB)
+        const compressedDataUrl = await compressImage(file, 1000, 0.75);
+
+        // 2. Base64 completo para la copia de seguridad en Google Drive
+        const fullBase64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
           reader.onerror = reject;
           reader.readAsDataURL(file);
         });
         
-        const response = await fetch('https://script.google.com/macros/s/AKfycbx2I7-77T-EUv-3DCK7ueL9eGn4871nv-EJY_qBJxRu5TFQ3IWNcXOjEE89ghI4UbLa2w/exec', {
-          method: 'POST',
-          body: JSON.stringify({
-            filename: `mtto_${obra.folio}_visita${selectedVisita.numero_visita}_${Date.now()}_${file.name}`,
-            mimeType: file.type,
-            base64: base64,
-            folderName: `Mantenimiento - ${obra.nombre_obra}`
-          })
-        });
-        
-        const result = await response.json();
-        if (result.success) {
-          uploadedUrls.push(result.url);
-          const driveId = extractDriveId(result.url);
-          const localBlob = pendingPhotos[i].preview;
-          setLocalPreviews(prev => ({
-            ...prev,
-            [result.url]: localBlob,
-            ...(driveId ? { [driveId]: localBlob } : {})
-          }));
+        let driveUrl = '';
+        try {
+          const response = await fetch('https://script.google.com/macros/s/AKfycbx2I7-77T-EUv-3DCK7ueL9eGn4871nv-EJY_qBJxRu5TFQ3IWNcXOjEE89ghI4UbLa2w/exec', {
+            method: 'POST',
+            body: JSON.stringify({
+              filename: `mtto_${obra.folio}_visita${selectedVisita.numero_visita}_${Date.now()}_${file.name}`,
+              mimeType: file.type,
+              base64: fullBase64,
+              folderName: `Mantenimiento - ${obra.nombre_obra}`
+            })
+          });
+          const result = await response.json();
+          if (result.success) {
+            driveUrl = result.url;
+          }
+        } catch (err) {
+          console.error("Error enviando respaldo a Google Drive:", err);
+        }
+
+        if (driveUrl) {
+          newItems.push({ url: compressedDataUrl, driveUrl: driveUrl });
         } else {
-          console.error("Error subiendo a Drive:", result.error);
+          newItems.push(compressedDataUrl);
         }
       }
       
-      if (uploadedUrls.length > 0) {
-        setEvidenciaFotos(prev => [...prev, ...uploadedUrls]);
+      if (newItems.length > 0) {
+        const updatedFotos = [...evidenciaFotos, ...newItems];
+        setEvidenciaFotos(updatedFotos);
         setPendingPhotos([]);
-        // Auto-guardar en base de datos para no perder las URLs si se salen
+        
         await supabase
           .from('visitas_mantenimiento_poliza')
-          .update({ evidencia_fotos: [...evidenciaFotos, ...uploadedUrls] })
+          .update({ evidencia_fotos: updatedFotos })
           .eq('id', selectedVisita.id);
       }
 
     } catch (err: any) {
-      console.error('Error al subir fotos a Drive:', err);
-      alert('Hubo un error subiendo algunas fotos a Google Drive: ' + err.message);
+      console.error('Error al procesar fotos:', err);
+      alert('Hubo un detalle procesando las imágenes: ' + err.message);
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -190,19 +229,31 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
 
   const getDriveThumbnailUrl = (url: string) => {
     if (!url) return '';
-    if (url.startsWith('data:image') || url.startsWith('blob:')) return url; // local preview or base64
-    
-    // 1. Usar vista previa local en la sesión actual para renderizado inmediato
-    if (localPreviews[url]) return localPreviews[url];
+    if (url.startsWith('data:image') || url.startsWith('blob:')) return url;
     const driveId = extractDriveId(url);
-    if (driveId && localPreviews[driveId]) return localPreviews[driveId];
-    
-    // 2. Enlace CDN directo de Google Drive (lh3.googleusercontent.com)
     if (driveId) {
       return `https://lh3.googleusercontent.com/d/${driveId}`;
     }
-    
     return url;
+  };
+
+  const getPhotoDisplayUrl = (foto: any): string => {
+    if (!foto) return '';
+    if (typeof foto === 'string') {
+      if (foto.startsWith('data:image') || foto.startsWith('blob:')) return foto;
+      return getDriveThumbnailUrl(foto);
+    }
+    if (typeof foto === 'object' && foto.url) {
+      return foto.url;
+    }
+    return '';
+  };
+
+  const getPhotoDriveUrl = (foto: any): string => {
+    if (!foto) return '#';
+    if (typeof foto === 'string') return foto;
+    if (typeof foto === 'object') return foto.driveUrl || foto.url || '#';
+    return '#';
   };
 
   const isHVAC = Array.isArray(obra.conceptos_incluidos) 
@@ -443,15 +494,15 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                       onDragEnd={() => setDraggedIndex(null)}
                       className={`relative group rounded-xl overflow-hidden border border-white/5 shadow-lg aspect-square cursor-move transition-all ${draggedIndex === idx ? 'opacity-50 scale-95 border-gold' : 'hover:border-gold/50'}`}
                     >
-                      <a href={foto} target="_blank" rel="noopener noreferrer" className="block w-full h-full pointer-events-auto">
+                      <a href={getPhotoDriveUrl(foto)} target="_blank" rel="noopener noreferrer" className="block w-full h-full pointer-events-auto">
                         <img 
-                          src={getDriveThumbnailUrl(foto)} 
+                          src={getPhotoDisplayUrl(foto)} 
                           alt={`Evidencia ${idx+1}`} 
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none bg-dark-2" 
                           onError={(e) => {
                             const target = e.currentTarget;
                             const currentSrc = target.src;
-                            const driveId = extractDriveId(foto) || extractDriveId(currentSrc);
+                            const driveId = extractDriveId(getPhotoDriveUrl(foto)) || extractDriveId(currentSrc);
                             
                             if (driveId && !target.dataset.failed) {
                               if (currentSrc.includes('lh3.googleusercontent.com')) {
