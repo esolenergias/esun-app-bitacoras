@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../context/supabase';
-import { HardHat, Search, Edit2, Trash2, MapPin, User, Plus, X, Save, FileText } from 'lucide-react';
+import { HardHat, Search, Edit2, Trash2, MapPin, User, Plus, X, Save, FileText, Calendar, AlertTriangle, PenTool, CheckCircle, Clock } from 'lucide-react';
+import ExpedienteMantenimiento from './ExpedienteMantenimiento';
 
 export interface PolizaGarantia {
   id?: string;
@@ -110,6 +111,9 @@ export default function MantenimientosObrasTab() {
   const [editingData, setEditingData] = useState<PolizaGarantia | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewFolio, setPreviewFolio] = useState('');
+  
+  // Expediente state
+  const [expedienteObra, setExpedienteObra] = useState<PolizaGarantia | null>(null);
   
   // Form live state for folio generation
   const [formNombreObra, setFormNombreObra] = useState('');
@@ -252,6 +256,15 @@ export default function MantenimientosObrasTab() {
     o.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (expedienteObra) {
+    return (
+      <ExpedienteMantenimiento 
+        obra={expedienteObra} 
+        onBack={() => setExpedienteObra(null)} 
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
@@ -308,7 +321,7 @@ export default function MantenimientosObrasTab() {
                 {filteredObras.map((obra) => (
                   <tr 
                     key={obra.id} 
-                    onClick={() => handleOpenEdit(obra)}
+                    onClick={() => setExpedienteObra(obra)}
                     className="hover:bg-dark-3/50 transition-colors group cursor-pointer"
                   >
                     <td className="px-3 py-3">
@@ -379,11 +392,18 @@ export default function MantenimientosObrasTab() {
                       })()}
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button 
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleOpenEdit(obra); }}
+                          className="p-1.5 bg-dark-3 hover:bg-gold/20 text-cream-muted hover:text-gold rounded-lg transition-colors border border-dark-4"
+                          title="Editar parámetros"
+                        >
+                          <PenTool className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={(e) => { e.stopPropagation(); handleDelete(obra); }}
-                          className="p-1.5 bg-dark-3 hover:bg-red-500/20 hover:text-red-400 text-cream-dim rounded-lg transition-colors border border-transparent hover:border-red-500/30"
-                          title="Eliminar Mantenimiento"
+                          className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors border border-red-500/20"
+                          title="Eliminar"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
