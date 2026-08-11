@@ -46,7 +46,7 @@ export interface Presupuesto {
   id: string;
   name: string;
   client_name: string;
-  status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado';
+  status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado' | 'realizado';
   produccion?: boolean;
   ubicacion?: string;
   indirect_percentage?: number;

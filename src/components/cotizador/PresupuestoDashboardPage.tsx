@@ -326,7 +326,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     }
   }, [id, currentUser]);
 
-  const handleUpdateStatus = async (newStatus: 'borrador' | 'enviado' | 'aprobado' | 'rechazado') => {
+  const handleUpdateStatus = async (newStatus: 'borrador' | 'enviado' | 'aprobado' | 'rechazado' | 'realizado') => {
     if (!budget) return;
     setUpdatingStatus(true);
     try {
@@ -1350,11 +1350,12 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
     return qty.toFixed(decimals);
   };
 
-  const getStatusBadgeStyles = (status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado') => {
+  const getStatusBadgeStyles = (status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado' | 'realizado') => {
     switch (status) {
       case 'borrador': return 'bg-gray-500/15 text-gray-400 border border-gray-500/30';
       case 'enviado': return 'bg-blue-500/15 text-blue-400 border border-blue-500/30';
       case 'aprobado': return 'bg-green-500/15 text-green-400 border border-green-500/30';
+      case 'realizado': return 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30';
       case 'rechazado': return 'bg-red-500/15 text-red-400 border border-red-500/30';
       default: return 'bg-cream/15 text-cream border border-cream/20';
     }
@@ -1731,6 +1732,7 @@ export default function PresupuestoDashboardPage({ id }: PresupuestoDashboardPag
               <option value="borrador">Borrador</option>
               <option value="enviado">Enviado</option>
               <option value="aprobado">Aprobado</option>
+              <option value="realizado">Realizado</option>
               <option value="rechazado">Rechazado</option>
             </select>
             {updatingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin text-gold mr-1.5" />}

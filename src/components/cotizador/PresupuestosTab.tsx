@@ -116,7 +116,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
   const [formName, setFormName] = useState<string>('');
   const [formClientName, setFormClientName] = useState<string>('');
   const [formClientAddress, setFormClientAddress] = useState<string>('');
-  const [formStatus, setFormStatus] = useState<'borrador' | 'enviado' | 'aprobado' | 'rechazado'>('borrador');
+  const [formStatus, setFormStatus] = useState<'borrador' | 'enviado' | 'aprobado' | 'rechazado' | 'realizado'>('borrador');
   const [formProduccion, setFormProduccion] = useState<boolean>(false);
   const [formConceptos, setFormConceptos] = useState<Partial<PresupuestoConcepto>[]>([]);
   const [formIndirect, setFormIndirect] = useState<number>(10.00);
@@ -217,7 +217,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
           id: row.id,
           name: row.name,
           client_name: row.client_name,
-          status: row.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado',
+          status: row.status as 'borrador' | 'enviado' | 'aprobado' | 'rechazado' | 'realizado',
           produccion: row.produccion ?? false,
           indirect_percentage: indPct,
           utility_percentage: utPct,
@@ -1529,14 +1529,16 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
     return qty.toFixed(decimals);
   };
 
-  const getStatusBadgeStyles = (status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado') => {
+  const getStatusBadgeStyles = (status: 'borrador' | 'enviado' | 'aprobado' | 'rechazado' | 'realizado') => {
     switch (status) {
       case 'borrador':
         return 'bg-gray-500/10 text-gray-400 border border-gray-500/25';
       case 'enviado':
         return 'bg-blue-500/10 text-blue-400 border border-blue-500/25';
       case 'aprobado':
-        return 'bg-green-500/10 text-green-400 border border-green-500/25';
+        return 'bg-green-500/15 text-green-400 border border-green-500/30';
+      case 'realizado':
+        return 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30';
       case 'rechazado':
         return 'bg-red-500/10 text-red-400 border border-red-500/25';
       default:
@@ -1791,6 +1793,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
                         <option value="borrador">Borrador</option>
                         <option value="enviado">Enviado</option>
                         <option value="aprobado">Aprobado</option>
+                        <option value="realizado">Realizado</option>
                         <option value="rechazado">Rechazado</option>
                         <option value="terminado">Terminado</option>
                       </select>
