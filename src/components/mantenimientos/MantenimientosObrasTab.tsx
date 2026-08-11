@@ -321,7 +321,7 @@ export default function MantenimientosObrasTab() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
                         obra.estado_mantenimiento === 'Sin programar' ? 'bg-dark-4 text-cream-muted' :
                         obra.estado_mantenimiento === 'Programado' ? 'bg-blue-500/20 text-blue-400' :
                         obra.estado_mantenimiento === 'En proceso' ? 'bg-gold/20 text-gold' :
@@ -335,7 +335,7 @@ export default function MantenimientosObrasTab() {
                       {(() => {
                         const alertData = getAlertaMantenimiento(obra.fecha_proximo_mantenimiento);
                         return (
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-bold ${alertData.color}`}>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg border text-xs font-bold whitespace-nowrap ${alertData.color}`}>
                             {alertData.text}
                           </span>
                         );
