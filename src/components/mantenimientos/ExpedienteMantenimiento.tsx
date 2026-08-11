@@ -174,7 +174,9 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const getDriveThumbnailUrl = (url: string) => {
     if (!url) return '';
     if (url.startsWith('data:image')) return url; // base64 compatibility
-    if (url.includes('drive.google.com/thumbnail')) return url; // already thumbnail
+    
+    // Si ya es un enlace uc, lo dejamos
+    if (url.includes('drive.google.com/uc')) return url;
     
     const patterns = [
       /\/file\/d\/([a-zA-Z0-9_-]+)/,
@@ -184,7 +186,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
     for (const pattern of patterns) {
       const match = url.match(pattern);
       if (match && match[1]) {
-        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
+        return `https://drive.google.com/uc?export=view&id=${match[1]}`;
       }
     }
     return url;
@@ -432,17 +434,6 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                         src={getDriveThumbnailUrl(foto)} 
                         alt={`Evidencia ${idx+1}`} 
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none bg-dark-2" 
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          // Fallback a descarga directa si el thumbnail de Drive aún no se genera
-                          if (target.src.includes('/thumbnail?id=')) {
-                            const id = target.src.match(/id=([a-zA-Z0-9_-]+)/)?.[1];
-                            if (id && !target.dataset.retried) {
-                              target.dataset.retried = 'true';
-                              target.src = `https://drive.google.com/uc?export=view&id=${id}`;
-                            }
-                          }
-                        }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-1/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                       <div className="absolute bottom-1 left-1 bg-dark-1/80 px-1.5 py-0.5 rounded text-[8px] font-bold text-cream-muted pointer-events-none">
