@@ -20,6 +20,7 @@ export interface PolizaGarantia {
   monto_total: number;
   estado_mantenimiento?: string;
   fecha_proximo_mantenimiento?: string;
+  modalidad_contratacion?: string;
   created_at?: string;
 }
 
@@ -56,7 +57,7 @@ const getAlertaMantenimiento = (obra: PolizaGarantia) => {
 };
 
 const getCostoBadge = (obra: PolizaGarantia) => {
-  if (obra.periodicidad === 'Por evento') {
+  if (obra.modalidad_contratacion === 'Cobro por Evento') {
     return { text: 'Cobro por Evento', color: 'text-blue-400 bg-blue-500/20 border-blue-500/30' };
   } else {
     let visitas = 1;

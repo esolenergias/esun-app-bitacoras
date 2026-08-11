@@ -289,6 +289,8 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
 
   // Form State
   const [formData, setFormData] = useState({
+    tipoCobertura: 'Mantenimiento Preventivo y Garantía de Ejecución Técnica',
+    modalidadContratacion: 'Póliza Prepagada',
     folio: generarFolioProtocolo(),
     clienteFinal: '',
     clienteTelefono: '',
@@ -296,7 +298,6 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
     direccionInstalacion: '',
     nombreObra: '',
     conceptosSeleccionados: [] as string[],
-    tipoCobertura: 'Mantenimiento Preventivo y Garantía de Ejecución Técnica',
     periodicidad: 'Trimestral',
     duracionAnos: 1,
     fechaInicio: new Date().toISOString().split('T')[0],
@@ -311,7 +312,8 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
     setEditingPolicyId(null);
     setSelectedBudget('');
     setFormData({
-      tipoCobertura: 'Preventiva',
+      tipoCobertura: 'Mantenimiento Preventivo y Garantía de Ejecución Técnica',
+      modalidadContratacion: 'Póliza Prepagada',
       folio: generarFolioProtocolo(),
       conceptosSeleccionados: [],
       clienteFinal: '',
@@ -336,6 +338,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
     
     setFormData({
       tipoCobertura: poliza.tipo_cobertura || 'Preventiva',
+      modalidadContratacion: poliza.modalidad_contratacion || 'Póliza Prepagada',
       folio: poliza.folio,
       conceptosSeleccionados: poliza.conceptos_incluidos || [],
       clienteFinal: poliza.cliente_nombre || '',
@@ -1323,6 +1326,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
         nombre_obra: formData.nombreObra,
         conceptos_incluidos: formData.conceptosSeleccionados,
         tipo_cobertura: formData.tipoCobertura,
+        modalidad_contratacion: formData.modalidadContratacion,
         periodicidad: formData.periodicidad,
         duracion_anos: Number(formData.duracionAnos),
         fecha_inicio: formData.fechaInicio,
@@ -1686,15 +1690,27 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
               3. Programación de Periodicidad y Visitas de Mantenimiento Preventivo
             </h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-cream-muted mb-1">Periodicidad de Mantenimiento</label>
+                <label className="block text-xs font-semibold text-cream-muted mb-1">Modalidad de Venta</label>
+                <select
+                  value={formData.modalidadContratacion}
+                  onChange={e => setFormData({ ...formData, modalidadContratacion: e.target.value })}
+                  className="w-full bg-dark-1 border border-dark-4 rounded-lg px-3 py-2 text-cream focus:border-gold outline-none text-sm"
+                >
+                  <option value="Póliza Prepagada">Póliza Prepagada</option>
+                  <option value="Cobro por Evento">Cliente Libre (Evento)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-cream-muted mb-1">Frecuencia de Mantenimiento</label>
                 <select
                   value={formData.periodicidad}
                   onChange={e => setFormData({ ...formData, periodicidad: e.target.value })}
                   className="w-full bg-dark-1 border border-dark-4 rounded-lg px-3 py-2 text-cream focus:border-gold outline-none text-sm"
                 >
-                  {PERIODICIDADES.map(p => (
+                  {PERIODICIDADES.filter(p => p.id !== 'Evento').map(p => (
                     <option key={p.id} value={p.id}>{p.label}</option>
                   ))}
                 </select>
