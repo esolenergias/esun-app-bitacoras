@@ -4,15 +4,17 @@ import type { PolizaGarantia } from './MantenimientosObrasTab';
 import { 
   ArrowLeft, Calendar, FileText, Camera, CheckSquare, Zap, 
   MapPin, Phone, Shield, FileCheck, Upload, Save, User, Clock, 
-  PlayCircle, AlertCircle, Activity, Cloud, CheckCircle
+  PlayCircle, AlertCircle, Activity, Cloud, CheckCircle, Download
 } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 
 interface ExpedienteProps {
   obra: PolizaGarantia;
+  reporterName?: string;
   onBack: () => void;
 }
 
-export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProps) {
+export default function ExpedienteMantenimiento({ obra, reporterName = 'ESOL Técnico', onBack }: ExpedienteProps) {
   const [activeTab, setActiveTab] = useState<'resumen' | 'calendario'>('resumen');
   const [visitas, setVisitas] = useState<any[]>([]);
   const [selectedVisita, setSelectedVisita] = useState<any>(null);
@@ -23,6 +25,7 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
   const [evidenciaFotos, setEvidenciaFotos] = useState<string[]>([]);
   const [notasVisita, setNotasVisita] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [pendingPhotos, setPendingPhotos] = useState<{file: File, preview: string}[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -192,23 +195,239 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
         .eq('id', selectedVisita.id);
       
       if (error) throw error;
-      alert('¡Bitácora guardada con éxito!');
-      
       // Update local state
-      setVisitas(prev => prev.map(v => v.id === selectedVisita.id ? {
+      const updatedVisitas = visitas.map(v => v.id === selectedVisita.id ? {
         ...v, 
         checklist_data: checklist, 
         evidencia_fotos: evidenciaFotos, 
         notas_visita: notasVisita,
         estado: 'completada',
         fecha_realizada: new Date().toISOString().split('T')[0]
-      } : v));
+      } : v);
+      
+      setVisitas(updatedVisitas);
+
+      // Now determine the NEXT visit to update the Poliza parent
+      const pendingVisitas = updatedVisitas
+        .filter(v => v.estado !== 'completada')
+        .sort((a, b) => new Date(a.fecha_programada).getTime() - new Date(b.fecha_programada).getTime());
+      
+      let newEstado = 'Terminado';
+      let newProximaFecha = null;
+      
+      if (pendingVisitas.length > 0) {
+        newEstado = 'En proceso';
+        newProximaFecha = pendingVisitas[0].fecha_programada;
+      }
+
+      await supabase
+        .from('polizas_garantia')
+        .update({
+          estado_mantenimiento: newEstado,
+          fecha_proximo_mantenimiento: newProximaFecha
+        })
+        .eq('id', obra.id);
+
+      alert('¡Bitácora guardada con éxito!');
       setSelectedVisita(null);
 
     } catch (err: any) {
       alert('Error guardando bitácora: ' + err.message);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleGeneratePDF = async () => {
+    if (!selectedVisita) return;
+    setIsGeneratingPDF(true);
+    
+    const fechaEmision = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+    const finalReporterName = (reporterName.toLowerCase().includes('menyfre') || reporterName.toLowerCase().includes('meny')) 
+      ? 'Manuel Fregoso' : reporterName;
+
+    const resolveImg = (uri: string): string => {
+      if (!uri) return '';
+      if (uri.startsWith('data:image')) return uri;
+      const match = uri.match(/(?:id=|\/d\/)([a-zA-Z0-9_-]{25,})/);
+      const driveId = match ? match[1] : null;
+      if (driveId) {
+          const finalUrl = `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
+          return `https://esolenergias.com/proxy.php?url=${encodeURIComponent(finalUrl)}`;
+      }
+      return uri;
+    };
+
+    const element = document.createElement('div');
+    element.innerHTML = `
+      <div style="font-family: 'Josefin Sans', sans-serif; padding: 10px 40px 40px 40px; color: #141410; max-width: 800px; margin: 0 auto; background: #F8F7F2; line-height: 1.5; font-size: 11px; min-height: 1035px; display: flex; flex-direction: column;">
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Josefin+Sans:wght@300;400;600;700&display=swap');
+          * { box-sizing: border-box; }
+          .header { background: #141410; color: #F8F7F2; display: flex; justify-content: space-between; align-items: center; padding: 24px 32px; border-radius: 12px; border-bottom: 4px solid #C49825; margin-bottom: 8mm; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+          .logo-container { width: 140px; }
+          .logo-container img { width: 100%; height: auto; object-fit: contain; }
+          .report-meta { text-align: right; }
+          .report-meta h1 { font-family: 'Cinzel', serif; font-size: 20px; color: #C49825; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin: 4px 0 8px 0; }
+          .report-meta .meta-subtitle { font-size: 10px; color: #D5D4C7; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; display: block; }
+          .report-meta p { font-size: 10px; color: #F8F7F2; margin: 0 0 3px 0; }
+          .reporter-badge { display: inline-block; background: rgba(196,152,37,0.2); border: 1px solid rgba(196,152,37,0.4); border-radius: 4px; padding: 4px 10px; font-size: 9px; color: #F8F7F2; font-weight: 700; margin-top: 8px; letter-spacing: .5px; }
+          .project-card { background: #EFEFE8; border: 1px solid #D5D4C7; border-radius: 8px; padding: 12px 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 8mm; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4); }
+          .info-group { display: flex; flex-direction: column; }
+          .info-label { font-size: 8px; color: #6A6A5E; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 2px; }
+          .info-value { font-size: 12px; font-weight: 600; color: #141410; }
+          .section-title { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: #141410; margin: 0 0 4mm 0; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 1px; }
+          .section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, #C49825, transparent); }
+          .day-header { background: #141410; color: #F8F7F2; padding: 6px 12px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4mm; }
+          .day-title { font-family: 'Cinzel', serif; font-size: 12px; font-weight: 600; letter-spacing: 1px; }
+          .day-badge { background: #C49825; color: #141410; font-weight: 700; font-size: 9px; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: .5px; }
+          .report-item { background: white; border: 1px solid #D5D4C7; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+          .report-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed #C4C3B4; }
+          .report-time { font-size: 12px; font-weight: 700; color: #141410; display: flex; align-items: center; gap: 6px; }
+          .report-time span { color: #8B6C1A; font-size: 11px; }
+          .meta-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+          .badge { background: #EFEFE8; border: 1px solid #D5D4C7; color: #3A3A32; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+          .concept-ref { display: inline-block; background: rgba(196,152,37,0.12); color: #8B6C1A; padding: 3px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; margin-bottom: 8px; letter-spacing: .5px; }
+          .report-desc { font-size: 12px; color: #3A3A32; line-height: 1.8; margin-bottom: 12px; }
+          .photo-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+          .photo-box { width: calc(33.333% - 4px); height: 160px; background: #E5E4DB; border: 1px solid #D5D4C7; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+          .signatures-section { margin-top: 100px; page-break-inside: avoid; }
+          .signatures-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; max-width: 600px; margin: 0 auto; }
+          .signature-box { text-align: center; }
+          .sig-line { height: 1px; background: #141410; margin-bottom: 6px; }
+          .sig-name { font-family: 'Cinzel', serif; font-weight: 700; font-size: 11px; color: #141410; }
+          .sig-role { font-size: 9px; color: #6A6A5E; text-transform: uppercase; letter-spacing: .5px; }
+        </style>
+
+        <header class="header">
+          <div class="logo-container">
+            <img src="${window.location.origin}/Logo_esol_w.png" alt="ESOL Energías" crossorigin="anonymous" onerror="this.style.display='none'">
+          </div>
+          <div class="report-meta">
+            <span class="meta-subtitle">Reporte Oficial</span>
+            <h1>Bitácora de Mantenimiento</h1>
+            <p><strong>FOLIO:</strong> ${obra.folio}</p>
+            <div class="reporter-badge">EJECUTADO POR: ${finalReporterName.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')}</div>
+          </div>
+        </header>
+
+        <div class="project-card">
+          <div class="info-group">
+            <span class="info-label">Nombre del Proyecto</span>
+            <span class="info-value">${obra.nombre_obra}</span>
+          </div>
+          <div class="info-group">
+            <span class="info-label">Cliente</span>
+            <span class="info-value">${obra.cliente_nombre}</span>
+          </div>
+          <div class="info-group">
+            <span class="info-label">Fecha Programada</span>
+            <span class="info-value">${formatFecha(selectedVisita.fecha_programada)}</span>
+          </div>
+          <div class="info-group">
+            <span class="info-label">Estado Actual</span>
+            <span class="info-value" style="color:#10B981">${selectedVisita.estado}</span>
+          </div>
+        </div>
+
+        <h2 class="section-title">Actividades Realizadas</h2>
+        
+        <div class="day-header">
+          <span class="day-title">VISITA #${selectedVisita.numero_visita} - REVISIÓN TÉCNICA</span>
+          <span class="day-badge">${selectedVisita.fecha_realizada ? 'COMPLETADA' : 'EN PROCESO'}</span>
+        </div>
+
+        <div class="report-item">
+          <div class="report-top">
+            <div class="report-time">
+              Checklist de Mantenimiento <span>• ${obra.nombre_obra}</span>
+            </div>
+            <div class="meta-badges">
+              <div class="badge">👷 ${finalReporterName}</div>
+              <div class="badge">${selectedVisita.fecha_realizada ? formatFecha(selectedVisita.fecha_realizada) : 'Pendiente'}</div>
+            </div>
+          </div>
+          
+          <div class="report-desc" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            ${checklistCategories?.map(cat => {
+              const checkedItems = cat.items.filter(item => checklist[item.id]);
+              if (checkedItems.length === 0) return '';
+              
+              return `
+              <div>
+                <h4 style="color: #C49825; margin: 0 0 8px; font-size: 11px; font-weight: bold;">${cat.title}</h4>
+                <ul style="list-style: none; padding: 0; margin: 0; font-size: 10px;">
+                  ${checkedItems.map(item => `
+                    <li style="margin-bottom: 4px; display: flex; align-items: flex-start; gap: 6px;">
+                      <span style="color: #10B981; font-weight: bold;">✓</span>
+                      <span>${item.label}</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        ${notasVisita ? `
+        <div class="report-item">
+          <div class="concept-ref">Observaciones / Trabajos Realizados</div>
+          <div class="report-desc" style="column-count: 2; column-gap: 20px;">
+            ${notasVisita.replace(/\n/g, '<br/>')}
+          </div>
+        </div>
+        ` : ''}
+
+        ${evidenciaFotos.length > 0 ? `
+        <h2 class="section-title" style="margin-top: 20px;">Evidencia Fotográfica</h2>
+        <div class="photo-grid">
+          ${evidenciaFotos.map((foto, idx) => `
+            <div class="photo-box">
+              <img src="${resolveImg(foto)}" alt="Evidencia de mantenimiento"
+                style="width:100%;height:100%;object-fit:cover;"
+                crossorigin="anonymous"
+                onerror="this.onerror=null; this.style.display='none';"
+              />
+            </div>
+          `).join('')}
+        </div>
+        ` : ''}
+        
+        <div class="signatures-section">
+          <div class="signatures-grid">
+            <div class="signature-box">
+              <div class="sig-line"></div>
+              <div class="sig-name">${finalReporterName.toUpperCase()}</div>
+              <div class="sig-role">SUPERVISOR DE MANTENIMIENTO</div>
+            </div>
+            <div class="signature-box">
+              <div class="sig-line"></div>
+              <div class="sig-name">${obra.cliente_nombre.toUpperCase()}</div>
+              <div class="sig-role">CLIENTE / RESPONSABLE</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const opt = {
+      margin:       [10, 0, 10, 0], // Top, Left, Bottom, Right
+      filename:     `Bitacora_Mantenimiento_${obra.folio}_Visita${selectedVisita.numero_visita}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, allowTaint: true },
+      jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
+    };
+
+    try {
+      const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, '_blank');
+    } catch (err) {
+      console.error("Error generating PDF:", err);
+      alert("Hubo un error al generar el PDF.");
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -549,6 +768,20 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
                   <Save className="w-5 h-5" />
                   {isSaving ? 'Guardando y Sellando...' : 'Guardar y Completar Visita'}
                 </button>
+
+                <button 
+                  onClick={handleGeneratePDF}
+                  disabled={isGeneratingPDF}
+                  className="w-full relative group overflow-hidden bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)]"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                  {isGeneratingPDF ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Download className="w-5 h-5" />
+                  )}
+                  {isGeneratingPDF ? 'Generando PDF...' : 'Generar reporte en PDF'}
+                </button>
               </div>
             </div>
           </div>
@@ -566,15 +799,16 @@ export default function ExpedienteMantenimiento({ obra, onBack }: ExpedienteProp
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] translate-y-1/3 -translate-x-1/3 pointer-events-none"></div>
         
         <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
-          <div className="space-y-6">
+          <div className="flex items-stretch gap-5">
             <button 
               onClick={onBack}
-              className="group flex items-center gap-2 text-sm font-bold text-cream-muted hover:text-gold transition-colors"
+              className="group flex flex-col items-center justify-center gap-2 px-3 py-2 bg-dark-3/50 hover:bg-gold/20 text-cream hover:text-gold rounded-xl transition-all border border-white/5 hover:border-gold/30 hover:-translate-x-1 shrink-0"
+              title="Regresar al Tablero"
             >
-              <div className="p-1.5 bg-dark-3 rounded-lg border border-white/5 group-hover:border-gold/30 transition-colors">
-                <ArrowLeft className="w-4 h-4" />
-              </div>
-              Regresar al Tablero
+              <ArrowLeft className="w-5 h-5" />
+              <span className="text-[9px] font-black uppercase tracking-widest leading-none text-cream-muted group-hover:text-gold transition-colors text-center">
+                Regresar
+              </span>
             </button>
             
             <div>

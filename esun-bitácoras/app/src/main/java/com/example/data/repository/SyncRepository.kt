@@ -57,6 +57,8 @@ class SyncRepository(private val context: Context) {
     private val crewMemberDao = db.crewMemberDao()
     private val matrixItemDao = db.matrixItemDao()
     private val taskDao = db.taskDao()
+    private val polizaDao = db.polizaDao()
+    private val visitaMantenimientoDao = db.visitaMantenimientoDao()
 
     private val syncMutex = kotlinx.coroutines.sync.Mutex()
 
@@ -267,9 +269,10 @@ class SyncRepository(private val context: Context) {
                 val supabaseKey = _syncStatus.value.supabaseKey
                 if (supabaseUrl.isNotEmpty() && supabaseKey.isNotEmpty()) {
                     try {
+                        val moshi = com.squareup.moshi.Moshi.Builder().add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()
                         val retrofit = Retrofit.Builder()
                             .baseUrl(if (supabaseUrl.endsWith("/")) supabaseUrl else "$supabaseUrl/")
-                            .addConverterFactory(MoshiConverterFactory.create())
+                            .addConverterFactory(MoshiConverterFactory.create(moshi))
                             .build()
                         val service = retrofit.create(SupabaseApiService::class.java)
                         val bearerToken = "Bearer $supabaseKey"
@@ -1047,6 +1050,106 @@ class SyncRepository(private val context: Context) {
 
     suspend fun deleteObra(obra: ObraEntity) {
         obraDao.deleteObra(obra)
+    }
+
+    // ==========================================
+    // MANTENIMIENTOS MODULE METHODS
+    // ==========================================
+
+    fun getAllPolizasFlow(): Flow<List<com.example.data.database.PolizaEntity>> {
+        return polizaDao.getAllPolizas()
+    }
+
+    fun getVisitasForPolizaFlow(polizaId: String): Flow<List<com.example.data.database.VisitaMantenimientoEntity>> {
+        return visitaMantenimientoDao.getVisitasForPoliza(polizaId)
+    }
+
+    fun getVisitasCompletadasFlow(): Flow<List<com.example.data.database.VisitaMantenimientoEntity>> {
+        return visitaMantenimientoDao.getVisitasCompletadas()
+    }
+
+    suspend fun updateVisitaMantenimientoLocal(
+        visita: com.example.data.database.VisitaMantenimientoEntity
+    ) {
+        withContext(Dispatchers.IO) {
+            visitaMantenimientoDao.updateVisita(visita)
+        }
+    }
+
+    suspend fun syncMantenimientosWithSupabase() = withContext(Dispatchers.IO) {
+        try {
+            val supabaseUrl = BuildConfig.SUPABASE_URL
+            val supabaseKey = BuildConfig.SUPABASE_ANON_KEY
+            if (supabaseUrl.isEmpty() || supabaseKey.isEmpty()) {
+                Log.e("SyncRepository", "Supabase URL or Key is empty")
+                return@withContext
+            }
+            val baseUrl = if (supabaseUrl.endsWith("/")) supabaseUrl else "$supabaseUrl/"
+
+            val moshi = com.squareup.moshi.Moshi.Builder()
+                .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+                .build()
+
+            val retrofit = Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .addConverterFactory(MoshiConverterFactory.create(moshi))
+                .build()
+            val api = retrofit.create(SupabaseApiService::class.java)
+
+            val bearerToken = "Bearer $supabaseKey"
+
+            // 1. Fetch Polizas
+            val polizasRes = api.getPolizasGarantia(
+                apiKey = supabaseKey,
+                authorization = bearerToken
+            )
+            if (polizasRes.isSuccessful && polizasRes.body() != null) {
+                val polizasEntities = polizasRes.body()!!.filter { it.id != null }.map {
+                    com.example.data.database.PolizaEntity(
+                        id = it.id!!,
+                        folio = it.folio ?: "SIN-FOLIO",
+                        clienteNombre = it.cliente_nombre ?: "Desconocido",
+                        clienteDireccion = it.cliente_direccion ?: "",
+                        nombreObra = it.nombre_obra ?: "Obra",
+                        estado = it.estado ?: "Activa",
+                        fechaInicio = it.fecha_inicio ?: "",
+                        fechaFin = it.fecha_fin ?: "",
+                        periodicidad = it.periodicidad ?: "Anual",
+                        estadoMantenimiento = it.estado_mantenimiento ?: "Pendiente",
+                        fechaProximoMantenimiento = it.fecha_proximo_mantenimiento
+                    )
+                }
+                polizaDao.insertPolizas(polizasEntities)
+            }
+
+            // 2. Fetch Visitas
+            val visitasRes = api.getVisitasMantenimiento(
+                apiKey = supabaseKey,
+                authorization = bearerToken
+            )
+            if (visitasRes.isSuccessful && visitasRes.body() != null) {
+                val adapter = moshi.adapter(Any::class.java)
+                val visitasEntities = visitasRes.body()!!.filter { it.id != null && it.poliza_id != null }.map {
+                    val checklistJson = if (it.checklist_data != null) adapter.toJson(it.checklist_data) else "{}"
+                    val evidenciaJson = if (it.evidencia_fotos != null) adapter.toJson(it.evidencia_fotos) else "[]"
+                    com.example.data.database.VisitaMantenimientoEntity(
+                        id = it.id!!,
+                        polizaId = it.poliza_id!!,
+                        numeroVisita = it.numero_visita ?: 1,
+                        fechaProgramada = it.fecha_programada ?: "",
+                        estado = it.estado ?: "Pendiente",
+                        fechaRealizada = it.fecha_realizada,
+                        checklistDataJson = checklistJson,
+                        evidenciaFotosJson = evidenciaJson,
+                        notasVisita = it.notas_visita ?: "",
+                        syncStatus = "SYNCED"
+                    )
+                }
+                visitaMantenimientoDao.insertVisitas(visitasEntities)
+            }
+        } catch (e: Exception) {
+            Log.e("SyncRepository", "Error syncing mantenimientos", e)
+        }
     }
 }
 

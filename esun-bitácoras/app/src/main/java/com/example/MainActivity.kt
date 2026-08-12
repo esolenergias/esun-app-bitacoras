@@ -208,7 +208,11 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "dashboard"
     val baseRoute = currentRoute.substringBefore("/")
-    val showBottomBar = baseRoute in listOf("dashboard", "bitacora", "reports", "settings")
+    val userRole by viewModel.userRole.collectAsState()
+    val isTecnico = userRole.lowercase().contains("mantenimiento") || userRole.lowercase().contains("tecnico") || userRole.lowercase().contains("técnico")
+    val isAdmin = userRole.lowercase().contains("admin") || userRole.lowercase().contains("gerente") || userRole.isEmpty() || userRole == "Supervisor" || userRole == "Residente de Obra"
+
+    val showBottomBar = baseRoute in listOf("dashboard", "bitacora", "mantenimientos", "settings")
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -236,12 +240,12 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                         )
                     )
 
-                    // Tab 2: Daily Log (Bitácora)
+                    // Tab 2: Daily Log (Bitácora de obra)
                     NavigationBarItem(
                         selected = currentRoute == "bitacora",
                         onClick = { navController.navigate("bitacora") { launchSingleTop = true } },
-                        icon = { Icon(Icons.Default.EventNote, contentDescription = "Bitácora", modifier = Modifier.size(26.dp)) },
-                        label = { Text("Bitácora", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
+                        icon = { Icon(Icons.Default.EventNote, contentDescription = "Bitácora de obra", modifier = Modifier.size(26.dp)) },
+                        label = { Text("Bitácora de obra", fontWeight = FontWeight.Bold, fontSize = 9.sp, maxLines = 1) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = ConnectedBlue,
                             selectedTextColor = ConnectedBlue,
@@ -251,25 +255,22 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                         )
                     )
 
-                    val userRole by viewModel.userRole.collectAsState()
-
-                    // Tab 5: Reports
-                    if (userRole != "Trabajador") {
-                        NavigationBarItem(
-                            selected = currentRoute == "reports",
-                            onClick = { navController.navigate("reports") { launchSingleTop = true } },
-                            icon = { Icon(Icons.Default.PictureAsPdf, contentDescription = "Reportes", modifier = Modifier.size(26.dp)) },
-                            label = { Text("Reportes", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = ConnectedBlue,
-                                selectedTextColor = ConnectedBlue,
-                                unselectedIconColor = OnSurfaceVariant,
-                                unselectedTextColor = OnSurfaceVariant,
-                                indicatorColor = Color(0xFFE2E7FF)
-                            )
+                    // Tab 3: Mantenimiento
+                    NavigationBarItem(
+                        selected = currentRoute == "mantenimientos",
+                        onClick = { navController.navigate("mantenimientos") { launchSingleTop = true } },
+                        icon = { Icon(Icons.Default.Build, contentDescription = "Mantenimientos", modifier = Modifier.size(26.dp)) },
+                        label = { Text("Mantenimiento", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = ConnectedBlue,
+                            selectedTextColor = ConnectedBlue,
+                            unselectedIconColor = OnSurfaceVariant,
+                            unselectedTextColor = OnSurfaceVariant,
+                            indicatorColor = Color(0xFFE2E7FF)
                         )
-                    }
-                    // Tab 6: Settings
+                    )
+
+                    // Tab 4: Settings
                     NavigationBarItem(
                         selected = currentRoute == "settings",
                         onClick = { navController.navigate("settings") { launchSingleTop = true } },
@@ -289,7 +290,7 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
-            NavHost(navController = navController, startDestination = "dashboard") {
+            NavHost(navController = navController, startDestination = if (isTecnico && !isAdmin) "mantenimientos" else "dashboard") {
                 composable("dashboard") {
                     DashboardScreen(
                         viewModel = viewModel,
@@ -392,6 +393,9 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                 }
                 composable("settings") {
                     SettingsScreen(viewModel = viewModel)
+                }
+                composable("mantenimientos") {
+                    com.example.ui.screens.MantenimientosScreen(viewModel = viewModel, onNavigateBack = { navController.popBackStack() })
                 }
                 composable("control_obras") {
                     com.example.ui.screens.ControlObrasScreen(viewModel = viewModel, onNavigateBack = { navController.popBackStack() })

@@ -57,6 +57,8 @@ class SyncRepository(private val context: Context) {
     private val crewMemberDao = db.crewMemberDao()
     private val matrixItemDao = db.matrixItemDao()
     private val taskDao = db.taskDao()
+    private val polizaDao = db.polizaDao()
+    private val visitaMantenimientoDao = db.visitaMantenimientoDao()
 
     private val syncMutex = kotlinx.coroutines.sync.Mutex()
 
@@ -1047,6 +1049,80 @@ class SyncRepository(private val context: Context) {
 
     suspend fun deleteObra(obra: ObraEntity) {
         obraDao.deleteObra(obra)
+    }
+
+    // ==========================================
+    // MANTENIMIENTOS MODULE METHODS
+    // ==========================================
+
+    fun getAllPolizasFlow(): Flow<List<com.example.data.database.PolizaEntity>> {
+        return polizaDao.getAllPolizas()
+    }
+
+    fun getVisitasForPolizaFlow(polizaId: String): Flow<List<com.example.data.database.VisitaMantenimientoEntity>> {
+        return visitaMantenimientoDao.getVisitasForPoliza(polizaId)
+    }
+
+    suspend fun updateVisitaMantenimientoLocal(
+        visita: com.example.data.database.VisitaMantenimientoEntity
+    ) {
+        withContext(Dispatchers.IO) {
+            visitaMantenimientoDao.updateVisita(visita)
+        }
+    }
+
+    suspend fun syncMantenimientosWithSupabase() = withContext(Dispatchers.IO) {
+        try {
+            val retrofit = Retrofit.Builder()
+                .baseUrl(BuildConfig.SUPABASE_URL)
+                .addConverterFactory(MoshiConverterFactory.create())
+                .build()
+            val api = retrofit.create(SupabaseApiService::class.java)
+
+            // 1. Fetch Polizas
+            val polizasRes = api.getPolizasGarantia(
+                apiKey = BuildConfig.SUPABASE_ANON_KEY,
+                authorization = "Bearer ${BuildConfig.SUPABASE_ANON_KEY}"
+            )
+            if (polizasRes.isSuccessful && polizasRes.body() != null) {
+                val polizasEntities = polizasRes.body()!!.map {
+                    com.example.data.database.PolizaEntity(
+                        id = it.id,
+                        folio = it.folio,
+                        clienteNombre = it.cliente_nombre,
+                        nombreObra = it.nombre_obra,
+                        estado = it.estado,
+                        fechaInicio = it.fecha_inicio,
+                        fechaFin = it.fecha_fin,
+                        periodicidad = it.periodicidad
+                    )
+                }
+                polizaDao.insertPolizas(polizasEntities)
+            }
+
+            // 2. Fetch Visitas
+            val visitasRes = api.getVisitasMantenimiento(
+                apiKey = BuildConfig.SUPABASE_ANON_KEY,
+                authorization = "Bearer ${BuildConfig.SUPABASE_ANON_KEY}"
+            )
+            if (visitasRes.isSuccessful && visitasRes.body() != null) {
+                val visitasEntities = visitasRes.body()!!.map {
+                    com.example.data.database.VisitaMantenimientoEntity(
+                        id = it.id,
+                        polizaId = it.poliza_id,
+                        numeroVisita = it.numero_visita,
+                        fechaProgramada = it.fecha_programada,
+                        estado = it.estado,
+                        fechaRealizada = it.fecha_realizada,
+                        notasVisita = it.notas_visita ?: "",
+                        syncStatus = "SYNCED"
+                    )
+                }
+                visitaMantenimientoDao.insertVisitas(visitasEntities)
+            }
+        } catch (e: Exception) {
+            Log.e("SyncRepository", "Error syncing mantenimientos", e)
+        }
     }
 }
 

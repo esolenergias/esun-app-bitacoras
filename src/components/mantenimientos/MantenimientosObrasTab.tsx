@@ -101,7 +101,7 @@ const generarFolioProtocolo = (nombreObra: string = '', clienteFinal: string = '
   return `POL-${dateCode}-${iniciales}-${numFormatted}`;
 };
 
-export default function MantenimientosObrasTab() {
+export default function MantenimientosObrasTab({ reporterName = 'ESOL Técnico' }: { reporterName?: string }) {
   const [obras, setObras] = useState<PolizaGarantia[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -266,7 +266,11 @@ export default function MantenimientosObrasTab() {
     return (
       <ExpedienteMantenimiento 
         obra={expedienteObra} 
-        onBack={() => setExpedienteObra(null)} 
+        reporterName={reporterName}
+        onBack={() => {
+          setExpedienteObra(null);
+          fetchObras();
+        }} 
       />
     );
   }

@@ -109,6 +109,36 @@ data class TaskEntity(
     val isImportant: Boolean = false
 )
 
+@Entity(tableName = "polizas_garantia")
+data class PolizaEntity(
+    @PrimaryKey val id: String,
+    val folio: String,
+    val clienteNombre: String,
+    @androidx.room.ColumnInfo(defaultValue = "") val clienteDireccion: String = "",
+    val nombreObra: String,
+    val estado: String,
+    val fechaInicio: String,
+    val fechaFin: String,
+    val periodicidad: String,
+    @androidx.room.ColumnInfo(defaultValue = "Pendiente") val estadoMantenimiento: String = "Pendiente",
+    val fechaProximoMantenimiento: String? = null
+)
+
+@Entity(tableName = "visitas_mantenimiento")
+data class VisitaMantenimientoEntity(
+    @PrimaryKey val id: String,
+    val polizaId: String,
+    val numeroVisita: Int,
+    val fechaProgramada: String,
+    @androidx.room.ColumnInfo(defaultValue = "Pendiente") val estado: String = "Pendiente",
+    val fechaRealizada: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "{}") val checklistDataJson: String = "{}",
+    @androidx.room.ColumnInfo(defaultValue = "[]") val evidenciaFotosJson: String = "[]",
+    @androidx.room.ColumnInfo(defaultValue = "") val notasVisita: String = "",
+    val firmaBase64: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "SYNCED") val syncStatus: String = "SYNCED"
+)
+
 
 
 // ==========================================
@@ -241,6 +271,39 @@ interface TaskDao {
     suspend fun deleteTask(task: TaskEntity)
 }
 
+@Dao
+interface PolizaDao {
+    @Query("SELECT * FROM polizas_garantia ORDER BY CASE WHEN fechaProximoMantenimiento IS NULL OR fechaProximoMantenimiento = '' THEN 1 ELSE 0 END, fechaProximoMantenimiento ASC, nombreObra ASC")
+    fun getAllPolizas(): Flow<List<PolizaEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPolizas(polizas: List<PolizaEntity>)
+
+    @Query("SELECT * FROM polizas_garantia WHERE id = :id LIMIT 1")
+    suspend fun getPolizaById(id: String): PolizaEntity?
+}
+
+@Dao
+interface VisitaMantenimientoDao {
+    @Query("SELECT * FROM visitas_mantenimiento WHERE polizaId = :polizaId ORDER BY numeroVisita ASC")
+    fun getVisitasForPoliza(polizaId: String): Flow<List<VisitaMantenimientoEntity>>
+
+    @Query("SELECT * FROM visitas_mantenimiento WHERE LOWER(estado) = 'completada'")
+    fun getVisitasCompletadas(): Flow<List<VisitaMantenimientoEntity>>
+
+    @Query("SELECT * FROM visitas_mantenimiento WHERE syncStatus = 'PENDING'")
+    suspend fun getPendingSyncVisitas(): List<VisitaMantenimientoEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVisitas(visitas: List<VisitaMantenimientoEntity>)
+
+    @Update
+    suspend fun updateVisita(visita: VisitaMantenimientoEntity)
+
+    @Query("UPDATE visitas_mantenimiento SET syncStatus = 'SYNCED' WHERE id = :id")
+    suspend fun markAsSynced(id: String)
+}
+
 
 
 // ==========================================
@@ -301,9 +364,11 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
         BudgetItemEntity::class,
         CrewMemberEntity::class,
         MatrixItemEntity::class,
-        TaskEntity::class
+        TaskEntity::class,
+        PolizaEntity::class,
+        VisitaMantenimientoEntity::class
     ],
-    version = 14,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -313,6 +378,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun crewMemberDao(): CrewMemberDao
     abstract fun matrixItemDao(): MatrixItemDao
     abstract fun taskDao(): TaskDao
+    abstract fun polizaDao(): PolizaDao
+    abstract fun visitaMantenimientoDao(): VisitaMantenimientoDao
 
     companion object {
         @Volatile
@@ -331,6 +398,49 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `polizas_garantia` (
+                        `id` TEXT NOT NULL,
+                        `folio` TEXT NOT NULL,
+                        `clienteNombre` TEXT NOT NULL,
+                        `nombreObra` TEXT NOT NULL,
+                        `estado` TEXT NOT NULL,
+                        `fechaInicio` TEXT NOT NULL,
+                        `fechaFin` TEXT NOT NULL,
+                        `periodicidad` TEXT NOT NULL,
+                        `estadoMantenimiento` TEXT NOT NULL DEFAULT 'Pendiente',
+                        `fechaProximoMantenimiento` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `visitas_mantenimiento` (
+                        `id` TEXT NOT NULL,
+                        `polizaId` TEXT NOT NULL,
+                        `numeroVisita` INTEGER NOT NULL,
+                        `fechaProgramada` TEXT NOT NULL,
+                        `estado` TEXT NOT NULL DEFAULT 'Pendiente',
+                        `fechaRealizada` TEXT,
+                        `checklistDataJson` TEXT NOT NULL DEFAULT '{}',
+                        `evidenciaFotosJson` TEXT NOT NULL DEFAULT '[]',
+                        `notasVisita` TEXT NOT NULL DEFAULT '',
+                        `firmaBase64` TEXT,
+                        `syncStatus` TEXT NOT NULL DEFAULT 'SYNCED',
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE polizas_garantia ADD COLUMN clienteDireccion TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -338,8 +448,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "esol_bitacoras_db"
                 )
-                .fallbackToDestructiveMigration()
-                .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance
                 instance

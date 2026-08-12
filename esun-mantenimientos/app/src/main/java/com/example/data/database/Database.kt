@@ -109,6 +109,35 @@ data class TaskEntity(
     val isImportant: Boolean = false
 )
 
+@Entity(tableName = "polizas_garantia")
+data class PolizaEntity(
+    @PrimaryKey val id: String,
+    val folio: String,
+    val clienteNombre: String,
+    val nombreObra: String,
+    val estado: String,
+    val fechaInicio: String,
+    val fechaFin: String,
+    val periodicidad: String,
+    val estadoMantenimiento: String = "Pendiente",
+    val fechaProximoMantenimiento: String? = null
+)
+
+@Entity(tableName = "visitas_mantenimiento")
+data class VisitaMantenimientoEntity(
+    @PrimaryKey val id: String,
+    val polizaId: String,
+    val numeroVisita: Int,
+    val fechaProgramada: String,
+    val estado: String = "Pendiente", // "Pendiente", "completada"
+    val fechaRealizada: String? = null,
+    val checklistDataJson: String = "{}",
+    val evidenciaFotosJson: String = "[]",
+    val notasVisita: String = "",
+    val firmaBase64: String? = null,
+    val syncStatus: String = "SYNCED" // "SYNCED", "PENDING"
+)
+
 
 
 // ==========================================
@@ -241,6 +270,36 @@ interface TaskDao {
     suspend fun deleteTask(task: TaskEntity)
 }
 
+@Dao
+interface PolizaDao {
+    @Query("SELECT * FROM polizas_garantia ORDER BY nombreObra ASC")
+    fun getAllPolizas(): Flow<List<PolizaEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPolizas(polizas: List<PolizaEntity>)
+
+    @Query("SELECT * FROM polizas_garantia WHERE id = :id LIMIT 1")
+    suspend fun getPolizaById(id: String): PolizaEntity?
+}
+
+@Dao
+interface VisitaMantenimientoDao {
+    @Query("SELECT * FROM visitas_mantenimiento WHERE polizaId = :polizaId ORDER BY numeroVisita ASC")
+    fun getVisitasForPoliza(polizaId: String): Flow<List<VisitaMantenimientoEntity>>
+
+    @Query("SELECT * FROM visitas_mantenimiento WHERE syncStatus = 'PENDING'")
+    suspend fun getPendingSyncVisitas(): List<VisitaMantenimientoEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVisitas(visitas: List<VisitaMantenimientoEntity>)
+
+    @Update
+    suspend fun updateVisita(visita: VisitaMantenimientoEntity)
+
+    @Query("UPDATE visitas_mantenimiento SET syncStatus = 'SYNCED' WHERE id = :id")
+    suspend fun markAsSynced(id: String)
+}
+
 
 
 // ==========================================
@@ -301,9 +360,11 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
         BudgetItemEntity::class,
         CrewMemberEntity::class,
         MatrixItemEntity::class,
-        TaskEntity::class
+        TaskEntity::class,
+        PolizaEntity::class,
+        VisitaMantenimientoEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -313,6 +374,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun crewMemberDao(): CrewMemberDao
     abstract fun matrixItemDao(): MatrixItemDao
     abstract fun taskDao(): TaskDao
+    abstract fun polizaDao(): PolizaDao
+    abstract fun visitaMantenimientoDao(): VisitaMantenimientoDao
 
     companion object {
         @Volatile

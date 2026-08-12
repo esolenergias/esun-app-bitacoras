@@ -252,26 +252,31 @@ interface SupabaseApiService {
 }
 
 data class SupabasePolizaGarantiaResponse(
-    val id: String,
-    val folio: String,
-    val presupuesto_id: String?,
-    val cliente_nombre: String,
-    val nombre_obra: String,
-    val estado: String,
-    val fecha_inicio: String,
-    val fecha_fin: String,
-    val periodicidad: String,
+    val id: String? = null,
+    val folio: String? = null,
+    val presupuesto_id: String? = null,
+    val cliente_nombre: String? = null,
+    val cliente_direccion: String? = null,
+    val nombre_obra: String? = null,
+    val estado: String? = null,
+    val fecha_inicio: String? = null,
+    val fecha_fin: String? = null,
+    val periodicidad: String? = null,
+    val estado_mantenimiento: String? = null,
+    val fecha_proximo_mantenimiento: String? = null,
     val conceptos_incluidos: Any? = null
 )
 
 data class SupabaseVisitaMantenimientoResponse(
-    val id: String,
-    val poliza_id: String,
-    val numero_visita: Int,
-    val fecha_programada: String,
-    val concepto_servicio: String?,
-    val estado: String,
-    val fecha_realizada: String?,
-    val tecnico_asignado: String?,
-    val notas_visita: String?
+    val id: String? = null,
+    val poliza_id: String? = null,
+    val numero_visita: Int? = 0,
+    val fecha_programada: String? = null,
+    val concepto_servicio: String? = null,
+    val estado: String? = null,
+    val fecha_realizada: String? = null,
+    val tecnico_asignado: String? = null,
+    val notas_visita: String? = null,
+    val checklist_data: Any? = null,
+    val evidencia_fotos: Any? = null
 )

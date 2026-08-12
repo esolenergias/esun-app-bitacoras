@@ -763,6 +763,29 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
         val hashBytes = digest.digest(password.toByteArray(Charsets.UTF_8))
         return hashBytes.joinToString("") { "%02x".format(it) }
     }
+
+    // --- Mantenimientos Module ---
+    val polizas: StateFlow<List<com.example.data.database.PolizaEntity>> = repository.getAllPolizasFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val visitasCompletadas: StateFlow<List<com.example.data.database.VisitaMantenimientoEntity>> = repository.getVisitasCompletadasFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun getVisitasForPoliza(polizaId: String): Flow<List<com.example.data.database.VisitaMantenimientoEntity>> {
+        return repository.getVisitasForPolizaFlow(polizaId)
+    }
+
+    fun syncMantenimientos() {
+        viewModelScope.launch {
+            repository.syncMantenimientosWithSupabase()
+        }
+    }
+
+    fun updateVisitaLocal(visita: com.example.data.database.VisitaMantenimientoEntity) {
+        viewModelScope.launch {
+            repository.updateVisitaMantenimientoLocal(visita)
+        }
+    }
 }
 
 

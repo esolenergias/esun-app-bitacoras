@@ -208,7 +208,7 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "dashboard"
     val baseRoute = currentRoute.substringBefore("/")
-    val showBottomBar = baseRoute in listOf("dashboard", "bitacora", "reports", "settings")
+    val showBottomBar = baseRoute in listOf("dashboard", "bitacora", "mantenimientos", "reports", "settings")
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -242,6 +242,21 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                         onClick = { navController.navigate("bitacora") { launchSingleTop = true } },
                         icon = { Icon(Icons.Default.EventNote, contentDescription = "Bitácora", modifier = Modifier.size(26.dp)) },
                         label = { Text("Bitácora", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = ConnectedBlue,
+                            selectedTextColor = ConnectedBlue,
+                            unselectedIconColor = OnSurfaceVariant,
+                            unselectedTextColor = OnSurfaceVariant,
+                            indicatorColor = Color(0xFFE2E7FF)
+                        )
+                    )
+
+                    // Tab 3: Mantenimientos
+                    NavigationBarItem(
+                        selected = currentRoute == "mantenimientos",
+                        onClick = { navController.navigate("mantenimientos") { launchSingleTop = true } },
+                        icon = { Icon(Icons.Default.Build, contentDescription = "Mantenimientos", modifier = Modifier.size(26.dp)) },
+                        label = { Text("Mantenimiento", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = ConnectedBlue,
                             selectedTextColor = ConnectedBlue,
@@ -289,7 +304,7 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
-            NavHost(navController = navController, startDestination = "dashboard") {
+            NavHost(navController = navController, startDestination = "mantenimientos") {
                 composable("dashboard") {
                     DashboardScreen(
                         viewModel = viewModel,
@@ -392,6 +407,9 @@ fun AppScaffold(navController: NavHostController, viewModel: BitacoraViewModel) 
                 }
                 composable("settings") {
                     SettingsScreen(viewModel = viewModel)
+                }
+                composable("mantenimientos") {
+                    com.example.ui.screens.MantenimientosScreen(viewModel = viewModel, onNavigateBack = { navController.popBackStack() })
                 }
                 composable("control_obras") {
                     com.example.ui.screens.ControlObrasScreen(viewModel = viewModel, onNavigateBack = { navController.popBackStack() })

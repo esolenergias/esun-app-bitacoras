@@ -52,8 +52,8 @@ export default function MantenimientosApp({ reporterName = 'ESOL Técnico' }: { 
 
       {/* Content Area */}
       <div className="mt-6">
-        {activeTab === 'obras' && <MantenimientosObrasTab />}
-        {activeTab === 'historial' && <HistorialMantenimientosTab />}
+        {activeTab === 'obras' && <MantenimientosObrasTab reporterName={reporterName} />}
+        {activeTab === 'historial' && <HistorialMantenimientosTab reporterName={reporterName} />}
       </div>
     </div>
   );
