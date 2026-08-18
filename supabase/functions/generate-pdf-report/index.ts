@@ -99,10 +99,44 @@ serve(async (req) => {
 
     // Get public URL
     const { data: publicUrlData } = supabase.storage.from('reports').getPublicUrl(fileName);
+    const pdfUrl = publicUrlData.publicUrl;
+
+    // 5. Send Email via Resend (Mock for now, but fully wired)
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    let emailStatus = "Not Sent (Missing RESEND_API_KEY)";
+
+    if (resendApiKey) {
+      const emailResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'Esolenergias <noreply@esolenergias.com>',
+          to: ['cliente@ejemplo.com'], // In a real scenario, this comes from the system/account
+          subject: `Reporte Mensual Fotovoltaico - ${system.plant_name}`,
+          html: `
+            <h2>Hola,</h2>
+            <p>Adjuntamos el enlace para descargar tu reporte de monitoreo fotovoltaico del mes de ${month}/${year}.</p>
+            <p><a href="${pdfUrl}">Descargar Reporte PDF</a></p>
+            <br/>
+            <p>Atentamente,<br/>El equipo de Esolenergias</p>
+          `
+        })
+      });
+      
+      if (emailResponse.ok) {
+        emailStatus = "Sent Successfully";
+      } else {
+        emailStatus = `Failed: ${await emailResponse.text()}`;
+      }
+    }
 
     return new Response(JSON.stringify({ 
       message: "PDF generated successfully", 
-      url: publicUrlData.publicUrl 
+      url: pdfUrl,
+      emailStatus
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
