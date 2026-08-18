@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Activity, AlertCircle, TrendingUp, Zap, FileText, Share2, Plus, Server, CheckCircle2, LayoutDashboard, Users } from 'lucide-react';
+import { AccountsManager } from '../modules/monitoreo/components/AccountsManager';
 
 type TabType = 'dashboard' | 'cuentas' | 'sistemas';
 
@@ -19,11 +20,17 @@ export default function MonitoreoTab() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-dark-3 hover:bg-dark-4 border border-dark-4 text-white rounded-xl text-sm font-bold transition-all">
+          <button 
+            onClick={() => setActiveTab('cuentas')}
+            className="flex items-center gap-2 px-4 py-2 bg-dark-3 hover:bg-dark-4 border border-dark-4 text-white rounded-xl text-sm font-bold transition-all"
+          >
             <Server className="w-4 h-4" />
             Vincular Cuenta
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold-light text-dark-1 rounded-xl text-sm font-black uppercase tracking-wider transition-all">
+          <button 
+            onClick={() => setActiveTab('sistemas')}
+            className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold-light text-dark-1 rounded-xl text-sm font-black uppercase tracking-wider transition-all"
+          >
             <Plus className="w-4 h-4 stroke-[3]" />
             Nuevo Sistema
           </button>
@@ -72,11 +79,7 @@ export default function MonitoreoTab() {
         )}
 
         {activeTab === 'cuentas' && (
-          <div className="bg-dark-2 border border-dark-3 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
-             <Users className="w-16 h-16 text-dark-4 mb-4" />
-             <h3 className="text-xl font-bold text-white mb-2">Gestión de Cuentas</h3>
-             <p className="text-cream-muted">Aquí irá el componente de administración de cuentas (Placeholder).</p>
-          </div>
+          <AccountsManager />
         )}
 
         {activeTab === 'sistemas' && (
