@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Activity, AlertCircle, TrendingUp, Zap, FileText, Share2, Plus, Server, CheckCircle2, LayoutDashboard, Users } from 'lucide-react';
 import { AccountsManager } from '../modules/monitoreo/components/AccountsManager';
 import { SystemsManager } from '../modules/monitoreo/components/SystemsManager';
+import { MonitoreoDashboard } from '../modules/monitoreo/components/MonitoreoDashboard';
 
 type TabType = 'dashboard' | 'cuentas' | 'sistemas';
 
@@ -72,11 +73,7 @@ export default function MonitoreoTab() {
       {/* Contenido de las pestañas */}
       <div className="mt-6">
         {activeTab === 'dashboard' && (
-          <div className="bg-dark-2 border border-dark-3 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
-             <LayoutDashboard className="w-16 h-16 text-dark-4 mb-4" />
-             <h3 className="text-xl font-bold text-white mb-2">Dashboard Resumen</h3>
-             <p className="text-cream-muted">Aquí irán los gráficos y el resumen general (Placeholder).</p>
-          </div>
+          <MonitoreoDashboard />
         )}
 
         {activeTab === 'cuentas' && (
