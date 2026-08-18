@@ -21,3 +21,13 @@ export interface PVSystem {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface ProductionLog {
+  id: string;
+  system_id: string;
+  date: string;
+  generated_kwh: number;
+  estimated_consumption_kwh?: number;
+  status_code?: string;
+  created_at?: string;
+}
