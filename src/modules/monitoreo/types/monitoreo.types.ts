@@ -31,3 +31,16 @@ export interface ProductionLog {
   status_code?: string;
   created_at?: string;
 }
+
+export type AlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface MonitoringAlert {
+  id: string;
+  system_id: string;
+  severity: AlertSeverity;
+  ai_description: string;
+  ai_recommendation: string;
+  is_resolved: boolean;
+  created_at?: string;
+  resolved_at?: string;
+}
