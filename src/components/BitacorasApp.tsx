@@ -24,6 +24,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
   const [selectedObraDetail, setSelectedObraDetail] = useState<ObraApp | null>(null);
   const [editingBitacora, setEditingBitacora] = useState<Bitacora | null>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [includeFinancialReport, setIncludeFinancialReport] = useState(true);
 
   // When opening modal
   useEffect(() => {
@@ -112,34 +113,47 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
       const siteName = formData.get('site_name') as string;
       
       let finalPhotoUri = editingBitacora?.photo_uri || null;
-      const photoFile = formData.get('photo_file') as File;
+      const photoFiles = formData.getAll('photo_file') as File[];
       
-      // Upload photo to Google Drive if selected
-      if (photoFile && photoFile.size > 0) {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(photoFile);
-        });
-        
-        try {
-          const response = await fetch('https://script.google.com/macros/s/AKfycbx2I7-77T-EUv-3DCK7ueL9eGn4871nv-EJY_qBJxRu5TFQ3IWNcXOjEE89ghI4UbLa2w/exec', {
-            method: 'POST',
-            body: JSON.stringify({
-              filename: `bitacora_${Date.now()}_${photoFile.name}`,
-              mimeType: photoFile.type,
-              base64: base64,
-              folderName: `Bitácora - ${siteName}`
-            })
+      const newUris: string[] = [];
+      
+      for (const file of photoFiles) {
+        if (file && file.size > 0) {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
           });
-          const result = await response.json();
-          if (result.success) {
-            finalPhotoUri = result.url;
+          
+          try {
+            const response = await fetch('https://script.google.com/macros/s/AKfycbx2I7-77T-EUv-3DCK7ueL9eGn4871nv-EJY_qBJxRu5TFQ3IWNcXOjEE89ghI4UbLa2w/exec', {
+              method: 'POST',
+              body: JSON.stringify({
+                filename: `bitacora_${Date.now()}_${file.name}`,
+                mimeType: file.type,
+                base64: base64,
+                moduleType: 'BITACORA',
+                siteName: siteName,
+                folderName: `Bitácora - ${siteName}`
+              })
+            });
+            const result = await response.json();
+            if (result.success) {
+              newUris.push(result.url);
+            }
+          } catch (e) {
+            console.error('Error uploading photo to Drive from Web:', e);
+            alert(`Hubo un error subiendo la foto ${file.name}, pero se guardará el registro.`);
           }
-        } catch (e) {
-          console.error('Error uploading photo to Drive from Web:', e);
-          alert('Hubo un error subiendo la foto, pero se guardará el registro.');
+        }
+      }
+
+      if (newUris.length > 0) {
+        if (finalPhotoUri) {
+          finalPhotoUri = finalPhotoUri + ',' + newUris.join(',');
+        } else {
+          finalPhotoUri = newUris.join(',');
         }
       }
 
@@ -162,7 +176,7 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
         budget_estimate: 0,
         latitude: 0,
         longitude: 0,
-        // photo_uri: finalPhotoUri, ya lo hicimos arriba, ahora falta el concepto
+        photo_uri: finalPhotoUri,
         concepto: selectedConceptoValue || null,
         timestamp: Date.now()
       };
@@ -252,11 +266,14 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
           created_at: p.created_at
         }));
         
-        const existingNames = new Set(combinedObras.map(o => o.nombre));
         for (const p of presObras) {
-          if (!existingNames.has(p.nombre)) {
+          const existingIndex = combinedObras.findIndex(o => o.nombre === p.nombre);
+          if (existingIndex !== -1) {
+            combinedObras[existingIndex].status = p.status;
+            combinedObras[existingIndex].cliente = p.cliente || combinedObras[existingIndex].cliente;
+            combinedObras[existingIndex].ubicacion = p.ubicacion || combinedObras[existingIndex].ubicacion;
+          } else {
             combinedObras.push(p);
-            existingNames.add(p.nombre);
           }
         }
       }
@@ -306,12 +323,12 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
 
   const filteredObrasActivas = obras.filter(o => 
     o.nombre.toLowerCase().includes(searchTerm.toLowerCase()) && 
-    o.status.toLowerCase() !== 'terminado'
+    (o.status.toLowerCase() === 'produccion' || o.status.toLowerCase() === 'producción')
   );
 
   const filteredObrasTerminadas = obras.filter(o => 
     o.nombre.toLowerCase().includes(searchTerm.toLowerCase()) && 
-    o.status.toLowerCase() === 'terminado'
+    (o.status.toLowerCase() === 'terminado' || o.status.toLowerCase() === 'realizado')
   );
 
   if (selectedObraDetail) {
@@ -347,21 +364,33 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => generateObraReport(selectedObraDetail, bitacoras, reporterName)}
-              className="flex items-center gap-2 px-5 py-3 bg-dark-3 hover:bg-gold/20 border border-gold/30 hover:border-gold text-gold font-black rounded-xl transition-all shadow-lg"
-            >
-              <FileText className="w-5 h-5" />
-              Generar Reporte PDF
-            </button>
-            <button 
-              onClick={openNewModal}
-              className="flex items-center gap-2 px-5 py-3 bg-gold hover:bg-gold-dim text-dark-1 font-black rounded-xl transition-colors shadow-lg shadow-gold/20"
-            >
-              <Plus className="w-5 h-5 stroke-[3]" />
-              Nuevo Registro
-            </button>
+
+          <div className="flex flex-col items-end gap-2">
+            <label className="flex items-center gap-2 text-xs text-cream-dim cursor-pointer hover:text-cream transition-colors">
+              <input 
+                type="checkbox" 
+                checked={includeFinancialReport}
+                onChange={(e) => setIncludeFinancialReport(e.target.checked)}
+                className="rounded bg-dark-4 border-dark-5 text-gold focus:ring-gold"
+              />
+              Incluir Finanzas
+            </label>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => generateObraReport(selectedObraDetail, bitacoras, reporterName, includeFinancialReport)}
+                className="flex items-center gap-2 px-5 py-3 bg-dark-3 hover:bg-gold/20 border border-gold/30 hover:border-gold text-gold font-black rounded-xl transition-all shadow-lg"
+              >
+                <FileText className="w-5 h-5" />
+                Generar Reporte PDF
+              </button>
+              <button 
+                onClick={openNewModal}
+                className="flex items-center gap-2 px-5 py-3 bg-gold hover:bg-gold-dim text-dark-1 font-black rounded-xl transition-colors shadow-lg shadow-gold/20"
+              >
+                <Plus className="w-5 h-5 stroke-[3]" />
+                Nuevo Registro
+              </button>
+            </div>
           </div>
         </div>
 
@@ -598,9 +627,9 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-cream-muted mb-1.5 uppercase">
-                      {editingBitacora?.photo_uri ? 'Reemplazar Fotografía (Opcional)' : 'Fotografía (Opcional)'}
+                      {editingBitacora?.photo_uri ? 'Añadir o Reemplazar Fotografías (Opcional)' : 'Fotografías (Opcional, selecciona varias)'}
                     </label>
-                    <input name="photo_file" type="file" accept="image/*" className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-2 text-sm text-cream file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-black file:bg-gold file:text-dark-1 hover:file:bg-gold-dim transition-colors" />
+                    <input name="photo_file" type="file" multiple accept="image/*" className="w-full bg-dark-3 border border-dark-4 rounded-xl px-4 py-2 text-sm text-cream file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-black file:bg-gold file:text-dark-1 hover:file:bg-gold-dim transition-colors" />
                   </div>
                 </div>
                 
@@ -855,13 +884,24 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                     <span className="text-cream-dim">Reportes registrados:</span>
                     <span className="font-bold text-cream">{bitacoras.filter(b => b.site_name === obra.nombre).length}</span>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); generateObraReport(obra, bitacoras, reporterName); }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-dim text-dark-1 font-black text-xs rounded-xl transition-all shadow-md hover:shadow-gold/30 hover:scale-[1.02] active:scale-95"
-                  >
-                    <FileText className="w-4 h-4 stroke-[2.5]" />
-                    Generar Reporte PDF
-                  </button>
+                  <div className="flex flex-col gap-2 mt-2">
+                    <label className="flex items-center justify-center gap-2 text-[10px] text-cream-dim cursor-pointer hover:text-cream transition-colors" onClick={e => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        checked={includeFinancialReport}
+                        onChange={(e) => setIncludeFinancialReport(e.target.checked)}
+                        className="rounded bg-dark-4 border-dark-5 text-gold focus:ring-gold h-3 w-3"
+                      />
+                      Incluir finanzas
+                    </label>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); generateObraReport(obra, bitacoras, reporterName, includeFinancialReport); }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-dim text-dark-1 font-black text-xs rounded-xl transition-all shadow-md hover:shadow-gold/30 hover:scale-[1.02] active:scale-95"
+                    >
+                      <FileText className="w-4 h-4 stroke-[2.5]" />
+                      Generar Reporte PDF
+                    </button>
+                  </div>
                 </div>
               </div>
             ))

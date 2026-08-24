@@ -1,6 +1,7 @@
+import html2pdf from 'html2pdf.js';
 import type { Bitacora, ObraApp } from './types';
 
-export const generateObraReport = (obra: ObraApp, bitacoras: Bitacora[], reporterName: string, includeFinancial: boolean = true) => {
+export const generateObraReport = async (obra: ObraApp, bitacoras: Bitacora[], reporterName: string, includeFinancial: boolean = true) => {
     if (reporterName.toLowerCase().includes('menyfre') || reporterName.toLowerCase().includes('meny')) {
         reporterName = 'Manuel Fregoso';
     }
@@ -119,12 +120,7 @@ export const generateObraReport = (obra: ObraApp, bitacoras: Bitacora[], reporte
         </div>
       </div>` : '';
 
-    const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Reporte Bitácora – ${obra.nombre}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Josefin+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    const html = `<div class="pdf-container">
   <style>
     :root {
       --bg-1:#F8F7F2;--bg-2:#EFEFE8;--bg-3:#E5E4DB;
@@ -135,83 +131,56 @@ export const generateObraReport = (obra: ObraApp, bitacoras: Bitacora[], reporte
       --success:#10B981;--danger:#EF4444;
     }
     *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
-    body{background:#333;display:flex;flex-direction:column;align-items:center;padding:2rem;
-      color:var(--text-1);font-family:'Josefin Sans',sans-serif;font-size:11px;line-height:1.5;}
+    .pdf-container{width:800px;margin:0 auto;padding:0;background:var(--bg-1);color:var(--text-1);font-family:'Josefin Sans',sans-serif;font-size:11px;line-height:1.5;}
     h1,h2,h3,h4{font-family:'Cinzel',serif;}
-    .page{width:800px;min-height:1035px;max-width:100%;margin:0 auto;background:var(--bg-1);
-      box-shadow:0 20px 25px -5px rgba(0,0,0,.1);display:flex;flex-direction:column;}
-    .page-content{padding:15mm 20mm;flex:1;display:flex;flex-direction:column;}
+    .page{width:800px;min-height:1035px;max-width:100%;margin:0 auto;background:var(--bg-1);display:flex;flex-direction:column;}
+    .page-content{padding:12mm 20mm;flex:1;display:flex;flex-direction:column;background:var(--bg-1);}
     @page{size:letter;margin:0;}
-    @media print{body{background:none;padding:0;}.page{box-shadow:none;margin:0;}.no-print{display:none!important;}}
-    .header{display:flex;justify-content:space-between;align-items:center;
-      padding-bottom:4mm;border-bottom:1px solid var(--border-2);margin-bottom:6mm;}
+    .header{display:flex;justify-content:space-between;align-items:center;padding-bottom:4mm;border-bottom:1px solid var(--border-2);margin-bottom:6mm;}
     .logo-container{width:130px;}
     .logo-container img{width:100%;height:auto;object-fit:contain;}
     .report-meta{text-align:right;}
     .report-meta h1{font-size:20px;color:var(--text-1);font-weight:700;letter-spacing:1px;text-transform:uppercase;}
-    .report-meta .meta-subtitle{font-size:10px;color:var(--gold);font-weight:600;text-transform:uppercase;
-      letter-spacing:2px;margin-bottom:4px;display:block;}
+    .report-meta .meta-subtitle{font-size:10px;color:var(--gold);font-weight:600;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;display:block;}
     .report-meta p{font-size:10px;color:var(--text-2);margin-bottom:1px;}
-    .reporter-badge{display:inline-block;background:var(--gold-muted);border:1px solid rgba(196,152,37,0.3);
-      border-radius:4px;padding:3px 8px;font-size:9px;color:var(--gold-dim);font-weight:700;margin-top:4px;letter-spacing:.5px;}
-    .project-card{background:var(--bg-2);border:1px solid var(--border-1);border-radius:8px;
-      padding:12px 16px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;
-      margin-bottom:8mm;box-shadow:inset 0 1px 0 rgba(255,255,255,0.4);}
+    .reporter-badge{display:inline-block;background:var(--gold-muted);border:1px solid rgba(196,152,37,0.3);border-radius:4px;padding:3px 8px;font-size:9px;color:var(--gold-dim);font-weight:700;margin-top:4px;letter-spacing:.5px;}
+    .project-card{background:var(--bg-2);border:1px solid var(--border-1);border-radius:8px;padding:12px 16px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:8mm;box-shadow:inset 0 1px 0 rgba(255,255,255,0.4);page-break-inside:avoid;}
     .info-group{display:flex;flex-direction:column;}
     .info-label{font-size:8px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:2px;}
     .info-value{font-size:12px;font-weight:600;color:var(--text-1);}
-    .section-title{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--text-1);
-      margin-bottom:4mm;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:1px;}
+    .section-title{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:4mm;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:1px;page-break-after:avoid;}
     .section-title::after{content:'';flex:1;height:1px;background:linear-gradient(to right,var(--gold),transparent);}
-    .finance-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8mm;}
-    .finance-card{background:white;border:1px solid var(--border-1);border-radius:6px;padding:10px 12px;
-      position:relative;overflow:hidden;}
+    .finance-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8mm;page-break-inside:avoid;}
+    .finance-card{background:white;border:1px solid var(--border-1);border-radius:6px;padding:10px 12px;position:relative;overflow:hidden;}
     .finance-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--gold);}
     .finance-card.success::before{background:var(--success);}
     .finance-card.warning::before{background:var(--gold-light);}
     .f-label{font-size:8px;color:var(--text-3);text-transform:uppercase;font-weight:700;letter-spacing:.5px;}
     .f-value{font-family:'Cinzel',serif;font-size:16px;font-weight:700;color:var(--text-1);margin-top:4px;}
     .day-container{margin-bottom:8mm;}
-    .day-header{background:var(--text-1);color:var(--bg-1);padding:6px 12px;border-radius:4px;
-      display:flex;justify-content:space-between;align-items:center;margin-bottom:4mm;}
+    .day-header{background:var(--text-1);color:var(--bg-1);padding:6px 12px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;margin-bottom:4mm;page-break-after:avoid;}
     .day-title{font-family:'Cinzel',serif;font-size:12px;font-weight:600;letter-spacing:1px;}
-    .day-badge{background:var(--gold);color:var(--text-1);font-weight:700;font-size:9px;
-      padding:2px 8px;border-radius:12px;text-transform:uppercase;letter-spacing:.5px;}
-    .report-item{background:white;border:1px solid var(--border-1);border-radius:6px;
-      padding:12px;margin-bottom:12px;}
-    .report-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;
-      padding-bottom:6px;border-bottom:1px dashed var(--border-2);}
+    .day-badge{background:var(--gold);color:var(--text-1);font-weight:700;font-size:9px;padding:2px 8px;border-radius:12px;text-transform:uppercase;letter-spacing:.5px;}
+    .report-item{background:white;border:1px solid var(--border-1);border-radius:6px;padding:12px;margin-bottom:12px;page-break-inside:avoid;}
+    .report-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px dashed var(--border-2);}
     .report-time{font-size:12px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:6px;}
     .report-time span{color:var(--gold-dim);font-size:11px;}
     .meta-badges{display:flex;gap:8px;flex-wrap:wrap;}
-    .badge{background:var(--bg-2);border:1px solid var(--border-1);color:var(--text-2);
-      font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;}
-    .concept-ref{display:inline-block;background:var(--gold-muted);color:var(--gold-dim);
-      padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:8px;letter-spacing:.5px;}
+    .badge{background:var(--bg-2);border:1px solid var(--border-1);color:var(--text-2);font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;}
+    .concept-ref{display:inline-block;background:var(--gold-muted);color:var(--gold-dim);padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:8px;letter-spacing:.5px;}
     .report-desc{font-size:12px;color:var(--text-2);line-height:1.8;margin-bottom:12px;}
     .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;}
-    .photo-box{width:100%;height:160px;background:var(--bg-3);border:1px solid var(--border-1);
-      border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+    .photo-box{width:100%;height:160px;background:var(--bg-3);border:1px solid var(--border-1);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
     .photo-placeholder{font-size:9px;color:var(--text-3);text-align:center;font-style:italic;padding:8px;}
-    .signatures-section{margin-top:auto;padding-top:20mm;page-break-inside:avoid;}
+    .signatures-section{margin-top:auto;padding-top:15mm;page-break-inside:avoid;}
     .signatures-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:40px;max-width:600px;margin:0 auto;}
     .signature-box{text-align:center;}
     .sig-line{height:1px;background:var(--text-1);margin-bottom:6px;}
     .sig-name{font-family:'Cinzel',serif;font-weight:700;font-size:11px;color:var(--text-1);}
     .sig-role{font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;}
-    .footer{margin-top:10mm;border-top:1px solid var(--border-2);padding-top:4mm;
-      display:flex;justify-content:space-between;font-size:8px;color:var(--text-3);
-      font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+    .footer{page-break-inside:avoid;margin-top:8mm;border-top:1px solid var(--border-2);padding-top:4mm;display:flex;justify-content:space-between;font-size:8px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:1px;}
     .footer .brand{color:var(--gold-dim);}
-    .print-btn{position:fixed;bottom:2rem;right:2rem;background:var(--gold);color:#fff;
-      border:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700;
-      cursor:pointer;font-family:'Josefin Sans',sans-serif;box-shadow:0 4px 15px rgba(0,0,0,.3);z-index:999;}
-    .print-btn:hover{background:var(--gold-light);}
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-</head>
-<body>
-  <button class="print-btn no-print" onclick="downloadPDF()">💾 Descargar PDF</button>
   <div class="page" id="report-content">
     <div class="page-content">
       <header class="header">
@@ -273,41 +242,56 @@ export const generateObraReport = (obra: ObraApp, bitacoras: Bitacora[], reporte
       </div>
     </div>
   </div>
-  <script>
-    function downloadPDF() {
-      const element = document.getElementById('report-content');
-      const btn = document.querySelector('.print-btn');
-      btn.style.display = 'none';
-      
-      const origMargin = element.style.margin;
-      element.style.margin = '0';
-      
-      const opt = {
-        margin:       0,
-        filename:     'Reporte_Bitacora_${obra.nombre.replace(/\\s+/g, '_')}.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-      };
-      
-      window.scrollTo(0, 0);
-      html2pdf().set(opt).from(element).save().then(() => {
-        element.style.margin = origMargin;
-        btn.style.display = 'block';
-      }).catch(err => {
-        element.style.margin = origMargin;
-        console.error(err);
-        btn.style.display = 'block';
-        alert('Hubo un error al generar el PDF. Por favor intenta de nuevo.');
-      });
-    }
-  </script>
-</body>
-</html>`;
+</div>`;
 
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(html);
-      win.document.close();
+    const container = document.createElement('div');
+    container.innerHTML = html;
+
+    const opt = {
+      margin:       [10, 0, 0, 0], // Solo Top margin. Bottom en 0 evita la página extra en blanco.
+      filename:     `Reporte_Bitacora_${obra.nombre.replace(/\s+/g, '_')}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#F8F7F2' },
+      jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' },
+      pagebreak:    { mode: ['css', 'legacy'] }
+    };
+
+    const win = window.open('about:blank', '_blank');
+
+    try {
+      const pdfBlob: Blob = await new Promise((resolve, reject) => {
+        html2pdf()
+          .set(opt)
+          .from(container)
+          .toPdf()
+          .get('pdf')
+          .then((pdf: any) => {
+            const n = pdf.internal.getNumberOfPages();
+            const w = pdf.internal.pageSize.getWidth();
+            
+            // jsPDF 1.5.3 (usado por html2pdf) no soporta bien HEX aquí, por eso salía negro. Usamos RGB.
+            pdf.setFillColor(248, 247, 242); // Beige
+            for (let i = 1; i <= n; i++) {
+              pdf.setPage(i);
+              // Pintamos el margen superior solapando 0.3mm para ocultar la línea de corte.
+              pdf.rect(0, 0, w, 10.3, 'F');
+            }
+            
+            // Si por alguna razón se genera una página en blanco al final, la eliminamos.
+            // Aunque con margin-bottom: 0 no debería ocurrir.
+            resolve(pdf.output('blob'));
+          })
+          .catch(reject);
+      });
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      if (win) {
+        win.location.replace(blobUrl);
+      } else {
+        window.open(blobUrl, '_blank');
+      }
+    } catch (err) {
+      console.error(err);
+      if (win) win.close();
+      alert('Hubo un error al generar el PDF. Revisa la consola.');
     }
-  };
+};
