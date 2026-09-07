@@ -76,9 +76,9 @@ export function Portal() {
         }
       } else if (currentUser.role === 'admin') {
         // Admins cannot access master-only views (dashboard, pro, cms, agents, seo, roles)
-        if (activeTab === 'dashboard' || activeTab === 'cms' || activeTab === 'agents' || activeTab === 'seo' || activeTab === 'roles') {
-          setActiveTab('leads');
-        }
+        if (activeTab === 'cms' || activeTab === 'agents' || activeTab === 'seo' || activeTab === 'roles') {
+            setActiveTab('dashboard');
+          }
       }
     }
   }, [currentUser, activeTab]);
@@ -1297,9 +1297,9 @@ export function Portal() {
                   )}
 
               {/* ==================================================== */}
-              {/* MASTER WORKSPACE SCREENS */}
-              {/* ==================================================== */}
-              {currentUser.role === 'master' && (
+              {/* MASTER WORKSPACE SCREENS (Shared with Admin) */}
+                {/* ==================================================== */}
+                {(currentUser.role === 'master' || currentUser.role === 'admin') && (
                 <div className="space-y-6">
                   
                   {/* MASTER TAB 1: GENERAL DASHBOARD */}
