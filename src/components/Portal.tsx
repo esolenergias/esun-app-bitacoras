@@ -1970,9 +1970,28 @@ export function Portal() {
               )}
 
               {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'cfeconfig' && (
-                <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
-                  {/* Config Header */}
-                  <div className="bg-dark-2 border border-dark-4 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm select-none">
+                  <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+                    <div className="flex space-x-2 border-b border-dark-4 pb-1 mb-6 overflow-x-auto">
+                      <button 
+                        onClick={() => setConfigSubTab('cfe')}
+                        className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-t-lg transition-colors whitespace-nowrap ${configSubTab === 'cfe' ? 'bg-dark-3 text-gold border-b-2 border-gold' : 'text-cream-muted hover:bg-dark-3/50'}`}
+                      >
+                        <Sparkles className="inline-block w-4 h-4 mr-2" />
+                        CFE IA
+                      </button>
+                      <button 
+                        onClick={() => setConfigSubTab('whatsapp')}
+                        className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-t-lg transition-colors whitespace-nowrap ${configSubTab === 'whatsapp' ? 'bg-dark-3 text-gold border-b-2 border-gold' : 'text-cream-muted hover:bg-dark-3/50'}`}
+                      >
+                        <MessageSquare className="inline-block w-4 h-4 mr-2" />
+                        Bot WhatsApp
+                      </button>
+                    </div>
+
+                    {configSubTab === 'cfe' && (
+                    <>
+                    {/* Config Header */}
+                    <div className="bg-dark-2 border border-dark-4 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm select-none">
                     <div className="space-y-1">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-gold/10 text-gold border border-gold/25">
                         <Sparkles className="w-3 h-3" />
@@ -2106,9 +2125,15 @@ export function Portal() {
                         </button>
                       </div>
                     </div>
+                    </div>
+                    </>
+                    )}
+
+                    {configSubTab === 'whatsapp' && (
+                      <WhatsAppConfig />
+                    )}
                   </div>
-                </div>
-              )}
+                )}
 
             </div>
           </div>
