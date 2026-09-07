@@ -20,6 +20,7 @@ import EsunPage from './esun/EsunPage';
 import BitacorasApp from './BitacorasApp';
 import MantenimientosApp from './mantenimientos/MantenimientosApp';
 import LegalTab from './legal/LegalTab';
+import WhatsAppConfig from './legal/WhatsAppConfig';
 import ClientesTab from './crm/ClientesTab';
 
 const CATEGORIES = [
@@ -61,6 +62,7 @@ export function Portal() {
 
   // Navigation tab based on user roles
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [configSubTab, setConfigSubTab] = useState<'cfe' | 'whatsapp'>('cfe');
   const [cotizadorSubTab, setCotizadorSubTab] = useState<'presupuestos' | 'matrices' | 'insumos' | 'grupos'>('presupuestos');
   const [legalTargetBudgetId, setLegalTargetBudgetId] = useState<string | null>(null);
 
@@ -405,177 +407,9 @@ export function Portal() {
                   </span>
 
                   {/* ------------------------- */}
-                  {/* CLIENT ROLE SIDEBAR TABS  */}
-                  {/* ------------------------- */}
-                  {currentUser.role === 'user' && (
-                    <>
-                      <button
-                        onClick={() => setActiveTab('dashboard')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'dashboard'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Zap className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Monitoreo</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('projects')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'projects'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Layers className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Mis Proyectos 3D</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('cfe')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cfe'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <TrendingUp className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Recibos CFE</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('chat')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'chat'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <MessageSquare className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Asistente IA</span>}
-                      </button>
-                    </>
-                  )}
-
-                  {/* ------------------------ */}
-                  {/* ADMIN ROLE SIDEBAR TABS  */}
-                  {/* ------------------------ */}
-                  {currentUser.role === 'admin' && (
-                    <>
-                      <button
-                        onClick={() => setActiveTab('leads')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'leads'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center relative' : ''}`}
-                      >
-                        <Users className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Pipeline Leads</span>}
-                        {leads.filter((l: any) => l.status === 'Pendiente de Envío').length > 0 && (
-                          sidebarCollapsed ? (
-                            <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-sm shadow-red-500/50" />
-                          ) : (
-                            <span className="ml-auto bg-red-500 text-white font-mono text-[9px] font-black px-1.5 py-0.5 rounded-full animate-pulse shadow-md shadow-red-500/20">
-                              {leads.filter((l: any) => l.status === 'Pendiente de Envío').length}
-                            </span>
-                          )
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('inventory')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'inventory'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Package className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Productos B2B</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('logistics')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'logistics'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Truck className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Logística envíos</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('cfemanager')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cfemanager'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <FileText className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>CFE Manager</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('esun')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'esun'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Sun className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Esun Solar</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('cotizador')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cotizador'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Sparkles className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Presupuestos esol</span>}
-                      </button>
-                      <button
-                        onClick={() => { setActiveTab('legal'); setLegalTargetBudgetId(null); }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'legal'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Shield className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Legal Esol</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('bitacoras')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'bitacoras'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Layers className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Bitácoras (App)</span>}
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('cfeconfig')}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeTab === 'cfeconfig'
-                            ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                            : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <Settings className="w-4 h-4 stroke-[2]" />
-                        {!sidebarCollapsed && <span>Configuración</span>}
-                      </button>
-                    </>
-                  )}
-
-                  {/* ------------------------- */}
                   {/* MASTER ROLE SIDEBAR TABS  */}
                   {/* ------------------------- */}
-                  {currentUser.role === 'master' && (
+                  {true && (
                     <>
                       <button
                         onClick={() => setActiveTab('dashboard')}
@@ -783,7 +617,8 @@ export function Portal() {
                               <Bot className="w-4 h-4 stroke-[2]" />
                               {!sidebarCollapsed && <span>Motores Chat IA</span>}
                             </button>
-                            <button
+                            {currentUser.role === 'master' && (
+<button
                               onClick={() => setActiveTab('roles')}
                               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
                                 activeTab === 'roles'
@@ -794,6 +629,7 @@ export function Portal() {
                               <Sliders className="w-4 h-4 stroke-[2]" />
                               {!sidebarCollapsed && <span>Roles y Permisos</span>}
                             </button>
+)}
                             <button
                               onClick={() => setActiveTab('cfeconfig')}
                               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${

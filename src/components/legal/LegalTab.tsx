@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool, Award } from 'lucide-react';
+import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool, Award, UserCheck } from 'lucide-react';
 import ContratosPanelesTab from './ContratosPanelesTab';
 import SubcontratacionTab from './SubcontratacionTab';
 import InstaladoresManagerTab from './InstaladoresManagerTab';
 import ExtensionGarantiaTab from './ExtensionGarantiaTab';
 import PolizaGarantiaTab from './PolizaGarantiaTab';
+import PersonalTab from './PersonalTab';
 
 interface LegalTabProps {
   initialBudgetId?: string | null;
 }
 
 export default function LegalTab({ initialBudgetId }: LegalTabProps) {
-  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'extension_garantia' | 'poliza_garantia' | 'instaladores' | 'ajustes'>('contratos_paneles');
+  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'extension_garantia' | 'poliza_garantia' | 'personal' | 'instaladores' | 'ajustes'>('contratos_paneles');
   const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem('esol_make_webhook_url') || '');
 
   return (
@@ -78,6 +79,18 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
             <Award className="w-4 h-4" />
             Póliza de Garantía
           </button>
+
+          <button
+            onClick={() => setLegalSubTab('personal')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              legalSubTab === 'personal'
+                ? 'border-gold text-gold bg-gold/5'
+                : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
+            }`}
+          >
+            <UserCheck className="w-4 h-4" />
+            Personal
+          </button>
         </div>
         
         <div className="flex space-x-1 min-w-max">
@@ -125,35 +138,41 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
           <PolizaGarantiaTab initialBudgetId={initialBudgetId} />
         )}
 
+        {legalSubTab === 'personal' && (
+          <PersonalTab />
+        )}
+
         {legalSubTab === 'instaladores' && (
           <InstaladoresManagerTab />
         )}
 
         {legalSubTab === 'ajustes' && (
-          <div className="bg-dark-2 border border-dark-4 rounded-2xl p-6 shadow-xl max-w-2xl mx-auto mt-10">
-            <h3 className="text-xl font-light text-cream mb-6 flex items-center gap-2">
-              <Settings className="w-5 h-5 text-gold" /> Ajustes de Nube e Integraciones
-            </h3>
-            <div className="bg-dark-3/50 p-4 rounded-xl border border-dark-4">
-              <h4 className="text-sm font-medium text-gold mb-3 flex items-center gap-2 border-b border-dark-4 pb-2">
-                <Cloud className="w-4 h-4" /> Integración con Google Drive
-              </h4>
-              <div>
-                <label className="block text-xs font-medium text-cream-muted mb-1">Webhook URL de Make.com o Zapier</label>
-                <input
-                  type="text"
-                  placeholder="https://hook.us1.make.com/..."
-                  value={webhookUrl}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setWebhookUrl(val);
-                    localStorage.setItem('esol_make_webhook_url', val);
-                  }}
-                  className="w-full bg-dark-1 border border-dark-4 rounded-lg px-3 py-2 text-cream focus:border-gold outline-none text-xs font-mono"
-                />
-                <p className="text-[10px] text-cream-muted mt-2 leading-relaxed">
-                  Pega aquí la URL de tu Webhook. Al dar clic en "Descargar PDF y Subir a Drive", el sistema enviará automáticamente el contrato generado (PDF) a esta dirección para que Make.com lo suba a la carpeta de tu cliente en Google Drive sin ocupar espacio en tu base de datos.
-                </p>
+          <div className="space-y-6">
+            <div className="bg-dark-2 border border-dark-4 rounded-2xl p-6 shadow-xl max-w-4xl mx-auto mt-6">
+              <h3 className="text-xl font-light text-cream mb-6 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-gold" /> Ajustes de Nube e Integraciones
+              </h3>
+              <div className="bg-dark-3/50 p-4 rounded-xl border border-dark-4">
+                <h4 className="text-sm font-medium text-gold mb-3 flex items-center gap-2 border-b border-dark-4 pb-2">
+                  <Cloud className="w-4 h-4" /> Integración con Google Drive
+                </h4>
+                <div>
+                  <label className="block text-xs font-medium text-cream-muted mb-1">Webhook URL de Make.com o Zapier</label>
+                  <input
+                    type="text"
+                    placeholder="https://hook.us1.make.com/..."
+                    value={webhookUrl}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setWebhookUrl(val);
+                      localStorage.setItem('esol_make_webhook_url', val);
+                    }}
+                    className="w-full bg-dark-1 border border-dark-4 rounded-lg px-3 py-2 text-cream focus:border-gold outline-none text-xs font-mono"
+                  />
+                  <p className="text-[10px] text-cream-muted mt-2 leading-relaxed">
+                    Pega aquí la URL de tu Webhook. Al dar clic en "Descargar PDF y Subir a Drive", el sistema enviará automáticamente el contrato generado (PDF) a esta dirección para que Make.com lo suba a la carpeta de tu cliente en Google Drive sin ocupar espacio en tu base de datos.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
