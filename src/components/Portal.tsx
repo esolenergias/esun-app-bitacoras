@@ -110,7 +110,7 @@ export function Portal() {
               utility_percentage,
               presupuesto_conceptos (
                 quantity,
-                costo_unitario
+                cost_price
               )
             `);
             if (data && !error) {
@@ -119,7 +119,7 @@ export function Portal() {
                 if (p.presupuesto_conceptos && Array.isArray(p.presupuesto_conceptos)) {
                   let costoDirecto = 0;
                   p.presupuesto_conceptos.forEach(c => {
-                    costoDirecto += (Number(c.quantity) || 0) * (Number(c.costo_unitario) || 0);
+                    costoDirecto += (Number(c.quantity) || 0) * (Number(c.cost_price) || 0);
                   });
                   const indPct = p.indirect_percentage ?? 10.00;
                   const utPct = p.utility_percentage ?? 8.00;
