@@ -592,6 +592,7 @@ export function Portal() {
                       <div className="mt-8 pt-4 border-t border-dark-4/50 space-y-1">
                         {!sidebarCollapsed && <div className="px-3 pb-2 text-[8px] font-black uppercase text-cream-muted/40 tracking-widest text-center">Opciones de Administración</div>}
   {/* LANDING PAGE ACCORDION */}
+                      {currentUser.role === 'master' && (
                       <div className="pt-2">
                         {!sidebarCollapsed && (
                           <button 
@@ -643,6 +644,7 @@ export function Portal() {
                           </div>
                         )}
                       </div>
+                      )}
   {/* TIENDA ACCORDION */}
                       <div className="pt-2">
                         {!sidebarCollapsed && (
@@ -674,6 +676,7 @@ export function Portal() {
                         )}
                       </div>
   {/* CONFIGURACION ACCORDION */}
+                      {currentUser.role === 'master' && (
                       <div className="pt-2">
                         {!sidebarCollapsed && (
                           <button 
@@ -727,6 +730,7 @@ export function Portal() {
                           </div>
                         )}
                       </div>
+                      )}
                       </div>
                       </>
                   )}
