@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Phone, Power, QrCode, Save, RefreshCw, LogOut, CheckCircle2, XCircle, Bell, MessageSquare, AlertCircle, Settings } from 'lucide-react';
 
-const API_URL = 'http://45.132.242.95:3001/api/whatsapp';
+const getApiUrl = (path: string) => {
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  return isLocal ? `http://45.132.242.95:3001/api/whatsapp${path}` : `/whatsapp-proxy.php?endpoint=${path}`;
+};
 const API_KEY = 'esol-whatsapp-2024';
 
 interface WaStatus {
@@ -29,7 +32,7 @@ export default function WhatsAppConfig() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch(`${API_URL}/status`, { headers: { 'x-api-key': API_KEY } });
+      const res = await fetch(`${getApiUrl('/status')}`, { headers: { 'x-api-key': API_KEY } });
       const data = await res.json();
       if (res.ok) {
         setStatus(data);
@@ -46,7 +49,7 @@ export default function WhatsAppConfig() {
 
   const fetchQr = async () => {
     try {
-      const res = await fetch(`${API_URL}/qr`, { headers: { 'x-api-key': API_KEY } });
+      const res = await fetch(`${getApiUrl('/qr')}`, { headers: { 'x-api-key': API_KEY } });
       const data = await res.json();
       if (res.ok && data.qr) {
         setQr(data.qr);
@@ -58,7 +61,7 @@ export default function WhatsAppConfig() {
 
   const fetchConfig = async () => {
     try {
-      const res = await fetch(`${API_URL}/config`, { headers: { 'x-api-key': API_KEY } });
+      const res = await fetch(`${getApiUrl('/config')}`, { headers: { 'x-api-key': API_KEY } });
       const data = await res.json();
       if (res.ok) setConfig(data);
     } catch (err) {
@@ -68,7 +71,7 @@ export default function WhatsAppConfig() {
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch(`${API_URL}/logs`, { headers: { 'x-api-key': API_KEY } });
+      const res = await fetch(`${getApiUrl('/logs')}`, { headers: { 'x-api-key': API_KEY } });
       const data = await res.json();
       if (res.ok && data.logs) setLogs(data.logs);
     } catch (err) {
@@ -102,7 +105,7 @@ export default function WhatsAppConfig() {
     setSaveLoading(true);
     setMessage(null);
     try {
-      const res = await fetch(`${API_URL}/config`, {
+      const res = await fetch(`${getApiUrl('/config')}`, {
         method: 'POST',
         headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -121,7 +124,7 @@ export default function WhatsAppConfig() {
   const handleLogout = async () => {
     if (!confirm('¿Seguro que deseas desconectar el bot de WhatsApp? Tendrás que volver a escanear el QR.')) return;
     try {
-      await fetch(`${API_URL}/logout`, {
+      await fetch(`${getApiUrl('/logout')}`, {
         method: 'POST',
         headers: { 'x-api-key': API_KEY }
       });
