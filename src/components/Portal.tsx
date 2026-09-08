@@ -1400,9 +1400,9 @@ export function Portal() {
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
                           <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Total Cotizado</span>
                           <h4 className="text-2xl font-black text-gold mt-2 font-display">
-                            ${esunQuotes.reduce((acc, q) => acc + (q.financial?.investment_mxn || 0), 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })} MXN
+                            ${dashboardPresupuestos.reduce((acc, p) => acc + (p.total_mxn || 0), 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })} MXN
                           </h4>
-                          <span className="text-[9px] text-green-400 font-bold block mt-3">↑ Total acumulado en Esun Solar</span>
+                          <span className="text-[9px] text-green-400 font-bold block mt-3">↑ Total de Presupuestos eSol</span>
                         </div>
                         {/* Stat 2 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
