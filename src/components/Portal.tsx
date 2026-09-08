@@ -97,20 +97,43 @@ export function Portal() {
   const [editProfileAvatar, setEditProfileAvatar] = useState('');
 
   // Load esun quotes to feed general dashboard statistics
-  const [esunQuotes, setEsunQuotes] = useState<any[]>([]);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('esun_quotes');
-      if (stored) {
-        setEsunQuotes(JSON.parse(stored));
-      } else {
-        setEsunQuotes([]);
+  // Load presupuestos for dashboard statistics
+    const [dashboardPresupuestos, setDashboardPresupuestos] = useState<any[]>([]);
+  
+    useEffect(() => {
+      if (activeTab === 'dashboard') {
+        const fetchStats = async () => {
+          try {
+            const { data, error } = await supabase.from('presupuestos').select('*');
+            if (data && !error) {
+              const mapped = data.map(p => {
+                let totalVenta = 0;
+                if (p.conceptos && Array.isArray(p.conceptos)) {
+                  let costoDirecto = 0;
+                  p.conceptos.forEach(c => {
+                    costoDirecto += (Number(c.quantity) || 0) * (Number(c.costo_unitario) || 0);
+                  });
+                  const indPct = p.indirect_percentage ?? 10.00;
+                  const utPct = p.utility_percentage ?? 8.00;
+                  const indirectCost = costoDirecto * (indPct / 100);
+                  const utility = (costoDirecto + indirectCost) * (utPct / 100);
+                  totalVenta = costoDirecto + indirectCost + utility;
+                  totalVenta = totalVenta * 1.16;
+                }
+                return {
+                  id: p.id,
+                  total_mxn: totalVenta
+                };
+              });
+              setDashboardPresupuestos(mapped);
+            }
+          } catch (e) {
+            console.error("Error loading dashboard presupuestos:", e);
+          }
+        };
+        fetchStats();
       }
-    } catch (e) {
-      console.error("Error loading esun quotes for dashboard stats:", e);
-    }
-  }, [activeTab]);
+    }, [activeTab]);
 
 
 
@@ -1383,10 +1406,10 @@ export function Portal() {
                         </div>
                         {/* Stat 2 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Leads por IA</span>
-                          <h4 className="text-2xl font-black text-gold mt-2 font-display">{esunQuotes.length} leads</h4>
-                          <span className="text-[9px] text-cream-muted block mt-3">Cotizaciones creadas en Esun Solar</span>
-                        </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Total Presupuestos</span>
+                            <h4 className="text-2xl font-black text-gold mt-2 font-display">{dashboardPresupuestos.length} presupuestos</h4>
+                            <span className="text-[9px] text-cream-muted block mt-3">Registrados en Plataforma</span>
+                          </div>
                         {/* Stat 3 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
                           <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Disponibilidad Bot</span>
