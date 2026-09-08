@@ -104,13 +104,21 @@ export function Portal() {
       if (activeTab === 'dashboard') {
         const fetchStats = async () => {
           try {
-            const { data, error } = await supabase.from('presupuestos').select('*');
+            const { data, error } = await supabase.from('presupuestos').select(`
+              id,
+              indirect_percentage,
+              utility_percentage,
+              presupuesto_conceptos (
+                quantity,
+                costo_unitario
+              )
+            `);
             if (data && !error) {
               const mapped = data.map(p => {
                 let totalVenta = 0;
-                if (p.conceptos && Array.isArray(p.conceptos)) {
+                if (p.presupuesto_conceptos && Array.isArray(p.presupuesto_conceptos)) {
                   let costoDirecto = 0;
-                  p.conceptos.forEach(c => {
+                  p.presupuesto_conceptos.forEach(c => {
                     costoDirecto += (Number(c.quantity) || 0) * (Number(c.costo_unitario) || 0);
                   });
                   const indPct = p.indirect_percentage ?? 10.00;
@@ -1407,7 +1415,7 @@ export function Portal() {
                         {/* Stat 2 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
                             <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Total Presupuestos</span>
-                            <h4 className="text-2xl font-black text-gold mt-2 font-display">{dashboardPresupuestos.length} presupuestos</h4>
+                            <h4 className="text-2xl font-black text-gold mt-2 font-display">{dashboardPresupuestos.length}</h4>
                             <span className="text-[9px] text-cream-muted block mt-3">Registrados en Plataforma</span>
                           </div>
                         {/* Stat 3 */}
