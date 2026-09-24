@@ -12,6 +12,7 @@ import { Portal } from './components/Portal';
 import { LoginModal } from './components/LoginModal';
 import PresupuestoDashboardPage from './components/cotizador/PresupuestoDashboardPage';
 import EsunPropuestaViewer from './components/esun/EsunPropuestaViewer';
+import { SistemaAdministrativoApp } from './modules/sistema-administrativo/SistemaAdministrativoApp';
 
 function AppContent() {
   const { currentView, isPortalOpen, closePortal, currentUser, content } = useApp();
@@ -72,10 +73,34 @@ function AppContent() {
   );
 }
 
+function StandaloneAdminWrapper() {
+  const { currentUser } = useApp();
+  return (
+    <SistemaAdministrativoApp
+      standalone={true}
+      userRole={currentUser?.role || 'master'}
+      userName={currentUser?.name || 'Administrador Esol'}
+      onBackToPortal={() => {
+        window.location.href = '/';
+      }}
+      onNavigateToOficios={(folio) => {
+        localStorage.setItem('esol_legal_active_subtab', 'oficios');
+        if (folio) localStorage.setItem('esol_oficio_editing_target', folio);
+        window.location.href = '/?tab=legal';
+      }}
+    />
+  );
+}
+
 function App() {
   const searchParams = new URLSearchParams(window.location.search);
   const esunPropuesta = searchParams.get('esun_propuesta');
   const presupuestoId = searchParams.get('presupuestoId');
+  const isStandaloneAdmin = 
+    searchParams.get('sistema_administrativo') !== null ||
+    searchParams.get('admin_erp') !== null ||
+    searchParams.get('tab') === 'sistema_administrativo' ||
+    window.location.pathname === '/sistema-administrativo';
 
   if (esunPropuesta) {
     const [projectId, proposalId] = esunPropuesta.split('_');
@@ -86,6 +111,14 @@ function App() {
 
   if (presupuestoId) {
     return <PresupuestoDashboardPage id={presupuestoId} />;
+  }
+
+  if (isStandaloneAdmin) {
+    return (
+      <AppProvider>
+        <StandaloneAdminWrapper />
+      </AppProvider>
+    );
   }
 
   return (

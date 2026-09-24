@@ -9,8 +9,9 @@ import {
   TrendingUp, Layers, Bot, Sparkles, Plus, FileText, BarChart, 
   RefreshCw, Sliders, Edit, Save, 
   ArrowRight, Sun, Moon, Zap, Leaf, 
-  DollarSign, MessageSquare, Package, Truck, Users, Activity,
-  Settings, Trash2, ChevronDown, ChevronRight, ChevronUp, Store, LayoutTemplate, Wrench
+  DollarSign, MessageSquare, Package, Truck, Users, Activity, Building2,
+  Settings, Trash2, ChevronDown, ChevronRight, ChevronUp, Store, LayoutTemplate, Wrench,
+  ExternalLink
 } from 'lucide-react';
 import InsumosTab from './cotizador/InsumosTab';
 import MatricesTab from './cotizador/MatricesTab';
@@ -22,6 +23,7 @@ import MantenimientosApp from './mantenimientos/MantenimientosApp';
 import LegalTab from './legal/LegalTab';
 import WhatsAppConfig from './legal/WhatsAppConfig';
 import ClientesTab from './crm/ClientesTab';
+import { SistemaAdministrativoApp } from '../modules/sistema-administrativo/SistemaAdministrativoApp';
 
 const CATEGORIES = [
   'Paneles Solares',
@@ -61,7 +63,13 @@ export function Portal() {
   } = useApp();
 
   // Navigation tab based on user roles
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'sistema_administrativo' || tabParam === 'admin_erp') return 'sistema_administrativo';
+    if (window.location.hash === '#sistema-administrativo') return 'sistema_administrativo';
+    return 'dashboard';
+  });
   const [configSubTab, setConfigSubTab] = useState<'cfe' | 'whatsapp'>('cfe');
   const [cotizadorSubTab, setCotizadorSubTab] = useState<'presupuestos' | 'matrices' | 'insumos' | 'grupos'>('presupuestos');
   const [legalTargetBudgetId, setLegalTargetBudgetId] = useState<string | null>(null);
@@ -738,7 +746,42 @@ export function Portal() {
               </div>
 
               {/* Sidebar bottom actions */}
-              <div className="space-y-2 mt-8">
+              <div className="space-y-2 mt-6 pt-3 border-t border-dark-4/60">
+                {/* ACCESO DIRECTO: SISTEMA ADMINISTRATIVO (ERP) */}
+                {currentUser.role !== 'user' && (
+                  <button
+                    onClick={() => window.open('/?sistema_administrativo=1', '_blank')}
+                    className={`w-full group flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer border bg-gradient-to-r from-gold/20 via-gold/10 to-transparent border-gold/50 hover:border-gold hover:from-gold/30 hover:shadow-lg hover:shadow-gold/10 text-cream ${
+                      sidebarCollapsed ? 'justify-center p-2.5' : ''
+                    }`}
+                    title="Abrir Sistema Administrativo (ERP) en ventana independiente"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-gold/20 border border-gold/60 flex items-center justify-center text-gold group-hover:bg-gold group-hover:text-dark-1 transition-all flex-shrink-0 shadow-sm">
+                        <Building2 className="w-4 h-4 stroke-[2.2]" />
+                      </div>
+                      {!sidebarCollapsed && (
+                        <div className="text-left truncate">
+                          <div className="text-[11px] font-black uppercase tracking-wider text-gold group-hover:text-gold-light transition-colors leading-none flex items-center gap-1.5">
+                            <span>Sistema Adm.</span>
+                          </div>
+                          <div className="text-[8.5px] font-bold text-cream-muted uppercase tracking-tight mt-1">
+                            ERP Obra & Finanzas
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {!sidebarCollapsed && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[8px] font-mono font-black bg-gold/20 text-gold px-1.5 py-0.5 rounded border border-gold/30">
+                          ERP
+                        </span>
+                        <ExternalLink className="w-3.5 h-3.5 text-gold/70 group-hover:text-gold group-hover:translate-x-0.5 transition-all" />
+                      </div>
+                    )}
+                  </button>
+                )}
+
                 {/* Collapse button for desktop */}
                 <button 
                   onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -1406,6 +1449,31 @@ export function Portal() {
                         </span>
                       </div>
 
+                      {/* BANNER ACCESO DIRECTO SISTEMA ADMINISTRATIVO ERP */}
+                      <div className="bg-gradient-to-r from-blue-900/40 via-indigo-950/50 to-slate-900/80 border border-blue-500/30 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-5 shadow-lg relative overflow-hidden">
+                        <div className="space-y-1.5 z-10">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                              Nuevo Módulo ERP
+                            </span>
+                            <span className="text-xs font-bold text-slate-300">Flujo Completo de 10 Pasos</span>
+                          </div>
+                          <h4 className="text-xl font-black text-white font-display flex items-center gap-2">
+                            Sistema Administrativo & Almacén
+                          </h4>
+                          <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                            Accede al panel integral: Solicitudes de compra, Órdenes de Compra, Recepciones, Kardex de inventario en tiempo real, Vales de entrega a obra, Mermas, Cierre de proyectos, Caja Chica/Grande y Cuentas Bancarias.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setActiveTab('sistema_administrativo')}
+                          className="px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-blue-500/25 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer z-10"
+                        >
+                          <span>Abrir Sistema Administrativo</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+
                       {/* Stats Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 select-none">
                         {/* Stat 1 */}
@@ -1418,10 +1486,10 @@ export function Portal() {
                         </div>
                         {/* Stat 2 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Total Presupuestos</span>
-                            <h4 className="text-2xl font-black text-gold mt-2 font-display">{dashboardPresupuestos.length}</h4>
-                            <span className="text-[9px] text-cream-muted block mt-3">Registrados en Plataforma</span>
-                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Total Presupuestos</span>
+                          <h4 className="text-2xl font-black text-gold mt-2 font-display">{dashboardPresupuestos.length}</h4>
+                          <span className="text-[9px] text-cream-muted block mt-3">Registrados en Plataforma</span>
+                        </div>
                         {/* Stat 3 */}
                         <div className="border border-dark-4 bg-dark-2/50 rounded-2xl p-5 relative overflow-hidden shadow-sm">
                           <span className="text-[10px] font-black uppercase tracking-widest text-cream-dim">Disponibilidad Bot</span>
@@ -1437,8 +1505,6 @@ export function Portal() {
                       </div>
                     </div>
                   )}
-
-
 
                   {/* MASTER TAB 3: CMS CONTENT EDITOR */}
                   {activeTab === 'clientes' && (
@@ -2054,6 +2120,21 @@ export function Portal() {
 
               {activeTab === 'legal' && (
                 <LegalTab initialBudgetId={legalTargetBudgetId} />
+              )}
+
+              {activeTab === 'sistema_administrativo' && (
+                <div className="-m-6 lg:-m-8 animate-fade-in">
+                  <SistemaAdministrativoApp
+                    userRole={currentUser.role}
+                    userName={currentUser.name}
+                    onBackToPortal={() => setActiveTab('dashboard')}
+                    onNavigateToOficios={(folio) => {
+                      localStorage.setItem('esol_legal_active_subtab', 'oficios');
+                      if (folio) localStorage.setItem('esol_oficio_editing_target', folio);
+                      setActiveTab('legal');
+                    }}
+                  />
+                </div>
               )}
 
               {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'cfeconfig' && (
