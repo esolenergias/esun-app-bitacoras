@@ -17,7 +17,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     login,
     register,
     verifyCode,
-    loginWithGoogle
+    loginWithGoogle,
+    quickAccessLogin
   } = useApp();
 
   // Auth fields
@@ -329,6 +330,23 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     </>
                   )}
                 </button>
+
+                <div className="pt-2 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => quickAccessLogin('master')}
+                    className="text-[10px] px-3 py-1 bg-dark-3 hover:bg-gold/20 text-gold border border-gold/30 rounded-lg transition-colors font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    👑 Acceso Master
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => quickAccessLogin('admin')}
+                    className="text-[10px] px-3 py-1 bg-dark-3 hover:bg-cream/10 text-cream-muted hover:text-cream border border-dark-4 rounded-lg transition-colors font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    💼 Admin
+                  </button>
+                </div>
               </form>
             )}
           </div>

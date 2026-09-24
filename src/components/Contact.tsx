@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Phone, Mail, MapPin, Send, CheckCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { generateAIContent } from '../lib/aiService';
 
 interface Message {
   id: string;
@@ -20,6 +21,14 @@ const getGeminiApiKey = (): string => {
   let apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
   if (!apiKey || apiKey === 'undefined' || apiKey === 'null') {
     apiKey = localStorage.getItem('cfe_gemini_api_key') || '';
+  }
+  return apiKey.trim().replace(/^["']|["']$/g, '');
+};
+
+const getSiliconFlowApiKey = (): string => {
+  let apiKey = import.meta.env.VITE_SILICON_FLOW_API_KEY || '';
+  if (!apiKey || apiKey === 'undefined' || apiKey === 'null') {
+    apiKey = localStorage.getItem('esol_silicon_flow_api_key') || '';
   }
   return apiKey.trim().replace(/^["']|["']$/g, '');
 };
@@ -208,8 +217,9 @@ export function Contact() {
 
     try {
       const apiKey = getGeminiApiKey();
+      const siliconKey = getSiliconFlowApiKey();
       
-      if (!apiKey) {
+      if (!apiKey && !siliconKey) {
         setMessages(prev => [
           ...prev,
           {
@@ -244,45 +254,27 @@ ${getPageContentContext()}
 - Teléfono del Cliente: ${currentContext.phone}
 - Cotización en Curso: ${currentContext.details} (${currentContext.amount})`;
 
-      // Format alternating history. Must start with 'user' role
-      const formattedContents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+      const messagesForAI: any[] = [{ role: 'system', content: systemPromptText }];
       const userStartIndex = updatedMessages.findIndex(m => m.sender === 'user');
       
       if (userStartIndex !== -1) {
         const chatHistoryToSend = updatedMessages.slice(userStartIndex);
         for (const m of chatHistoryToSend) {
-          const role = m.sender === 'user' ? 'user' : 'model';
-          if (formattedContents.length > 0 && formattedContents[formattedContents.length - 1].role === role) {
-            // Combine consecutive messages of the same sender to avoid Gemini validation errors
-            formattedContents[formattedContents.length - 1].parts[0].text += "\n" + m.text;
-          } else {
-            formattedContents.push({
-              role: role,
-              parts: [{ text: m.text }]
-            });
-          }
+          messagesForAI.push({
+            role: m.sender === 'user' ? 'user' : 'assistant',
+            content: m.text
+          });
         }
       }
 
-      const payload = {
-        systemInstruction: {
-          parts: [{ text: systemPromptText }]
-        },
-        contents: formattedContents
-      };
-
-      let geminiRes = await fetchGeminiWithRetry(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }
+      const siliconApiKey = getSiliconFlowApiKey();
+      const rawReply = await generateAIContent(
+        messagesForAI,
+        apiKey,
+        siliconApiKey,
+        model,
+        0.4
       );
-
-      if (geminiRes.ok) {
-        const resultJson = await geminiRes.json();
-        const rawReply = resultJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
         
         let replyText = '';
         // Parse response and metadata
@@ -346,24 +338,7 @@ ${getPageContentContext()}
         };
         setMessages(prev => [...prev, botMsg]);
 
-      } else {
-        const errStatus = geminiRes.status;
-        console.error(`Gemini API returned error status ${errStatus}`);
-        
-        let userMessageText = 'Disculpa, en este momento el canal de consulta inteligente está recibiendo una gran cantidad de mensajes. ☀️ Por favor, intenta de nuevo en unos segundos, o si prefieres, con gusto te atenderemos directamente por WhatsApp al 3112343034.';
-        
-        if (errStatus === 403 || errStatus === 400) {
-          userMessageText = 'Hola, disculpa. Parece que hay un inconveniente temporal de configuración con nuestro servicio de asesoría. Si gustas, puedes contactarnos directamente por WhatsApp al 3112343034 para ayudarte de inmediato.';
-        }
-        
-        const botMsg: Message = {
-          id: `bot-err-${Date.now()}`,
-          text: userMessageText,
-          sender: 'bot',
-          timestamp: getFormattedTime()
-        };
-        setMessages(prev => [...prev, botMsg]);
-      }
+
     } catch (err: any) {
       console.error("Chatbot Error: ", err);
       const errMsg: Message = {

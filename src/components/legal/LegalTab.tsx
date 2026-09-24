@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool, Award, UserCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool, Award, UserCheck, ScrollText } from 'lucide-react';
 import ContratosPanelesTab from './ContratosPanelesTab';
 import SubcontratacionTab from './SubcontratacionTab';
+import OficiosTab from './oficios/OficiosTab';
 import InstaladoresManagerTab from './InstaladoresManagerTab';
 import ExtensionGarantiaTab from './ExtensionGarantiaTab';
 import PolizaGarantiaTab from './PolizaGarantiaTab';
@@ -9,11 +10,33 @@ import PersonalTab from './PersonalTab';
 
 interface LegalTabProps {
   initialBudgetId?: string | null;
+  initialSubTab?: 'contratos_paneles' | 'subcontratacion' | 'oficios' | 'extension_garantia' | 'poliza_garantia' | 'personal' | 'instaladores' | 'ajustes';
 }
 
-export default function LegalTab({ initialBudgetId }: LegalTabProps) {
-  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'extension_garantia' | 'poliza_garantia' | 'personal' | 'instaladores' | 'ajustes'>('contratos_paneles');
+export default function LegalTab({ initialBudgetId, initialSubTab }: LegalTabProps) {
+  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'oficios' | 'extension_garantia' | 'poliza_garantia' | 'personal' | 'instaladores' | 'ajustes'>(() => {
+    if (localStorage.getItem('esol_oficio_editing_target')) {
+      return 'oficios';
+    }
+    const saved = localStorage.getItem('esol_legal_active_subtab');
+    if (saved) {
+      localStorage.removeItem('esol_legal_active_subtab');
+      return saved as any;
+    }
+    return initialSubTab || 'contratos_paneles';
+  });
   const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem('esol_make_webhook_url') || '');
+
+  useEffect(() => {
+    if (localStorage.getItem('esol_oficio_editing_target')) {
+      setLegalSubTab('oficios');
+    }
+    const saved = localStorage.getItem('esol_legal_active_subtab');
+    if (saved) {
+      setLegalSubTab(saved as any);
+      localStorage.removeItem('esol_legal_active_subtab');
+    }
+  }, [initialBudgetId, initialSubTab]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -25,7 +48,7 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
             Legal Esol
           </h2>
           <p className="text-cream-muted text-sm mt-1">
-            Gestión de contratos, pólizas de garantía multidisciplinarias, notificaciones y recibos oficiales.
+            Gestión de contratos, pólizas de garantía multidisciplinarias, oficios de obra, notificaciones y recibos oficiales.
           </p>
         </div>
       </div>
@@ -54,6 +77,18 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
           >
             <HardHat className="w-4 h-4" />
             Subcontratación
+          </button>
+
+          <button
+            onClick={() => setLegalSubTab('oficios')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              legalSubTab === 'oficios'
+                ? 'border-gold text-gold bg-gold/5'
+                : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
+            }`}
+          >
+            <ScrollText className="w-4 h-4" />
+            Oficios
           </button>
 
           <button
@@ -128,6 +163,10 @@ export default function LegalTab({ initialBudgetId }: LegalTabProps) {
 
         {legalSubTab === 'subcontratacion' && (
           <SubcontratacionTab initialBudgetId={initialBudgetId} />
+        )}
+
+        {legalSubTab === 'oficios' && (
+          <OficiosTab initialBudgetId={initialBudgetId} />
         )}
 
         {legalSubTab === 'extension_garantia' && (

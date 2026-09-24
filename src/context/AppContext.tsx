@@ -21,6 +21,12 @@ export interface B2BProduct {
   tiers: VolumeTier[];
   active: boolean;
   stock: number;
+  solarSpecs?: {
+    wp?: number;
+    voc?: number;
+    maxVdc?: number;
+    kw?: number;
+  };
 }
 
 export interface User {
@@ -122,6 +128,10 @@ interface AppContextType {
   // Gemini API Key Management
   globalGeminiApiKey: string;
   updateGeminiApiKey: (key: string) => Promise<void>;
+
+  // Silicon Flow API Key Management
+  siliconFlowApiKey: string;
+  updateSiliconFlowApiKey: (key: string) => Promise<void>;
 
   // SEO Management (Master)
   seoData: SEOData;
@@ -341,7 +351,8 @@ const initialProducts: B2BProduct[] = [
       { minQty: 30, price: 2712, label: "Distribuidor (30+ pzs)" }
     ],
     stock: 50,
-    active: true
+    active: true,
+    solarSpecs: { wp: 615, voc: 55.4 }
   },
   {
     id: "prod-867dyli",
@@ -357,7 +368,8 @@ const initialProducts: B2BProduct[] = [
       { minQty: 30, price: 2538, label: "Distribuidor (30+ módulos)" }
     ],
     stock: 50,
-    active: true
+    active: true,
+    solarSpecs: { wp: 550, voc: 49.6 }
   },
   {
     id: "prod-q6nebff",
@@ -373,7 +385,8 @@ const initialProducts: B2BProduct[] = [
       { minQty: 30, price: 2821, label: "Distribuidor (30+ módulos)" }
     ],
     stock: 50,
-    active: true
+    active: true,
+    solarSpecs: { wp: 580, voc: 52.06 }
   },
   {
     id: "prod-m4mtfnx",
@@ -389,7 +402,8 @@ const initialProducts: B2BProduct[] = [
       { minQty: 30, price: 10638, label: "Distribuidor (30+ equipos)" }
     ],
     stock: 50,
-    active: true
+    active: true,
+    solarSpecs: { kw: 6, maxVdc: 600 }
   },
   {
     id: "prod-vvq92g5",
@@ -405,7 +419,8 @@ const initialProducts: B2BProduct[] = [
       { minQty: 30, price: 5480, label: "Distribuidor (30+ equipos)" }
     ],
     stock: 50,
-    active: true
+    active: true,
+    solarSpecs: { kw: 3.3, maxVdc: 550 }
   },
   {
     id: "prod-8efy6a4",
@@ -421,7 +436,8 @@ const initialProducts: B2BProduct[] = [
       { minQty: 30, price: 4814, label: "Distribuidor (30+ equipos)" }
     ],
     stock: 50,
-    active: true
+    active: true,
+    solarSpecs: { kw: 2, maxVdc: 60 }
   },
   {
     id: "prod-d8m2xnl",
@@ -438,6 +454,142 @@ const initialProducts: B2BProduct[] = [
     ],
     stock: 50,
     active: true
+  },
+  {
+    id: "prod-grwt-min3k",
+    category: "Inversores",
+    name: "Growatt MIN 3000TL-X",
+    brand: "Growatt",
+    basePrice: 6500,
+    unit: "equipo",
+    specs: ["Potencia: 3kW", "Max Vdc: 500V", "Fases: 1"],
+    tiers: [
+      { minQty: 1, price: 6500, label: "Precio Regular" },
+      { minQty: 11, price: 6100, label: "Mayoreo (11+ equipos)" },
+      { minQty: 30, price: 5800, label: "Distribuidor (30+ equipos)" }
+    ],
+    stock: 50,
+    active: true,
+    solarSpecs: { kw: 3, maxVdc: 500 }
+  },
+  {
+    id: "prod-grwt-min5k",
+    category: "Inversores",
+    name: "Growatt MIN 5000TL-X",
+    brand: "Growatt",
+    basePrice: 9200,
+    unit: "equipo",
+    specs: ["Potencia: 5kW", "Max Vdc: 550V", "Fases: 1"],
+    tiers: [
+      { minQty: 1, price: 9200, label: "Precio Regular" },
+      { minQty: 11, price: 8600, label: "Mayoreo (11+ equipos)" },
+      { minQty: 30, price: 8000, label: "Distribuidor (30+ equipos)" }
+    ],
+    stock: 50,
+    active: true,
+    solarSpecs: { kw: 5, maxVdc: 550 }
+  },
+  {
+    id: "prod-grwt-min10k",
+    category: "Inversores",
+    name: "Growatt MIN 10000TL-X",
+    brand: "Growatt",
+    basePrice: 15500,
+    unit: "equipo",
+    specs: ["Potencia: 10kW", "Max Vdc: 600V", "Fases: 1"],
+    tiers: [
+      { minQty: 1, price: 15500, label: "Precio Regular" },
+      { minQty: 11, price: 14500, label: "Mayoreo (11+ equipos)" },
+      { minQty: 30, price: 13500, label: "Distribuidor (30+ equipos)" }
+    ],
+    stock: 50,
+    active: true,
+    solarSpecs: { kw: 10, maxVdc: 600 }
+  },
+  {
+    id: "prod-grwt-mac15k",
+    category: "Inversores",
+    name: "Growatt MAC 15KTL3-XL",
+    brand: "Growatt",
+    basePrice: 22000,
+    unit: "equipo",
+    specs: ["Potencia: 15kW", "Max Vdc: 1100V", "Fases: 3"],
+    tiers: [
+      { minQty: 1, price: 22000, label: "Precio Regular" },
+      { minQty: 11, price: 20500, label: "Mayoreo (11+ equipos)" },
+      { minQty: 30, price: 19000, label: "Distribuidor (30+ equipos)" }
+    ],
+    stock: 50,
+    active: true,
+    solarSpecs: { kw: 15, maxVdc: 1100 }
+  },
+  {
+    id: "prod-grwt-mac30k",
+    category: "Inversores",
+    name: "Growatt MAC 30KTL3-X",
+    brand: "Growatt",
+    basePrice: 38000,
+    unit: "equipo",
+    specs: ["Potencia: 30kW", "Max Vdc: 1100V", "Fases: 3"],
+    tiers: [
+      { minQty: 1, price: 38000, label: "Precio Regular" },
+      { minQty: 11, price: 35500, label: "Mayoreo (11+ equipos)" },
+      { minQty: 30, price: 33000, label: "Distribuidor (30+ equipos)" }
+    ],
+    stock: 50,
+    active: true,
+    solarSpecs: { kw: 30, maxVdc: 1100 }
+  },
+  {
+    id: "prod-grwt-mac50k",
+    category: "Inversores",
+    name: "Growatt MAC 50KTL3-X LV",
+    brand: "Growatt",
+    basePrice: 62000,
+    unit: "equipo",
+    specs: ["Potencia: 50kW", "Max Vdc: 1100V", "Fases: 3"],
+    tiers: [
+      { minQty: 1, price: 62000, label: "Precio Regular" },
+      { minQty: 11, price: 58000, label: "Mayoreo (11+ equipos)" },
+      { minQty: 30, price: 54000, label: "Distribuidor (30+ equipos)" }
+    ],
+    stock: 50,
+    active: true,
+    solarSpecs: { kw: 50, maxVdc: 1100 }
+  },
+  {
+    id: "prod-grwt-max80k",
+    category: "Inversores",
+    name: "Growatt MAX 80KTL3-LV",
+    brand: "Growatt",
+    basePrice: 95000,
+    unit: "equipo",
+    specs: ["Potencia: 80kW", "Max Vdc: 1100V", "Fases: 3"],
+    tiers: [
+      { minQty: 1, price: 95000, label: "Precio Regular" },
+      { minQty: 11, price: 90000, label: "Mayoreo (11+ equipos)" },
+      { minQty: 30, price: 85000, label: "Distribuidor (30+ equipos)" }
+    ],
+    stock: 50,
+    active: true,
+    solarSpecs: { kw: 80, maxVdc: 1100 }
+  },
+  {
+    id: "prod-grwt-max100k",
+    category: "Inversores",
+    name: "Growatt MAX 100KTL3-X LV",
+    brand: "Growatt",
+    basePrice: 125000,
+    unit: "equipo",
+    specs: ["Potencia: 100kW", "Max Vdc: 1100V", "Fases: 3"],
+    tiers: [
+      { minQty: 1, price: 125000, label: "Precio Regular" },
+      { minQty: 11, price: 118000, label: "Mayoreo (11+ equipos)" },
+      { minQty: 30, price: 110000, label: "Distribuidor (30+ equipos)" }
+    ],
+    stock: 50,
+    active: true,
+    solarSpecs: { kw: 100, maxVdc: 1100 }
   }
 ];
 
@@ -510,10 +662,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (storedProducts) {
       try {
         const loaded = JSON.parse(storedProducts);
-        if (loaded && loaded.some((p: any) => p.id === 'ja-550w' || p.id === 'zn-450w' || p.id === 'solis-10kw')) {
-          console.log("Cleaning up old products in localStorage...");
-          localStorage.setItem('esol_b2b_products', JSON.stringify(initialProducts));
-          setProducts(initialProducts);
+        
+        // Ensure all initialProducts (like the new Growatt inverters or updated solarSpecs) are merged in
+        let merged = false;
+        const newLoaded = [...loaded];
+        for (const initProd of initialProducts) {
+          const existingIndex = newLoaded.findIndex(p => p.id === initProd.id);
+          if (existingIndex === -1) {
+            newLoaded.push(initProd);
+            merged = true;
+          } else {
+            // Check if it's missing solarSpecs that we just added
+            if (initProd.solarSpecs && !newLoaded[existingIndex].solarSpecs) {
+              newLoaded[existingIndex] = { ...newLoaded[existingIndex], solarSpecs: initProd.solarSpecs };
+              merged = true;
+            }
+          }
+        }
+
+        if (merged || (loaded && loaded.some((p: any) => p.id === 'ja-550w' || p.id === 'zn-450w' || p.id === 'solis-10kw'))) {
+          // If we had old bad products, filter them out
+          const cleaned = newLoaded.filter(p => p.id !== 'ja-550w' && p.id !== 'zn-450w' && p.id !== 'solis-10kw');
+          console.log("Merging/Cleaning up products in localStorage...");
+          localStorage.setItem('esol_b2b_products', JSON.stringify(cleaned));
+          setProducts(cleaned);
         }
       } catch (e) {
         localStorage.setItem('esol_b2b_products', JSON.stringify(initialProducts));
@@ -581,9 +753,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.error("Error fetching user profile:", e);
         }
       } else {
-        // Logged out
-        setCurrentUser(null);
-        localStorage.removeItem('esol_current_user');
+        // Solo borrar usuario si hubo un logout explícito, permitiendo persistir sesiones de desarrollo local
+        if (_event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          localStorage.removeItem('esol_current_user');
+        }
       }
     });
 
@@ -724,6 +898,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return localStorage.getItem('cfe_gemini_api_key') || '';
   });
 
+  // Silicon Flow API Key State
+  const [siliconFlowApiKey, setSiliconFlowApiKey] = useState<string>(() => {
+    return localStorage.getItem('esol_silicon_flow_api_key') || '';
+  });
+
   // Content State (Landing Page CMS)
   const [content, setContent] = useState<LandingPageContent>(() => {
     const stored = localStorage.getItem('esol_landing_content');
@@ -849,9 +1028,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const productsRow = cmsData.find(r => r.key === 'b2b_products');
           if (productsRow) {
             console.log("Loaded b2b_products from Supabase");
-            setProducts(productsRow.value as B2BProduct[]);
+            const dbProducts = productsRow.value as B2BProduct[];
+            
+            // Merge logic to ensure new hardcoded products (like Growatt inverters) make it to DB
+            let merged = false;
+            const newLoaded = [...dbProducts];
+            for (const initProd of initialProducts) {
+              const existingIndex = newLoaded.findIndex(p => p.id === initProd.id);
+              if (existingIndex === -1) {
+                newLoaded.push(initProd);
+                merged = true;
+              } else {
+                if (initProd.solarSpecs && !newLoaded[existingIndex].solarSpecs) {
+                  newLoaded[existingIndex] = { ...newLoaded[existingIndex], solarSpecs: initProd.solarSpecs };
+                  merged = true;
+                }
+              }
+            }
+            
+            // Clean old bad ones
+            const cleaned = newLoaded.filter(p => p.id !== 'ja-550w' && p.id !== 'zn-450w' && p.id !== 'solis-10kw');
+            if (cleaned.length !== dbProducts.length) merged = true;
+            
+            setProducts(cleaned);
+            if (merged) {
+              localStorage.setItem('esol_b2b_products', JSON.stringify(cleaned));
+              // It will sync back to Supabase automatically on next add/edit/delete, 
+              // or we can just leave it in state, but the user will see it instantly.
+            }
           }
-
           const geminiRow = cmsData.find(r => r.key === 'gemini_config');
           if (geminiRow) {
             console.log("Loaded gemini_config from Supabase");
@@ -1252,6 +1457,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateSiliconFlowApiKey = async (key: string) => {
+    setSiliconFlowApiKey(key);
+    localStorage.setItem('esol_silicon_flow_api_key', key);
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'master')) {
+      await saveCmsContentToDb('silicon_flow_config', key);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1279,6 +1492,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         triggerAgentSimulation,
         globalGeminiApiKey,
         updateGeminiApiKey,
+        siliconFlowApiKey,
+        updateSiliconFlowApiKey,
         seoData,
         updateSEO,
         theme,

@@ -12,13 +12,13 @@ export const SelectBrand: React.FC<SelectBrandProps> = ({ value, onChange, class
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as InverterBrand)}
-      className={`border border-gray-300 rounded-md px-3 py-2 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`}
+      className={`w-full bg-dark-1 border border-dark-4 rounded-xl px-4 py-2 text-cream focus:outline-none focus:ring-2 focus:ring-gold focus:border-transparent text-sm transition-all shadow-sm ${className}`}
       {...props}
     >
       <option value="" disabled>Seleccionar Marca</option>
-      <option value="Huawei">Huawei</option>
-      <option value="Growatt">Growatt</option>
-      <option value="Hoymiles">Hoymiles</option>
+      <option value="Huawei">Huawei (FusionSolar)</option>
+      <option value="Growatt">Growatt (OpenAPI)</option>
+      <option value="Hoymiles">Hoymiles (Miles API)</option>
     </select>
   );
 };

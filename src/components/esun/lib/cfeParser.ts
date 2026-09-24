@@ -1,7 +1,9 @@
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
+import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.js?url';
+import Tesseract from 'tesseract.js';
 
-// Configure worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// Configure worker locally via Vite
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export interface CFEHistoricPeriod {
   period: string;
@@ -25,6 +27,11 @@ export interface CFEData {
   last_payment_date?: string;
   last_payment_amount?: number;
   historic_periods?: CFEHistoricPeriod[];
+  city?: string;
+  client_email?: string;
+  client_phone?: string;
+  client_address?: string;
+  client_rfc?: string;
 }
 
 export async function extractTextFromPdf(file: File): Promise<string> {
@@ -49,23 +56,35 @@ export function parseCFEText(rawFullText: string): CFEData {
   console.log(fullText);
   console.log("======================================================");
 
+  // Detect CFE obfuscated PDFs (where embedded fonts lack unicode mapping)
+  const numbersCount = (fullText.match(/\d/g) || []).length;
+  const isObfuscated = numbersCount < 30 || fullText.includes("A238$/,");
+  
+  if (isObfuscated) {
+    throw new Error("Este formato de recibo CFE tiene la capa de texto cifrada u ofuscada por CFE (fuente sin mapa Unicode), por lo que no es posible leer los números automáticamente. Por favor, ingresa los datos manualmente o intenta con otro recibo.");
+  }
+
   // Normalize string: squash multiple spaces and line breaks into single spaces for easier regex matches
   const normalizedText = fullText.replace(/\s+/g, ' ');
 
   // 1. Tariff (search normalized string)
-  const tariffMatch = normalizedText.match(/Tarifa\s*:\s*([A-Z0-9]+)/i) || 
+  const tariffMatch = normalizedText.match(/TARIFA[\s:]*(PDBT|PDST|GDBT|GDMTO|GDMTH|DAC|1[A-F]?)/i) ||
+                      normalizedText.match(/Tarifa\s*:\s*([A-Z0-9]+)/i) || 
                       normalizedText.match(/Tarifa\s+([A-Z0-9]+)/i) ||
                       normalizedText.match(/\b(DAC|PDBT|GDBT|GDMTO|GDMTH|1[A-F]?)\b/i);
-  const tariff = tariffMatch ? tariffMatch[1].toUpperCase() : 'DAC';
+  let tariff = tariffMatch ? tariffMatch[1].toUpperCase() : 'DAC';
+  // OCR Correction
+  if (tariff.startsWith('PDST') || tariff.startsWith('PDBTNO')) tariff = 'PDBT';
 
   // 2. Service Number (remove spaces in matched output)
   const serviceMatch = normalizedText.match(/(?:Núm(?:ero)?|No\.?)(?:\s+de)?\s+Servicio[\s:]*([\d\s]{12,18})/i) ||
                        normalizedText.match(/\b(\d{12,18})\b/);
 
   // 3. Total MXN Amount
-  const totalMatch = normalizedText.match(/Total\s+a\s+[Pp]agar\s*[\$:\s]*\s*([\d,]+\.?\d*)/i) ||
+  const totalMatch = normalizedText.match(/Total\s*a\s*[Pp]agar\s*[\$:\s]*\s*([\d,]+\.?\d*)/i) ||
+                     normalizedText.match(/TOTALAPAGAR\s*[\$:\s\w]*\s*([\d,]+\.?\d*)/i) ||
                      normalizedText.match(/Cargo\s+Límite\s*[\$:\s]*\s*([\d,]+\.?\d*)/i) ||
-                     normalizedText.match(/Total\s*[\$:\s]*\s*([\d,]+\.?\d*)\s*Pago/i);
+                     normalizedText.match(/Total\s*[\$:\s]*\s*([\d,]+\.\d{2})\b/i);
 
   // 4. Demand kW
   const demandMatch = normalizedText.match(/Demanda\s*:\s*(\d+\.?\d*)\s*kW/i) ||
@@ -131,16 +150,23 @@ export function parseCFEText(rawFullText: string): CFEData {
   }
 
   // 7. Extract Period Match
+  // OCR often confuses '1' with "'" or '"', so we allow those characters
   const periodMatch = normalizedText.match(/PERIODO FACTURADO\s*:\s*([\d\s\w-]{10,25})/i) ||
-                      normalizedText.match(/PERIODO\s+FACTURADO\s*:\s*([\d\s\w-]{10,25})/i);
-  const current_period = periodMatch ? periodMatch[1].replace(/-/g, ' - ').replace(/\s+/g, ' ').trim() : undefined;
+                      normalizedText.match(/PERIODO\s+FACTURADO\s*:\s*([\d\s\w-]{10,25})/i) ||
+                      normalizedText.match(/PERIODO\s+FACTURADO[\s:]*([\'\"\d\w\s-]+(?:2[0-9]))/i);
+  let current_period = periodMatch ? periodMatch[1].replace(/-/g, ' - ').replace(/\s+/g, ' ').trim() : undefined;
+  
+  // Clean OCR noise from period (e.g., '5 -> 15)
+  if (current_period) {
+    current_period = current_period.replace(/^[\'\"]/, '1').replace(/\s+[\'\"](\d)/, ' 1$1');
+  }
 
   // 8. Extract Historic Periods: Period, kWh, Amount
   const historic_periods: CFEHistoricPeriod[] = [];
   
   // Strategy A: Direct line-by-line regex match for table rows (Mes Año kWh Importe)
-  // Coincides on the end of the line, ignoring payment status if present
-  const tableRowRegex = /\b(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\s+(\d{2})\s+(\d+)\s+\$?([\d,]+(?:\.\d{2})?)\b/gi;
+  // OCR often inserts spaces randomly, so we allow extra spaces and commas/dots
+  const tableRowRegex = /\b(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\s+(\d{2})\s+(\d{2,5})\s+\$?([\d,]+(?:\.\d{2})?)\b/gi;
   let hMatch;
   while ((hMatch = tableRowRegex.exec(normalizedText)) !== null) {
     historic_periods.push({
@@ -148,6 +174,21 @@ export function parseCFEText(rawFullText: string): CFEData {
       kwh: parseInt(hMatch[3]),
       amount: parseFloat(hMatch[4].replace(/,/g, ''))
     });
+  }
+
+  // Strategy B: PDBT/GDBT historical table (del DD MES YY al DD MES YY kWh Importe)
+  // OCR often mangles the amount in these tables (e.g., S8M7O00 instead of $8,879.00), so we only capture the kWh.
+  if (historic_periods.length === 0) {
+    // Ultra tolerant regex: allows missing 'del', weird 'al', missing spaces.
+    const pdbtTableRegex = /(?:de[lI1!]\s*)?(\d{1,2})\s*([A-Z]{3})\s*(\d{2})\s*(?:a[lI1!]\s*|a\s+)(\d{1,2})\s*([A-Z]{3})\s*(\d{2})\s*(\d{1,6})/gi;
+    let pMatch;
+    while ((pMatch = pdbtTableRegex.exec(normalizedText)) !== null) {
+      historic_periods.push({
+        period: `${pMatch[5]} ${pMatch[6]}`, // e.g. ABR 26
+        kwh: parseInt(pMatch[7]),
+        amount: 0 // Amount is usually illegible in OCR for this format
+      });
+    }
   }
 
   // Strategy B: Proximity-based extraction if desynced columns (PDF.js reads column blocks separately)
@@ -243,9 +284,11 @@ export function parseCFEText(rawFullText: string): CFEData {
 
   if (consumption === null || isNaN(consumption) || consumption <= 0) {
     // Strategy C: Table-based residential "Diferencia Totales Energía <Current> <Previous> <Diff>"
-    const tableMatch = normalizedText.match(/(?:Diferencia\s+Totales\s+Energía|Energía)\s+(\d+)\s+(\d+)\s+(\d+)/i);
+    // OCR correction: it might read "Energía (kWh) 207 870 1.207"
+    const tableMatch = normalizedText.match(/(?:Diferencia\s+Totales\s+Energía|Energía(?:\s*\(kWh\))?)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/i);
     if (tableMatch) {
-      consumption = parseInt(tableMatch[3]);
+      // Remove dots that Tesseract OCR might mistakenly insert instead of commas
+      consumption = parseInt(tableMatch[3].replace(/[.,]/g, ''));
     }
   }
 
@@ -283,4 +326,91 @@ export function parseCFEText(rawFullText: string): CFEData {
 export async function parseCFEPdf(file: File): Promise<CFEData> {
   const text = await extractTextFromPdf(file);
   return parseCFEText(text);
+}
+
+export async function renderPdfToCanvases(file: File): Promise<HTMLCanvasElement[]> {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const canvases: HTMLCanvasElement[] = [];
+  const maxPages = Math.min(pdf.numPages, 3); // Max 3 pages to avoid memory/time overload
+  
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await pdf.getPage(i);
+    const scale = 3.0; // Max scale for best OCR accuracy on tiny numbers
+    const viewport = page.getViewport({ scale });
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error("Canvas context not available");
+    
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    
+    await page.render({
+      canvasContext: context,
+      viewport: viewport
+    }).promise;
+    
+    canvases.push(canvas);
+  }
+  
+  return canvases;
+}
+
+export async function extractTextWithOCR(canvases: HTMLCanvasElement[], onProgress?: (msg: string) => void): Promise<string> {
+  if (onProgress) onProgress("Iniciando motor de IA OCR...");
+  
+  const worker = await Tesseract.createWorker('spa', 1, {
+    logger: m => {
+      if (m.status === 'recognizing text' && onProgress) {
+        onProgress(`Analizando imagen... ${Math.round(m.progress * 100)}%`);
+      }
+    }
+  });
+  
+  let fullText = "";
+  for (let i = 0; i < canvases.length; i++) {
+    const canvas = canvases[i];
+    
+    // For Page 2 (index 1), CFE PDBT bills have the historic table at the top-left.
+    // Tesseract struggles with the full page due to the bar chart. We will crop and scale the table area.
+    if (i === 1) {
+      if (onProgress) onProgress(`Enfocando IA en tabla histórica (página 2)...`);
+      
+      const cropCanvas = document.createElement('canvas');
+      const cropCtx = cropCanvas.getContext('2d');
+      if (cropCtx) {
+        // Top-Left quadrant: ~45% width, ~35% height
+        const cropW = canvas.width * 0.45;
+        const cropH = canvas.height * 0.35;
+        // Scale up 2x for even higher quality OCR on tiny numbers
+        cropCanvas.width = cropW * 2;
+        cropCanvas.height = cropH * 2;
+        
+        // Disable smoothing for sharp edges
+        cropCtx.imageSmoothingEnabled = false;
+        
+        // Draw the cropped region scaled up
+        cropCtx.drawImage(
+          canvas, 
+          0, 0, cropW, cropH, // Source (top-left)
+          0, 0, cropCanvas.width, cropCanvas.height // Destination
+        );
+        
+        await worker.setParameters({ tessedit_pageseg_mode: '6' }); // Uniform block of text
+        const { data: { text: tableText } } = await worker.recognize(cropCanvas);
+        await worker.setParameters({ tessedit_pageseg_mode: '3' }); // Reset to Auto
+        
+        fullText += tableText + "\n";
+      }
+    }
+    
+    // Normal OCR for the whole page
+    if (onProgress) onProgress(`Extrayendo texto general (página ${i+1}/${canvases.length})...`);
+    const { data: { text } } = await worker.recognize(canvas);
+    fullText += text + "\n";
+  }
+  
+  await worker.terminate();
+  return fullText;
 }

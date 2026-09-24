@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, FileText, Sun, Calendar, TrendingUp, Edit3, Save, X, MapPin } from 'lucide-react';
+import { ArrowLeft, User, FileText, Sun, Calendar, TrendingUp, Edit3, Save, X, MapPin, ScrollText, Download, Cloud, Eye, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../context/supabase';
+import type { OficioData } from '../legal/oficios/types';
+import OficioPreviewModal from '../legal/oficios/OficioPreviewModal';
+import { generateOficioPdf } from '../legal/oficios/oficioPdfGenerator';
+import { getNextFolio } from '../legal/oficios/OficiosTab';
 
 interface ClienteDetailProps {
   cliente: any;
@@ -14,6 +18,8 @@ export default function ClienteDetail({ cliente: initialCliente, onBack, onNavig
   const [editForm, setEditForm] = useState(initialCliente);
   const [presupuestos, setPresupuestos] = useState<any[]>([]);
   const [esunQuotes, setEsunQuotes] = useState<any[]>([]);
+  const [oficios, setOficios] = useState<OficioData[]>([]);
+  const [selectedPreviewOficio, setSelectedPreviewOficio] = useState<OficioData | null>(null);
   const [loading, setLoading] = useState(true);
   
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
@@ -53,24 +59,197 @@ export default function ClienteDetail({ cliente: initialCliente, onBack, onNavig
         setPresupuestos(presData);
       }
 
-      // 2. Fetch Esun quotes from localStorage
-      const storedEsun = localStorage.getItem('esun_quotes');
-      if (storedEsun) {
-        try {
-          const parsed = JSON.parse(storedEsun);
-          const relatedEsun = parsed.filter((q: any) => 
-            q.client_name?.toLowerCase().trim() === cliente.nombre_razon_social.toLowerCase().trim()
-          );
-          setEsunQuotes(relatedEsun);
-        } catch (e) {
-          console.error('Error parsing esun quotes', e);
+      // 2. Fetch Esun projects from Supabase esun_proyectos & local fallback
+      const { data: esunData, error: esunErr } = await supabase
+        .from('esun_proyectos')
+        .select('*')
+        .ilike('client_name', cliente.nombre_razon_social);
+
+      if (!esunErr && esunData && esunData.length > 0) {
+        setEsunQuotes(esunData);
+      } else {
+        const storedEsun = localStorage.getItem('esun_projects') || localStorage.getItem('esun_quotes');
+        if (storedEsun) {
+          try {
+            const parsed = JSON.parse(storedEsun);
+            const relatedEsun = parsed.filter((q: any) => 
+              q.client_name?.toLowerCase().trim() === cliente.nombre_razon_social.toLowerCase().trim()
+            );
+            setEsunQuotes(relatedEsun);
+          } catch (e) {
+            console.error('Error parsing esun quotes', e);
+          }
         }
+      }
+
+      // 3. Fetch Oficios eSol from Supabase & local fallback
+      try {
+        let loadedOficios: OficioData[] = [];
+        const clientNameClean = (cliente.nombre_razon_social || '').trim().toLowerCase();
+        const budgetIds = (presData || []).map((p: any) => p.id);
+
+        try {
+          const { data: oficiosData } = await supabase
+            .from('oficios_obra')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (oficiosData && oficiosData.length > 0) {
+            const mapped: OficioData[] = oficiosData.map((d: any) => ({
+              id: d.id,
+              folio: d.folio || '',
+              fecha: d.fecha || '',
+              lugar: d.lugar || 'Tepic, Nayarit',
+              presupuestoId: d.presupuesto_id || '',
+              nombreObra: d.nombre_obra || '',
+              ubicacionObra: d.ubicacion_obra || '',
+              clienteFinal: d.cliente_final || '',
+              tipoOficio: d.tipo_oficio || 'libre',
+              destinatarioTitulo: d.destinatario_titulo || '',
+              destinatarioNombre: d.destinatario_nombre || '',
+              destinatarioCargo: d.destinatario_cargo || '',
+              destinatarioEmpresa: d.destinatario_empresa || '',
+              destinatarioAtencion: d.destinatario_atencion || '',
+              asunto: d.asunto || '',
+              referencia: d.referencia || '',
+              vocativo: d.vocativo || '',
+              antecedentes: d.antecedentes || '',
+              cuerpo: d.cuerpo || '',
+              fundamentacion: d.fundamentacion || '',
+              peticion: d.peticion || '',
+              despedida: d.despedida || '',
+              remitenteNombre: d.remitente_nombre || 'Manuel de Jesus Fregoso Samaniega',
+              remitenteCargo: d.remitente_cargo || 'REPRESENTANTE LEGAL',
+              remitenteCedula: d.remitente_cedula || '',
+              empresaRazonSocial: d.empresa_razon_social || 'ESOL ENERGIAS',
+              empresaRFC: d.empresa_rfc || '',
+              empresaDomicilio: d.empresa_domicilio || 'Tepic, Nayarit, México',
+              empresaTelefono: d.empresa_telefono || '3112343034',
+              empresaEmail: d.empresa_email || '',
+              ccp: Array.isArray(d.ccp) ? d.ccp : [],
+              estado: d.estado || 'emitido',
+              drive_url: d.drive_url,
+              firmaDigital: d.firma_digital || undefined,
+              incluirFirmaDigital: d.incluir_firma_digital ?? true,
+              created_at: d.created_at,
+              updated_at: d.updated_at
+            }));
+            loadedOficios = mapped;
+          }
+        } catch (dbErr) {
+          console.warn('Error al cargar oficios de Supabase:', dbErr);
+        }
+
+        const localOficios = localStorage.getItem('esol_oficios_guardados_local');
+        if (localOficios) {
+          try {
+            const parsed: OficioData[] = JSON.parse(localOficios);
+            if (Array.isArray(parsed)) {
+              parsed.forEach(localItem => {
+                const exists = loadedOficios.some(o => o.id === localItem.id || o.folio === localItem.folio);
+                if (!exists) {
+                  loadedOficios.push(localItem);
+                }
+              });
+            }
+          } catch (e) {
+            console.error('Error parsing local oficios:', e);
+          }
+        }
+
+        const clientOficios = loadedOficios.filter((o: any) => {
+          const ofCliente = (o.clienteFinal || '').toLowerCase().trim();
+          const ofDest = (o.destinatarioNombre || '').toLowerCase().trim();
+          const ofEmpresa = (o.destinatarioEmpresa || '').toLowerCase().trim();
+          const matchesName = (ofCliente && (ofCliente.includes(clientNameClean) || clientNameClean.includes(ofCliente))) ||
+                              (ofDest && (ofDest.includes(clientNameClean) || clientNameClean.includes(ofDest))) ||
+                              (ofEmpresa && (ofEmpresa.includes(clientNameClean) || clientNameClean.includes(ofEmpresa)));
+          const matchesBudget = o.presupuestoId && budgetIds.includes(o.presupuestoId);
+          return matchesName || matchesBudget;
+        });
+
+        setOficios(clientOficios);
+      } catch (ofErr) {
+        console.warn('Error al cargar oficios del cliente:', ofErr);
       }
 
     } catch (err) {
       console.error('Error fetching client projects:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleOficioStatus = async (targetOficio: OficioData, newStatus: 'borrador' | 'emitido') => {
+    try {
+      const updated: OficioData = {
+        ...targetOficio,
+        estado: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        await supabase.from('oficios_obra').upsert({
+          id: updated.id,
+          folio: updated.folio,
+          fecha: updated.fecha,
+          lugar: updated.lugar,
+          presupuesto_id: updated.presupuestoId || null,
+          nombre_obra: updated.nombreObra,
+          ubicacion_obra: updated.ubicacionObra,
+          cliente_final: updated.clienteFinal,
+          tipo_oficio: updated.tipoOficio,
+          destinatario_titulo: updated.destinatarioTitulo,
+          destinatario_nombre: updated.destinatarioNombre,
+          destinatario_cargo: updated.destinatarioCargo,
+          destinatario_empresa: updated.destinatarioEmpresa,
+          destinatario_atencion: updated.destinatarioAtencion,
+          asunto: updated.asunto,
+          referencia: updated.referencia,
+          vocativo: updated.vocativo,
+          antecedentes: updated.antecedentes,
+          cuerpo: updated.cuerpo,
+          fundamentacion: updated.fundamentacion,
+          peticion: updated.peticion,
+          despedida: updated.despedida,
+          remitente_nombre: updated.remitenteNombre,
+          remitente_cargo: updated.remitenteCargo,
+          remitente_cedula: updated.remitenteCedula,
+          empresa_razon_social: updated.empresaRazonSocial,
+          empresa_rfc: updated.empresaRFC,
+          empresa_domicilio: updated.empresaDomicilio,
+          empresa_telefono: updated.empresaTelefono,
+          empresa_email: updated.empresaEmail,
+          ccp: updated.ccp,
+          estado: newStatus,
+          drive_url: updated.drive_url || null,
+          firma_digital: updated.firmaDigital || null,
+          incluir_firma_digital: updated.incluirFirmaDigital ?? true,
+          updated_at: updated.updated_at
+        });
+      } catch (dbErr) {
+        console.warn('Error al actualizar en Supabase:', dbErr);
+      }
+
+      try {
+        const local = localStorage.getItem('esol_oficios_guardados_local');
+        if (local) {
+          let list: OficioData[] = JSON.parse(local);
+          if (Array.isArray(list)) {
+            const idx = list.findIndex(o => o.id === updated.id || o.folio === updated.folio);
+            if (idx >= 0) {
+              list[idx] = updated;
+            } else {
+              list = [updated, ...list];
+            }
+            localStorage.setItem('esol_oficios_guardados_local', JSON.stringify(list));
+          }
+        }
+      } catch (lsErr) {}
+
+      setOficios(prev => prev.map(o => (o.id === updated.id || o.folio === updated.folio) ? updated : o));
+    } catch (err) {
+      console.error('Error toggling oficio status:', err);
     }
   };
 
@@ -322,7 +501,7 @@ export default function ClienteDetail({ cliente: initialCliente, onBack, onNavig
                         <span className="text-cream ml-5 break-words">{p.ubicacion || 'No especificada'}</span>
                       )}
                     </div>
-                    <div className="mt-3 pt-3 border-t border-dark-4/50 flex justify-end gap-2">
+                    <div className="mt-3 pt-3 border-t border-dark-4/50 flex justify-end gap-2 flex-wrap items-center">
                       {p.contrato_url ? (
                         <a 
                           href={p.contrato_url}
@@ -340,6 +519,24 @@ export default function ClienteDetail({ cliente: initialCliente, onBack, onNavig
                           <FileText className="w-3 h-3 opacity-50" /> Sin Contrato
                         </button>
                       )}
+
+                      {/* Oficios vinculados a este presupuesto */}
+                      {(() => {
+                        const bOficios = oficios.filter(o => o.presupuestoId === p.id);
+                        if (bOficios.length > 0) {
+                          return (
+                            <button
+                              onClick={() => setSelectedPreviewOficio(bOficios[0])}
+                              className="text-[10px] font-bold uppercase tracking-wider text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-amber-400/20 flex items-center gap-1"
+                              title="Ver Oficio de Obra"
+                            >
+                              <ScrollText className="w-3 h-3" /> Oficio ({bOficios.length})
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       <button 
                         onClick={() => onNavigateTo && onNavigateTo('cotizador', p.id)}
                         className="text-[10px] font-bold uppercase tracking-wider text-gold hover:text-gold-light hover:bg-gold/10 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-gold/20"
@@ -366,44 +563,256 @@ export default function ClienteDetail({ cliente: initialCliente, onBack, onNavig
               </p>
             ) : (
               <div className="space-y-3">
-                {esunQuotes.map(q => (
-                  <div key={q.id} className="bg-dark-2 border border-dark-4 p-4 rounded-xl hover:border-gold/30 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="font-bold text-cream">
-                        {q.system?.system_kWp?.toFixed(2)} kWp en {q.city || 'Ciudad Desconocida'}
+                {esunQuotes.map(q => {
+                  const firstProp = q.proposals && q.proposals.length > 0 ? q.proposals[0] : null;
+                  const kwp = q.system?.system_kWp || firstProp?.system?.installed_kWp || firstProp?.system?.system_kWp || 0;
+                  const investment = q.financial?.totalInvestment || firstProp?.financial?.investment_mxn || 0;
+                  const savings = q.financial?.savings25Years || firstProp?.financial?.savings_25yr || 0;
+                  const isOffgrid = q.project_type === 'off-grid' || Boolean(q.load_profile);
+
+                  return (
+                    <div key={q.id} className="bg-dark-2 border border-dark-4 p-4 rounded-xl hover:border-gold/30 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-bold text-cream flex items-center gap-2">
+                          <span>{kwp > 0 ? `${kwp.toFixed(2)} kWp` : 'Sistema Solar'}</span>
+                          <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${
+                            isOffgrid ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-gold/10 text-gold border border-gold/20'
+                          }`}>
+                            {isOffgrid ? 'Aislado (Baterías)' : 'Interconectado CFE'}
+                          </span>
+                        </div>
+                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-dark-4 text-cream-muted">
+                          {q.status || 'Borrador'}
+                        </span>
                       </div>
-                      <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-dark-4 text-cream-muted">
-                        {q.status || 'Borrador'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-cream-muted flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {new Date(q.created_at).toLocaleDateString()}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-dark-4/50">
-                      <div>
-                        <div className="text-[10px] text-cream-dim uppercase">Inversión</div>
-                        <div className="text-sm font-bold text-cream">${q.financial?.totalInvestment?.toLocaleString()}</div>
+                      <div className="text-xs text-cream-muted flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {new Date(q.created_at).toLocaleDateString()}
+                        {q.city && <span>• {q.city}</span>}
                       </div>
-                      <div>
-                        <div className="text-[10px] text-cream-dim uppercase">Ahorro 25 años</div>
-                        <div className="text-sm font-bold text-green-400">${q.financial?.savings25Years?.toLocaleString()}</div>
+                      <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-dark-4/50">
+                        <div>
+                          <div className="text-[10px] text-cream-dim uppercase">Inversión</div>
+                          <div className="text-sm font-bold text-cream">${Math.round(investment).toLocaleString()} MXN</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-cream-dim uppercase">{isOffgrid ? 'Propuestas' : 'Ahorro 25 años'}</div>
+                          <div className={`text-sm font-bold ${isOffgrid ? 'text-gold' : 'text-green-400'}`}>
+                            {isOffgrid ? `${q.proposals?.length || 1} diseño(s)` : `$${Math.round(savings).toLocaleString()}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-dark-4/50 flex justify-end gap-2">
+                        <button 
+                          onClick={() => onNavigateTo && onNavigateTo('esun', q.id)}
+                          className="text-[10px] font-bold uppercase tracking-wider text-gold hover:text-gold-light hover:bg-gold/10 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-gold/20"
+                        >
+                          Cargar en Esun Solar
+                        </button>
                       </div>
                     </div>
-                    <div className="mt-3 pt-3 border-t border-dark-4/50 flex justify-end gap-2">
-                      <button 
-                        onClick={() => onNavigateTo && onNavigateTo('esun', q.id)}
-                        className="text-[10px] font-bold uppercase tracking-wider text-gold hover:text-gold-light hover:bg-gold/10 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-gold/20"
-                      >
-                        Cargar Esun Solar
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
+
+          {/* OFICIOS DE OBRA DEL CLIENTE */}
+          <div className="md:col-span-2 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-dark-4 pb-2">
+              <h3 className="text-sm font-black uppercase tracking-widest text-cream-muted flex items-center gap-2">
+                <ScrollText className="w-4 h-4 text-gold" />
+                Oficios de Obra y Borradores ({oficios.length})
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const newDraftTarget = {
+                      folio: getNextFolio(),
+                      clienteFinal: cliente.nombre_razon_social,
+                      ubicacionObra: cliente.direccion || '',
+                      estado: 'borrador'
+                    };
+                    localStorage.setItem('esol_oficio_editing_target', JSON.stringify(newDraftTarget));
+                    localStorage.setItem('esol_legal_active_subtab', 'oficios');
+                    if (onNavigateTo) onNavigateTo('legal', 'oficios');
+                  }}
+                  className="text-xs text-dark-1 font-bold bg-gold hover:bg-gold-light px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                >
+                  <ScrollText className="w-3.5 h-3.5" />
+                  + Redactar Oficio
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.setItem('esol_legal_active_subtab', 'oficios');
+                    if (onNavigateTo) onNavigateTo('legal', 'oficios');
+                  }}
+                  className="text-xs text-cream-muted hover:text-gold hover:underline flex items-center gap-1 px-2 py-1"
+                >
+                  Ir al Módulo →
+                </button>
+              </div>
+            </div>
+
+            {oficios.length === 0 ? (
+              <div className="bg-dark-2 p-6 rounded-xl border border-dark-4/50 text-center space-y-2">
+                <ScrollText className="w-8 h-8 mx-auto text-gold/30" />
+                <p className="text-sm text-cream-muted">
+                  No se han generado oficios ni borradores para este cliente aún.
+                </p>
+                <button
+                  onClick={() => {
+                    const newDraftTarget = {
+                      folio: getNextFolio(),
+                      clienteFinal: cliente.nombre_razon_social,
+                      ubicacionObra: cliente.direccion || '',
+                      estado: 'borrador'
+                    };
+                    localStorage.setItem('esol_oficio_editing_target', JSON.stringify(newDraftTarget));
+                    localStorage.setItem('esol_legal_active_subtab', 'oficios');
+                    if (onNavigateTo) onNavigateTo('legal', 'oficios');
+                  }}
+                  className="text-xs text-gold hover:underline font-medium inline-block mt-1"
+                >
+                  Crear el primer oficio para {cliente.nombre_razon_social}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {oficios.map((of) => {
+                  const isDraft = of.estado === 'borrador';
+
+                  return (
+                    <div
+                      key={of.id || of.folio}
+                      className={`border rounded-xl p-4 transition-all flex flex-col justify-between gap-3 shadow-md ${
+                        isDraft
+                          ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60'
+                          : 'bg-dark-2 border-dark-4 hover:border-gold/40'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                          <span className="font-mono text-xs font-bold text-gold bg-gold/10 px-2 py-0.5 rounded border border-gold/20">
+                            {of.folio}
+                          </span>
+
+                          {isDraft ? (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40">
+                              Borrador
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/40">
+                              Emitido
+                            </span>
+                          )}
+
+                          <span className="text-[11px] text-cream-muted flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-gold/70" />
+                            {of.fecha}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-medium text-cream line-clamp-2 mb-1">
+                          {of.asunto || 'Sin asunto'}
+                        </h4>
+                        <p className="text-[10px] text-cream-muted">
+                          <strong>Destinatario:</strong> {of.destinatarioTitulo} {of.destinatarioNombre || '(Pendiente)'} {of.destinatarioEmpresa ? `(${of.destinatarioEmpresa})` : ''}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-dark-4/50 pt-2.5">
+                        {of.drive_url ? (
+                          <a
+                            href={of.drive_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20"
+                          >
+                            <Cloud className="w-3 h-3" /> Ver en Drive
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-cream-dim flex items-center gap-1">
+                            <ScrollText className="w-3 h-3 opacity-50" /> {isDraft ? 'Borrador' : 'Local'}
+                          </span>
+                        )}
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => handleToggleOficioStatus(of, isDraft ? 'emitido' : 'borrador')}
+                            className={`px-2 py-1 rounded-lg transition-colors text-[10px] font-semibold flex items-center gap-1 border ${
+                              isDraft
+                                ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-emerald-500/40'
+                                : 'bg-dark-3 hover:bg-amber-500/20 text-amber-300 border-dark-4 hover:border-amber-500/30'
+                            }`}
+                            title={isDraft ? 'Promover inmediatamente a Emitido' : 'Cambiar a Borrador'}
+                          >
+                            {isDraft ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Emitir</span>
+                              </>
+                            ) : (
+                              <>
+                                <Edit3 className="w-3 h-3 text-amber-400" />
+                                <span>Borrador</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              localStorage.setItem('esol_oficio_editing_target', JSON.stringify(of));
+                              localStorage.setItem('esol_legal_active_subtab', 'oficios');
+                              if (onNavigateTo) onNavigateTo('legal', 'oficios');
+                            }}
+                            className={`p-1.5 rounded-lg transition-colors text-xs flex items-center gap-1 border ${
+                              isDraft
+                                ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border-amber-500/40'
+                                : 'bg-dark-3 hover:bg-gold/20 text-cream-muted hover:text-gold border-dark-4'
+                            }`}
+                            title={isDraft ? 'Continuar editando borrador' : 'Editar este Oficio'}
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setSelectedPreviewOficio(of)}
+                            className="p-1.5 bg-dark-3 hover:bg-dark-4 text-gold rounded-lg transition-colors text-xs flex items-center gap-1 border border-dark-4"
+                            title="Ver Vista Previa"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => generateOficioPdf(of)}
+                            className="p-1.5 bg-dark-3 hover:bg-gold/20 text-cream-muted hover:text-gold rounded-lg transition-colors text-xs flex items-center gap-1 border border-dark-4"
+                            title="Descargar PDF"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
+      )}
+
+      {/* Modal de Vista Previa de Oficios */}
+      {selectedPreviewOficio && (
+        <OficioPreviewModal
+          isOpen={Boolean(selectedPreviewOficio)}
+          onClose={() => setSelectedPreviewOficio(null)}
+          oficio={selectedPreviewOficio}
+          onEdit={(of) => {
+            localStorage.setItem('esol_oficio_editing_target', JSON.stringify(of));
+            localStorage.setItem('esol_legal_active_subtab', 'oficios');
+            setSelectedPreviewOficio(null);
+            if (onNavigateTo) onNavigateTo('legal', 'oficios');
+          }}
+        />
       )}
     </div>
   );

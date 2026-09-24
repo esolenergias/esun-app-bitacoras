@@ -78,7 +78,7 @@ fun MantenimientosScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.syncMantenimientos() }) {
+                    IconButton(onClick = { viewModel.syncMantenimientos(isManual = true) }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Sincronizar", tint = GoldAccent)
                     }
                 },
@@ -175,7 +175,7 @@ fun MantenimientosScreen(
                                     }
                                 }
                             },
-                            onSync = { viewModel.syncMantenimientos() }
+                            onSync = { viewModel.syncMantenimientos(isManual = true) }
                         )
                     }
                 }

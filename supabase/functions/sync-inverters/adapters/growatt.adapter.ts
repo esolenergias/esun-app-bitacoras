@@ -1,4 +1,4 @@
-import { IInverterAdapter, DailyProductionResult } from "./index.ts";
+import { IInverterAdapter, DailyProductionResult, DiscoveredPlant } from "./index.ts";
 
 export class GrowattAdapter implements IInverterAdapter {
   private apiUser: string;
@@ -11,11 +11,41 @@ export class GrowattAdapter implements IInverterAdapter {
   }
 
   async authenticate(): Promise<void> {
-    // Growatt OpenAPI typically requires passing the token in the headers
-    // If we only have username/password, we would hit the login endpoint here.
-    // For OpenAPI, the token provided by Growatt is usually sufficient.
     if (!this.apiToken) {
       throw new Error("Growatt API requires a valid API token.");
+    }
+  }
+
+  async listPlants(): Promise<DiscoveredPlant[]> {
+    await this.authenticate();
+
+    try {
+      // GET /v1/plant/list
+      const url = new URL(`${this.baseUrl}/plant/list`);
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Token': this.apiToken!
+        }
+      });
+
+      if (!response.ok) throw new Error(`Growatt plant/list failed: ${response.statusText}`);
+
+      const data = await response.json();
+      if (data.error_code !== 0 || !data.data) return [];
+
+      const list = Array.isArray(data.data) ? data.data : data.data.plants || [];
+
+      return list.map((item: any) => ({
+        plant_id: String(item.plant_id || item.id),
+        plant_name: item.plant_name || item.name || 'Planta Growatt',
+        capacity_kwp: parseFloat(item.peak_power || item.nominal_power || 0) || 5.0,
+        address: item.city || item.country || '',
+        status: 'ACTIVE'
+      }));
+    } catch (e: any) {
+      console.error("Growatt listPlants Error:", e);
+      throw e;
     }
   }
 
@@ -23,8 +53,6 @@ export class GrowattAdapter implements IInverterAdapter {
     await this.authenticate();
 
     try {
-      // GET /v1/plant/energy
-      // Parameters usually: plant_id, date
       const url = new URL(`${this.baseUrl}/plant/energy`);
       url.searchParams.append('plant_id', plantId);
       url.searchParams.append('date', date);

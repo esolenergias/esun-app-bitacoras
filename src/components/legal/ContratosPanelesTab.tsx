@@ -368,12 +368,11 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
         contents: [{ parts }]
       };
 
-      // Model fallback order: initial selected model -> gemini-2.0-flash -> gemini-1.5-flash -> gemini-2.5-flash
       const modelsToTry = Array.from(new Set([
         initialModel,
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
-        'gemini-2.5-flash'
+        'gemini-3.5-flash',
+        'gemini-2.5-flash',
+        'gemini-flash-latest'
       ]));
 
       let res: Response | null = null;
@@ -1534,7 +1533,6 @@ export default function ContratosPanelesTab({ initialBudgetId }: ContratosPanele
     (window as any).updateSupabaseContract = async (driveUrl: string) => {
       if (!selectedBudget) return;
       try {
-        const { supabase } = await import('../../context/supabase');
         await supabase.from('presupuestos').update({ contrato_url: driveUrl }).eq('id', selectedBudget);
         console.log('✅ Contrato vinculado en CRM:', driveUrl);
       } catch(err) {

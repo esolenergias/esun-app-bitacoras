@@ -1,0 +1,49 @@
+[TAILING] Tailing last 30 lines for [esol-whatsapp] process (change the value with --lines option)
+/root/.pm2/logs/esol-whatsapp-error.log last 30 lines:
+0|esol-wha | ProtocolError: Protocol error (Runtime.callFunctionOn): Execution context was destroyed.
+0|esol-wha |     at Callback.<instance_members_initializer> (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/common/CallbackRegistry.ts:129:12)
+0|esol-wha |     at new Callback (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/common/CallbackRegistry.ts:134:3)
+0|esol-wha |     at CallbackRegistry.create (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/common/CallbackRegistry.ts:32:22)
+0|esol-wha |     at Connection._rawSend (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/cdp/Connection.ts:150:22)
+0|esol-wha |     at CdpCDPSession.send (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/cdp/CdpSession.ts:104:29)
+0|esol-wha |     at ExecutionContext.#evaluate (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:424:44)
+0|esol-wha |     at ExecutionContext.evaluate (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:293:32)
+0|esol-wha |     at IsolatedWorld.evaluate (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:196:26)
+0|esol-wha |     at CdpFrame.evaluate (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/api/Frame.ts:488:35)
+0|esol-wha |     at CdpFrame.<anonymous> (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/util/decorators.ts:63:21)
+0|esol-wha |     at CdpPage.evaluate (/var/www/esol-whatsapp/node_modules/puppeteer-core/src/api/Page.ts:2362:35)
+0|esol-wha |     at Client.inject (/var/www/esol-whatsapp/node_modules/whatsapp-web.js/src/Client.js:146:55)
+0|esol-wha |     at async Client.initialize (/var/www/esol-whatsapp/node_modules/whatsapp-web.js/src/Client.js:493:9)
+
+/root/.pm2/logs/esol-whatsapp-out.log last 30 lines:
+0|esol-wha | █▀▄█▀▀█▄▄ ▀ █▀ ▀█▀█ ██  ▄█▀ ▄▄▄▄▄▀▀ ▀ ██ ▄ ▄▄ ▄ ██▀▄▄  █ ▀█
+0|esol-wha | ██ ▀  ▄▄▄ ▀█▀█ ▄  ▀▀▄▀█▄▀ ▀ ▄▄▄  ▄ ██▄▄ █▀▀▀▄█▀▀█ ▄▄▄  ▄▀▀█
+0|esol-wha | ██▄▀  █▄█ ██  ▄█▄▄▄█ ▀██▀▄▄ █▄█ █▄ █▄▄▄  ▀▀██ ██▀ █▄█ ▄▀▄▄█
+0|esol-wha | ███▀▀ ▄▄▄▄ █▀█ ▄   ▄▄▄█ ▄█▄▄▄▄  ▄ ▄██▀▀▄▀ ▄▄█▀ ▀█ ▄▄▄ ▄█▀ █
+0|esol-wha | █▄▄▄▀ ▀▄▀▄▀   ▄██▄█  ▄▄ ▄█ ▀▀█▄▄██ ▄▀ ▄█▄  ▄▀▀▄▄  █▄▄██▄▄██
+0|esol-wha | █▀▄█ █ ▄▄ ▀█▄█▀█▀ ▀▀██ ████▀  ▀▄▀ ▀ ████ ▀▄▀  ▀▄█ ▀▄ ▄███ █
+0|esol-wha | ██▀█▀ █▄▄▄▄█ ██▀    ▀ ▄  ▄█   █ ▄ █ ▄▄▀▄▄ ▄█  █ ████ ▀▄█▄ █
+0|esol-wha | █  █▀▄█▄▄▄▄█▄ ▀█ ▄▀▄█ █▄▀▄ ▀ ▄  ▄█ ▄▄███▀▀▄▄█ ▀▀▄  ██▄█▄ ▄█
+0|esol-wha | █▄▀▀▄▀ ▄█  ▄▀▄█ ▄█ ▄▀▀ █▀▄ ▄▄▄▄ ▄  █  █▀▄█ ▄▄ ▄▄█▀▄▄██ ▄  █
+0|esol-wha | █▀ █▀  ▄▀ ▀▀█▄█ ███▄ ▀ ██ █ ▄ ▄ █ █   ▀ ▄▄▀█▀ ▀ █ ▄▄▀▄█▄▄ █
+0|esol-wha | █▄▄▄ ██▄███▄ ▀▄▀█▄▄▄█▄ ██▄  ██▄█▄▀██▀▄██▀ █▄▄█▄▄▄█▄▀█▄ ▀█ █
+0|esol-wha | █ ▀ ▀▀▄▄▀ █▀█▄▄ ▄▄█▀█ ▀▄███▄▄▄ ▄▄▀▄  ▄  █ █ ▄▀▀▀▄▀▀ ▀▄▄▄▀ █
+0|esol-wha | ███████▄▄▀▀▄▄  ▄▄▀▄▄▀▄ ▄███ ▄▄▄ ▄▄█ ▄▄▀█▀ ▄▄  █▀▀ ▄▄▄  █▄▄█
+0|esol-wha | █ ▄▄▄▄▄ █▄▄▀▄██▀ ▄▀▀ ██▄▄▄  █▄█   █████ █▄█ ▀ ▀▄▄ █▄█ ██ ██
+0|esol-wha | █ █   █ █▀▄▄▀████▀ ▄▀  ▀▀ ▄▄    █  █▄▄▄  █ ██ ▄▄▀ ▄▄▄ ▄▄  █
+0|esol-wha | █ █▄▄▄█ █▀▀█▀▀ ▄██▀█▄▄  █▀ ▄█▄█▀████▄█▄ ▀▀▄█ ▀ ▄█▄▀▄▄▄▄██▄█
+0|esol-wha | █▄▄▄▄▄▄▄█▄▄▄▄▄█▄███▄█▄▄▄▄▄▄███▄▄▄▄███▄██▄▄▄▄▄█▄▄▄█▄█▄█▄▄▄██
+0|esol-wha | 
+0|esol-wha | QR generado - escanea con WhatsApp
+0|esol-wha | Autenticado correctamente
+0|esol-wha | Autenticado correctamente
+0|esol-wha | Autenticado correctamente
+0|esol-wha | Autenticado correctamente
+0|esol-wha | Autenticado correctamente
+0|esol-wha | WhatsApp Bot conectado y listo!
+0|esol-wha | Autenticado correctamente
+0|esol-wha | WhatsApp Bot conectado y listo!
+0|esol-wha | ESOL WhatsApp API corriendo en puerto 3001
+0|esol-wha | Autenticado correctamente
+0|esol-wha | WhatsApp Bot conectado y listo!
+

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { FileText, AlertTriangle, Loader2, ArrowRight } from 'lucide-react';
-import { extractTextFromPdf, parseCFEText, type CFEData } from './lib/cfeParser';
+import { extractTextFromPdf, parseCFEText, renderPdfToCanvases, extractTextWithOCR, type CFEData } from './lib/cfeParser';
+import { parseCFETextWithAI } from './lib/aiParser';
 
 interface CFEUploaderProps {
   onParsed: (data: CFEData) => void;
@@ -9,6 +10,7 @@ interface CFEUploaderProps {
 export default function CFEUploader({ onParsed }: CFEUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -29,6 +31,7 @@ export default function CFEUploader({ onParsed }: CFEUploaderProps) {
     }
 
     setLoading(true);
+    setOcrProgress('');
     setError(null);
 
     try {
@@ -36,10 +39,30 @@ export default function CFEUploader({ onParsed }: CFEUploaderProps) {
       const data = parseCFEText(text);
       onParsed(data);
     } catch (err: any) {
-      console.error("Error al parsear CFE PDF:", err);
-      setError(err?.message || "Ocurrió un error inesperado al leer el PDF. Asegúrate de que sea un recibo de CFE válido.");
+      // Siempre intentar el Fallback a OCR/IA si falla el parser normal
+      console.log("Parser normal falló, intentando OCR + IA...", err?.message);
+      
+      try {
+        setOcrProgress("Preparando imagen del recibo...");
+        const canvases = await renderPdfToCanvases(file);
+        const ocrText = await extractTextWithOCR(canvases, setOcrProgress);
+        
+        setOcrProgress("Extrayendo datos con IA Generativa...");
+        try {
+          const aiData = await parseCFETextWithAI(ocrText);
+          onParsed(aiData);
+        } catch (aiErr: any) {
+          console.error("AI Parser Error:", aiErr);
+          setError(`Error de la IA: ${aiErr.message}. Verifica tu API Key en Ajustes Generales.`);
+          setOcrProgress('');
+        }
+      } catch (ocrErr: any) {
+        console.error("Error al ejecutar OCR:", ocrErr);
+        setError(`Tampoco fue posible leer el archivo con IA (Error: ${ocrErr?.message || ocrErr}). Por favor ingresa los datos manualmente.`);
+      }
     } finally {
       setLoading(false);
+      setOcrProgress('');
     }
   };
 
@@ -112,7 +135,9 @@ export default function CFEUploader({ onParsed }: CFEUploaderProps) {
           <div className="flex flex-col items-center py-6">
             <Loader2 className="h-12 w-12 text-gold animate-spin mb-4" />
             <p className="text-cream font-semibold">Procesando recibo...</p>
-            <p className="text-cream-muted text-xs mt-1">Extrayendo texto y calculando variables</p>
+            <p className="text-cream-muted text-xs mt-1 text-center max-w-[200px] h-8">
+              {ocrProgress || "Extrayendo texto y calculando variables"}
+            </p>
           </div>
         ) : (
           <div className="flex flex-col items-center py-4 text-center">

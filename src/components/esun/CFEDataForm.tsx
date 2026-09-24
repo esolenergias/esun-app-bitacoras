@@ -38,6 +38,11 @@ interface CFEDataFormProps {
 
 export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
   const [clientName, setClientName] = useState(data.client_name || '');
+  const [email, setEmail] = useState(data.client_email || '');
+  const [phone, setPhone] = useState(data.client_phone || '');
+  const [address, setAddress] = useState(data.client_address || '');
+  const [rfc, setRfc] = useState(data.client_rfc || '');
+  const [city, setCity] = useState(data.city || '');
   const [serviceNumber, setServiceNumber] = useState(data.service_number || '');
   const [tariff, setTariff] = useState(data.tariff || 'DAC');
   const [isBimonthly, setIsBimonthly] = useState(data.is_bimonthly);
@@ -198,6 +203,11 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
     e.preventDefault();
     const finalData: CFEData = {
       client_name: clientName,
+      client_email: email.trim() || undefined,
+      client_phone: phone.trim() || undefined,
+      client_address: address.trim() || undefined,
+      client_rfc: rfc.trim() || undefined,
+      city: city.trim() || undefined,
       service_number: serviceNumber || undefined,
       tariff,
       monthly_kWh: monthlyKWh,
@@ -221,28 +231,95 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
           <FileText className="h-6 w-6 text-[#C49825]" />
         </div>
         <div>
-          <h2 className="text-xl font-bold font-display text-gold uppercase tracking-wide">Verificar Datos del Recibo</h2>
+          <h2 className="text-xl font-bold font-display text-gold uppercase tracking-wide">Verificar Datos del Recibo & Contacto</h2>
           <p className="text-cream-muted text-xs">
-            Revisa y ajusta los valores detectados del recibo de CFE.
+            Revisa y ajusta los valores del cliente y consumos detectados del recibo de CFE.
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Client Name */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-cream uppercase tracking-wide">Nombre del Cliente</label>
-            <input
-              type="text"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder="Ej. Juan Pérez"
-              required
-              className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors"
-            />
-          </div>
+        {/* Contact info grid */}
+        <div className="bg-dark-2/40 border border-dark-4 p-4 rounded-xl space-y-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-gold">Datos del Cliente (CRM)</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-cream uppercase tracking-wide">Nombre del Cliente / Razón Social *</label>
+              <input
+                type="text"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder="Ej. Juan Pérez"
+                required
+                className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors"
+              />
+            </div>
 
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-cream uppercase tracking-wide">Teléfono</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder="Ej. (311) 123-4567"
+                className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-cream uppercase tracking-wide">Correo Electrónico</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder="Ej. cliente@ejemplo.com"
+                className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-cream uppercase tracking-wide">RFC / CURP</label>
+              <input
+                type="text"
+                value={rfc}
+                onChange={(e) => setRfc(e.target.value.toUpperCase())}
+                onFocus={(e) => e.target.select()}
+                placeholder="Ej. PEZJ850101XXX"
+                className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors uppercase"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-cream uppercase tracking-wide">Ciudad / Municipio</label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder="Ej. Tepic, Nayarit"
+                className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-cream uppercase tracking-wide">Dirección / Ubicación</label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder="Ej. Calle Principal #123, Col. Centro"
+                className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3.5 py-2.5 rounded-xl focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Technical CFE details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Service Number */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-cream uppercase tracking-wide">Número de Servicio</label>
@@ -526,10 +603,10 @@ export default function CFEDataForm({ data, onSubmit }: CFEDataFormProps) {
         <div className="pt-4 border-t border-dark-4 flex justify-end">
           <button
             type="submit"
-            className="flex items-center gap-2 px-6 py-3 bg-[#C49825] hover:bg-gold-light text-dark-1 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-gold/10"
+            className="flex items-center gap-2 px-6 py-3 bg-[#C49825] hover:bg-gold-light text-dark-1 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-gold/10 hover:scale-105"
           >
-            Generar Propuesta
-            <ArrowRight className="h-4 w-4" />
+            <Save className="h-4 w-4" />
+            <span>Guardar Cambios</span>
           </button>
         </div>
       </form>

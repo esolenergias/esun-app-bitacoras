@@ -39,6 +39,7 @@ fun BitacoraScreen(
     val userRole by viewModel.userRole.collectAsState()
     val mockObras by viewModel.projectsList.collectAsState()
     val tasks by viewModel.allTasks.collectAsState()
+    val syncStatus by viewModel.syncStatus.collectAsState()
 
     Column(
         modifier = Modifier
@@ -102,11 +103,17 @@ fun BitacoraScreen(
                                     shape = RoundedCornerShape(16.dp)
                                 )
                                 ExtendedFloatingActionButton(
-                                    onClick = { viewModel.triggerProductionBudgetSync() },
+                                    onClick = { if (!syncStatus.isSyncing) viewModel.triggerManualSync(isManual = true) },
                                     containerColor = ConnectedBlue,
                                     contentColor = PureWhite,
-                                    icon = { Icon(Icons.Default.CloudSync, contentDescription = null) },
-                                    text = { Text("Sincronizar", fontWeight = FontWeight.Black) },
+                                    icon = {
+                                        if (syncStatus.isSyncing) {
+                                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = PureWhite, strokeWidth = 2.dp)
+                                        } else {
+                                            Icon(Icons.Default.CloudSync, contentDescription = null)
+                                        }
+                                    },
+                                    text = { Text(if (syncStatus.isSyncing) "Sincronizando..." else "Sincronizar", fontWeight = FontWeight.Black) },
                                     shape = RoundedCornerShape(16.dp)
                                 )
                             }

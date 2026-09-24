@@ -107,6 +107,23 @@
     overflow-x: hidden;
   }
   
+  /* Inputs & Select base theme styling */
+  input, select, textarea {
+    color-scheme: light dark;
+  }
+
+  .light-mode select option,
+  .light-mode select optgroup {
+    background-color: #F8F7F2 !important;
+    color: #141410 !important;
+  }
+
+  .dark-mode select option,
+  .dark-mode select optgroup {
+    background-color: #1C1C17 !important;
+    color: #F0EFE8 !important;
+  }
+
   /* Modern custom scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
@@ -144,3 +161,13 @@
   background-position: center;
   background-size: cover;
 }
+
+@keyframes energyPulseFlow {
+  from {
+    stroke-dashoffset: 200;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+

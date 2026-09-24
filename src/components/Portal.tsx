@@ -141,7 +141,7 @@ export function Portal() {
         };
         fetchStats();
       }
-    }, [activeTab]);
+    }, [activeTab, currentUser]);
 
 
 

@@ -14,7 +14,7 @@ param(
     [switch]$Full  # Usar -Full para subir todos los archivos dist/
 )
 
-$ftpHost   = "ftp://esolenergias.com"
+$ftpHost   = "ftp://82.29.81.191"
 $ftpUser   = "u821937813.esolenergias.com"
 $ftpPass   = "h+[g5P./*yW5Prd"
 $webRoot   = ""   # FTP root = web root (NO usar /public_html/)
@@ -52,12 +52,12 @@ npm run build
 if ($LASTEXITCODE -ne 0) { Write-Host "ERROR: Build fallo. Abortando deploy."; exit 1 }
 
 # Obtener nombres de assets generados por Vite (hash dinamico)
-$jsFile  = Get-ChildItem "$localDist\assets\*.js"  | Select-Object -First 1
-$cssFile = Get-ChildItem "$localDist\assets\*.css" | Select-Object -First 1
+$jsFiles  = Get-ChildItem "$localDist\assets\*.js"
+$cssFiles = Get-ChildItem "$localDist\assets\*.css"
 
 Write-Host "`n=== Deploy a esolenergias.com ===`n"
-Write-Host "  JS  : $($jsFile.Name)"
-Write-Host "  CSS : $($cssFile.Name)`n"
+Write-Host "  Archivos JS  : $($jsFiles.Count)"
+Write-Host "  Archivos CSS : $($cssFiles.Count)`n"
 
 if ($Full) {
     # ── Deploy completo (primera vez o cambios en imagenes/estaticos) ──
@@ -81,11 +81,33 @@ if ($Full) {
     if (Test-Path "$localDist\.htaccess") {
         UploadFile "$localDist\.htaccess"   "$ftpHost/.htaccess"
     }
+    if (Test-Path "$localDist\robots.txt") {
+        UploadFile "$localDist\robots.txt"  "$ftpHost/robots.txt"
+    }
+    if (Test-Path "$localDist\sitemap.xml") {
+        UploadFile "$localDist\sitemap.xml" "$ftpHost/sitemap.xml"
+    }
+    if (Test-Path "$localDist\llms.txt") {
+        UploadFile "$localDist\llms.txt"    "$ftpHost/llms.txt"
+    }
+    if (Test-Path "$localDist\site.webmanifest") {
+        UploadFile "$localDist\site.webmanifest" "$ftpHost/site.webmanifest"
+    }
     if (Test-Path "$localDist\proxy.php") {
         UploadFile "$localDist\proxy.php"   "$ftpHost/proxy.php"
     }
-    UploadFile $jsFile.FullName             "$ftpHost/assets/$($jsFile.Name)"
-    UploadFile $cssFile.FullName            "$ftpHost/assets/$($cssFile.Name)"
+    if (Test-Path "$localDist\crosssection_offgrid.jpg") {
+        UploadFile "$localDist\crosssection_offgrid.jpg" "$ftpHost/crosssection_offgrid.jpg"
+    }
+    if (Test-Path "$localDist\crosssection_gridtied.jpg") {
+        UploadFile "$localDist\crosssection_gridtied.jpg" "$ftpHost/crosssection_gridtied.jpg"
+    }
+    foreach ($file in $jsFiles) {
+        UploadFile $file.FullName "$ftpHost/assets/$($file.Name)"
+    }
+    foreach ($file in $cssFiles) {
+        UploadFile $file.FullName "$ftpHost/assets/$($file.Name)"
+    }
 
     # Limpiar assets viejos con diferente hash
     Write-Host "`n  Limpiando assets obsoletos..."
@@ -101,7 +123,9 @@ if ($Full) {
         $reader.Close(); $resp.Close()
     } catch {}
 
-    $keepNames = @($jsFile.Name, $cssFile.Name)
+    $keepNames = @()
+    $jsFiles | ForEach-Object { $keepNames += $_.Name }
+    $cssFiles | ForEach-Object { $keepNames += $_.Name }
     foreach ($f in $remoteAssets) {
         if ($f -match "^index-.*\.(js|css)$" -and $keepNames -notcontains $f) {
             try {

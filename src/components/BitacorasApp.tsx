@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../context/supabase';
-import { RefreshCw, Search, Calendar, MapPin, HardHat, TrendingUp, DollarSign, Cloud, Users, CheckCircle, Clock, Plus, X, Edit2, Trash2, ArrowLeft, Image as ImageIcon, ChevronDown, ChevronUp, ExternalLink, FileText, Download } from 'lucide-react';
+import { RefreshCw, Search, Calendar, MapPin, HardHat, TrendingUp, DollarSign, Cloud, Users, CheckCircle, Clock, Plus, X, Edit2, Trash2, ArrowLeft, Image as ImageIcon, ChevronDown, ChevronUp, ExternalLink, FileText, Download , BookOpen } from 'lucide-react';
 
 import type { Bitacora, ObraApp } from './esun/types';
 import { generateObraReport } from './esun/pdfGenerator';
+import { generateCoverPDF } from './esun/pdfCoverGenerator';
 
 export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { reporterName?: string }) {
   const [bitacoras, setBitacoras] = useState<Bitacora[]>([]);
@@ -376,6 +377,13 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
               Incluir Finanzas
             </label>
             <div className="flex items-center gap-3">
+              <button 
+                onClick={() => generateCoverPDF(selectedObraDetail)}
+                className="flex items-center gap-2 px-5 py-3 bg-dark-3 hover:bg-gold/20 border border-gold/30 hover:border-gold text-gold font-black rounded-xl transition-all shadow-lg"
+              >
+                <BookOpen className="w-5 h-5" />
+                Portada PDF
+              </button>
               <button 
                 onClick={() => generateObraReport(selectedObraDetail, bitacoras, reporterName, includeFinancialReport)}
                 className="flex items-center gap-2 px-5 py-3 bg-dark-3 hover:bg-gold/20 border border-gold/30 hover:border-gold text-gold font-black rounded-xl transition-all shadow-lg"
@@ -894,13 +902,22 @@ export default function BitacorasApp({ reporterName = 'ESOL Supervisor' }: { rep
                       />
                       Incluir finanzas
                     </label>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); generateObraReport(obra, bitacoras, reporterName, includeFinancialReport); }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-dim text-dark-1 font-black text-xs rounded-xl transition-all shadow-md hover:shadow-gold/30 hover:scale-[1.02] active:scale-95"
-                    >
-                      <FileText className="w-4 h-4 stroke-[2.5]" />
-                      Generar Reporte PDF
-                    </button>
+                    <div className="flex gap-2 w-full">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); generateCoverPDF(obra); }}
+                        className="w-1/3 flex items-center justify-center gap-2 px-2 py-2.5 bg-dark-3 hover:bg-gold/20 border border-gold/30 text-gold font-black text-xs rounded-xl transition-all shadow-md hover:border-gold"
+                        title="Generar Portada PDF"
+                      >
+                        <BookOpen className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); generateObraReport(obra, bitacoras, reporterName, includeFinancialReport); }}
+                        className="w-2/3 flex items-center justify-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-dim text-dark-1 font-black text-xs rounded-xl transition-all shadow-md hover:shadow-gold/30 hover:scale-[1.02] active:scale-95"
+                      >
+                        <FileText className="w-4 h-4 stroke-[2.5]" />
+                        Reporte
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

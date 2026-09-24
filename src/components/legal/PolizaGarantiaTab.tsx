@@ -188,33 +188,7 @@ const getBase64ImageFromUrl = (imageUrl: string): Promise<string> => {
   });
 };
 
-const generarFolioProtocolo = (nombreObra: string = '', clienteFinal: string = '', consecutivo: number = 1) => {
-  const d = new Date();
-  const yy = d.getFullYear().toString().slice(-2);
-  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-  const dateCode = `${yy}${mm}`;
-
-  const sourceText = (nombreObra.trim() || clienteFinal.trim() || 'ESOL');
-  const stopWords = ['de', 'del', 'la', 'las', 'los', 'el', 'en', 'y', 'sa', 'cv', 's.a.', 'c.v.'];
-  const words = sourceText
-    .split(/\s+/)
-    .filter(w => w.length > 0 && !stopWords.includes(w.toLowerCase()));
-
-  let iniciales = '';
-  if (words.length >= 2) {
-    iniciales = (words[0][0] + words[1][0]).toUpperCase();
-  } else if (words.length === 1 && words[0].length >= 2) {
-    iniciales = words[0].substring(0, 2).toUpperCase();
-  } else if (words.length === 1 && words[0].length === 1) {
-    iniciales = (words[0] + 'X').toUpperCase();
-  } else {
-    iniciales = 'ES';
-  }
-
-  iniciales = iniciales.replace(/[^A-Z]/g, 'X').padEnd(2, 'X');
-  const numFormatted = consecutivo.toString().padStart(3, '0');
-  return `POL-${dateCode}-${iniciales}-${numFormatted}`;
-};
+import { generarFolioCentralizado } from '../../utils/folioGenerator';
 
 const numeroALetras = (numero: number): string => {
   if (numero === 0) return 'CERO PESOS 00/100 M.N.';
@@ -291,7 +265,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
   const [formData, setFormData] = useState({
     tipoCobertura: 'Mantenimiento Preventivo y Garantía de Ejecución Técnica',
     modalidadContratacion: 'Póliza Prepagada',
-    folio: generarFolioProtocolo(),
+    folio: generarFolioCentralizado('POL'),
     clienteFinal: '',
     clienteTelefono: '',
     clienteEmail: '',
@@ -305,7 +279,9 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
     montoVisita: 0,
     observaciones: '',
     representanteEmpresa: 'Gustavo Corona Cervantes',
-    airesAcondicionados: [] as Array<{ id: string; modelo: string; tonelaje: string; cantidad: number }>
+    airesAcondicionados: [] as Array<{ id: string; modelo: string; tonelaje: string; cantidad: number }>,
+    sourceId: null as string | null,
+    sourceCreatedAt: null as string | null
   });
 
   const resetForm = () => {
@@ -314,7 +290,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
     setFormData({
       tipoCobertura: 'Mantenimiento Preventivo y Garantía de Ejecución Técnica',
       modalidadContratacion: 'Póliza Prepagada',
-      folio: generarFolioProtocolo(),
+      folio: generarFolioCentralizado('POL'),
       conceptosSeleccionados: [],
       clienteFinal: '',
       clienteTelefono: '',
@@ -328,7 +304,9 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
       montoVisita: 0,
       observaciones: '',
       representanteEmpresa: 'Gustavo Corona Cervantes',
-      airesAcondicionados: []
+      airesAcondicionados: [],
+      sourceId: null,
+      sourceCreatedAt: null
     });
   };
 
@@ -495,6 +473,28 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
       const obra = budget.project_name || budget.nombre_proyecto || budget.name || 'Póliza de Mantenimiento';
       const cliente = budget.client_name || '';
 
+      // Find if this budget was generated from an ESUN proposal to keep the exact folio
+      let sourceId = budget.id;
+      let sourceCreatedAt = budget.created_at;
+      try {
+        const { data: esunProjects } = await supabase
+          .from('esun_proyectos')
+          .select('id, proposals');
+        
+        if (esunProjects) {
+          for (const proj of esunProjects) {
+            const matchedProp = proj.proposals?.find((p: any) => p.financialParams?.linked_presupuesto_id === budget.id);
+            if (matchedProp) {
+              sourceId = matchedProp.id;
+              sourceCreatedAt = matchedProp.created_at;
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error finding ESUN proposal:", err);
+      }
+
       setFormData(prev => ({
         ...prev,
         clienteFinal: cliente,
@@ -502,8 +502,10 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
         clienteEmail: fetchedEmail,
         direccionInstalacion: fetchedAddress || details?.encabezado?.direccion_obra || details?.encabezado?.lugar || '',
         nombreObra: obra,
-        folio: generarFolioProtocolo(obra, cliente),
-        montoTotal: Number(budget.total || budget.monto || 0) * 0.10 // Default estimado 10% del proyecto
+        folio: generarFolioCentralizado('POL', cliente, sourceId, sourceCreatedAt),
+        montoTotal: Number(budget.total || budget.monto || 0) * 0.10, // Default estimado 10% del proyecto
+        sourceId: sourceId,
+        sourceCreatedAt: sourceCreatedAt
       }));
     } catch (error) {
       console.error("Error al obtener detalles del presupuesto:", error);
@@ -1476,7 +1478,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
                 <span>Folio Protocolizado</span>
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, folio: generarFolioProtocolo(prev.nombreObra, prev.clienteFinal) }))}
+                  onClick={() => setFormData(prev => ({ ...prev, folio: generarFolioCentralizado('POL', prev.clienteFinal, prev.sourceId, prev.sourceCreatedAt) }))}
                   className="text-[10px] text-gold hover:underline font-normal cursor-pointer"
                   title="Regenerar Folio con nomenclatura estándar"
                 >
@@ -1504,7 +1506,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
                   setFormData(prev => ({
                     ...prev,
                     clienteFinal: newClient,
-                    folio: prev.nombreObra ? prev.folio : generarFolioProtocolo(prev.nombreObra, newClient)
+                    folio: prev.nombreObra ? prev.folio : generarFolioCentralizado('POL', newClient, prev.sourceId, prev.sourceCreatedAt)
                   }));
                 }}
                 className="w-full bg-dark-1 border border-dark-4 rounded-lg px-3 py-2 text-cream focus:border-gold outline-none text-sm"
@@ -1524,7 +1526,7 @@ export default function PolizaGarantiaTab({ initialBudgetId }: PolizaGarantiaTab
                   setFormData(prev => ({
                     ...prev,
                     nombreObra: newObra,
-                    folio: generarFolioProtocolo(newObra, prev.clienteFinal)
+                    folio: generarFolioCentralizado('POL', prev.clienteFinal, prev.sourceId, prev.sourceCreatedAt)
                   }));
                 }}
                 className="w-full bg-dark-1 border border-dark-4 rounded-lg px-3 py-2 text-cream focus:border-gold outline-none text-sm"

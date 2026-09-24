@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <h1>Test page</h1>
+  <button id="btn">Generate</button>
+  <script>
+    document.getElementById('btn').onclick = () => {
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '0';
+      container.style.top = '0';
+      container.style.width = '8.5in';
+      container.style.backgroundColor = '#ffffff';
+      container.style.boxSizing = 'border-box';
+      container.style.zIndex = '-1';
+      container.innerHTML = '<h1>Hello World</h1><p>This is a test PDF.</p>';
+      document.body.appendChild(container);
+
+      const opt = {
+        margin:       0,
+        filename:     'test.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: true },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(container).output('blob').then((pdfBlob) => {
+        console.log("Blob size:", pdfBlob.size);
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        window.open(blobUrl, '_blank');
+        document.body.removeChild(container);
+      }).catch(err => {
+        console.error(err);
+      });
+    };
+  </script>
+</body>
+</html>

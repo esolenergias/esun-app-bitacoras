@@ -28,6 +28,10 @@ export default function InventoryTab() {
   const [newProdDistPrice, setNewProdDistPrice] = useState<number>(0);
   const [inventoryActiveTab, setInventoryActiveTab] = useState('Paneles Solares');
   const [newProdStock, setNewProdStock] = useState<number>(50);
+  const [solarSpecWp, setSolarSpecWp] = useState<number | ''>('');
+  const [solarSpecVoc, setSolarSpecVoc] = useState<number | ''>('');
+  const [solarSpecKw, setSolarSpecKw] = useState<number | ''>('');
+  const [solarSpecMaxVdc, setSolarSpecMaxVdc] = useState<number | ''>('');
   const [editingProduct, setEditingProduct] = useState<B2BProduct | null>(null);
   const [scrapingUrl, setScrapingUrl] = useState('');
   const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'scraping' | 'success' | 'error'>('idle');
@@ -252,6 +256,13 @@ export default function InventoryTab() {
       { minQty: Number(newProdDistMin), price: Number(newProdDistPrice), label: `Distribuidor (${newProdDistMin}+ ${newProdUnit}s)` }
     ];
 
+    const solarSpecsObj = {
+      ...(solarSpecWp !== '' && { wp: Number(solarSpecWp) }),
+      ...(solarSpecVoc !== '' && { voc: Number(solarSpecVoc) }),
+      ...(solarSpecKw !== '' && { kw: Number(solarSpecKw) }),
+      ...(solarSpecMaxVdc !== '' && { maxVdc: Number(solarSpecMaxVdc) })
+    };
+
     addProduct({
       category: newProdCategory,
       name: newProdName,
@@ -261,7 +272,8 @@ export default function InventoryTab() {
       specs: specsArray,
       tiers,
       stock: Number(newProdStock),
-      active: Number(newProdStock) > 0
+      active: Number(newProdStock) > 0,
+      solarSpecs: Object.keys(solarSpecsObj).length > 0 ? solarSpecsObj : undefined
     });
 
     // Reset Form
@@ -275,6 +287,10 @@ export default function InventoryTab() {
     setNewProdDistMin(30);
     setNewProdDistPrice(0);
     setNewProdStock(50);
+    setSolarSpecWp('');
+    setSolarSpecVoc('');
+    setSolarSpecKw('');
+    setSolarSpecMaxVdc('');
     setScrapingUrl('');
     setScrapingStatus('idle');
     setShowAddProductForm(false);
@@ -411,6 +427,57 @@ export default function InventoryTab() {
                                 className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
                               />
                             </div>
+
+                            {newProdCategory === 'Paneles Solares' && (
+                              <>
+                                <div className="space-y-1.5">
+                                  <label className="text-[9.5px] uppercase font-bold text-sky-400 select-none">Potencia (Wp)</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Ej. 550"
+                                    value={solarSpecWp}
+                                    onChange={(e) => setSolarSpecWp(Number(e.target.value) || '')}
+                                    className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-[9.5px] uppercase font-bold text-sky-400 select-none">Voltaje (Voc)</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Ej. 50"
+                                    value={solarSpecVoc}
+                                    onChange={(e) => setSolarSpecVoc(Number(e.target.value) || '')}
+                                    className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            {(newProdCategory === 'Inversores' || newProdCategory === 'Microinversores') && (
+                              <>
+                                <div className="space-y-1.5">
+                                  <label className="text-[9.5px] uppercase font-bold text-purple-400 select-none">Capacidad (kW)</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    placeholder="Ej. 5.0"
+                                    value={solarSpecKw}
+                                    onChange={(e) => setSolarSpecKw(Number(e.target.value) || '')}
+                                    className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-[9.5px] uppercase font-bold text-purple-400 select-none">Max Vdc (V)</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Ej. 600"
+                                    value={solarSpecMaxVdc}
+                                    onChange={(e) => setSolarSpecMaxVdc(Number(e.target.value) || '')}
+                                    className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
+                                  />
+                                </div>
+                              </>
+                            )}
 
                             <div className="space-y-1.5 md:col-span-3">
                               <label className="text-[9.5px] uppercase font-bold text-cream select-none">Especificaciones (separadas por comas)</label>
@@ -742,6 +809,65 @@ export default function InventoryTab() {
                                   className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
                                 />
                               </div>
+
+                              {editingProduct.category === 'Paneles Solares' && (
+                                <>
+                                  <div className="space-y-1.5">
+                                    <label className="text-[9.5px] uppercase font-bold text-sky-400 select-none">Potencia (Wp)</label>
+                                    <input
+                                      type="number"
+                                      value={editingProduct.solarSpecs?.wp || ''}
+                                      onChange={(e) => setEditingProduct({ 
+                                        ...editingProduct, 
+                                        solarSpecs: { ...editingProduct.solarSpecs, wp: Number(e.target.value) || undefined } 
+                                      })}
+                                      className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-[9.5px] uppercase font-bold text-sky-400 select-none">Voltaje (Voc)</label>
+                                    <input
+                                      type="number"
+                                      value={editingProduct.solarSpecs?.voc || ''}
+                                      onChange={(e) => setEditingProduct({ 
+                                        ...editingProduct, 
+                                        solarSpecs: { ...editingProduct.solarSpecs, voc: Number(e.target.value) || undefined } 
+                                      })}
+                                      className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              {(editingProduct.category === 'Inversores' || editingProduct.category === 'Microinversores') && (
+                                <>
+                                  <div className="space-y-1.5">
+                                    <label className="text-[9.5px] uppercase font-bold text-purple-400 select-none">Capacidad (kW)</label>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={editingProduct.solarSpecs?.kw || ''}
+                                      onChange={(e) => setEditingProduct({ 
+                                        ...editingProduct, 
+                                        solarSpecs: { ...editingProduct.solarSpecs, kw: Number(e.target.value) || undefined } 
+                                      })}
+                                      className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-[9.5px] uppercase font-bold text-purple-400 select-none">Max Vdc (V)</label>
+                                    <input
+                                      type="number"
+                                      value={editingProduct.solarSpecs?.maxVdc || ''}
+                                      onChange={(e) => setEditingProduct({ 
+                                        ...editingProduct, 
+                                        solarSpecs: { ...editingProduct.solarSpecs, maxVdc: Number(e.target.value) || undefined } 
+                                      })}
+                                      className="w-full bg-dark-1 border border-dark-4 focus:border-gold/45 text-cream px-3 py-2.5 rounded-lg focus:outline-none font-mono"
+                                    />
+                                  </div>
+                                </>
+                              )}
                               
                               <div className="space-y-1.5 md:col-span-3">
                                 <label className="text-[9.5px] uppercase font-bold text-cream select-none">Especificaciones (separadas por comas)</label>

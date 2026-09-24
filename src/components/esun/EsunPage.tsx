@@ -1,530 +1,447 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sun, Plus, ArrowRight, UploadCloud, FileText, ArrowLeft, Trash2, ShieldCheck, Settings, Box, RefreshCw, Layers, Zap, Battery } from 'lucide-react';
+import type { SolarProject, Proposal } from './esunTypes';
 import CFEUploader from './CFEUploader';
 import CFEDataForm from './CFEDataForm';
-import SystemProposal from './SystemProposal';
-import FinancialAnalysis from './FinancialAnalysis';
-import EnvironmentalImpact from './EnvironmentalImpact';
-import { calculateFinancials } from './lib/financialEngine';
-import { SOLAR_CONSTANTS } from './lib/solarConstants';
-import html2pdf from 'html2pdf.js';
+import LoadProfileForm from './offgrid/LoadProfileForm';
+import ProjectDashboard from './ProjectDashboard';
 import { supabase } from '../../context/supabase';
+import { useApp } from '../../context/AppContext';
 
 export default function EsunPage() {
-  const [view, setView] = useState<'upload' | 'form' | 'results' | 'export'>('upload');
-  const [cfeData, setCfeData] = useState<any>(null);
-  const [system, setSystem] = useState<any>(null);
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
-  const [financialParams, setFinancialParams] = useState<any>({
-    isCredit: false,
-    interestRate: 15,
-    termMonths: 36,
-    manualCost: undefined
-  });
+  const { currentUser } = useApp();
+  const [view, setView] = useState<'welcome' | 'upload' | 'form' | 'offgrid-form' | 'project'>('welcome');
+  const [projects, setProjects] = useState<SolarProject[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [pendingCfeData, setPendingCfeData] = useState<any>(null);
 
-  // Load quotes from localStorage
-  const loadQuotes = () => {
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
     try {
-      const stored = localStorage.getItem('esun_quotes');
+      const stored = localStorage.getItem('esun_projects');
       if (stored) {
-        setQuotes(JSON.parse(stored));
+        setProjects(JSON.parse(stored));
+      }
+
+      const { data, error } = await supabase
+        .from('esun_proyectos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error loading projects from Supabase:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Map data from supabase table to our SolarProject interface
+        const supabaseProjects = data.map(row => ({
+          id: row.id,
+          created_at: row.created_at,
+          client_name: row.client_name,
+          client_email: row.client_email,
+          client_phone: row.client_phone,
+          client_address: row.client_address,
+          client_rfc: row.client_rfc,
+          city: row.city,
+          project_type: row.project_type || (row.load_profile ? 'off-grid' : 'grid-tie'),
+          cfe_data: row.cfe_data,
+          load_profile: row.load_profile,
+          proposals: row.proposals || [],
+          status: row.status || 'draft'
+        }));
+        setProjects(supabaseProjects);
+        localStorage.setItem('esun_projects', JSON.stringify(supabaseProjects));
       }
     } catch (e) {
-      console.error("Error loading quotes:", e);
+      console.error("Error loading projects:", e);
     }
   };
 
-  useEffect(() => {
-    loadQuotes();
-    
-    // Check if we were redirected here to edit a specific quote
-    setTimeout(() => {
-      const targetId = localStorage.getItem('esun_target_quote_id');
-      if (targetId) {
-        const stored = localStorage.getItem('esun_quotes');
-        if (stored) {
-          try {
-            const qs = JSON.parse(stored);
-            const q = qs.find((x: any) => x.id === targetId);
-            if (q) {
-              loadQuote(q);
-            }
-          } catch(e) {}
-        }
-        localStorage.removeItem('esun_target_quote_id');
-      }
-    }, 100);
-  }, []);
+  const saveProjects = (updatedProjects: SolarProject[]) => {
+    localStorage.setItem('esun_projects', JSON.stringify(updatedProjects));
+    setProjects(updatedProjects);
+  };
 
-  const saveQuote = useCallback((cfe: any, sys: any, finParams: any) => {
-    if (!cfe || !sys) return;
-    
-    const finResult = calculateFinancials({
-      system_kWp: sys.system_kWp,
-      installed_kWp: sys.installed_kWp,
-      annual_production_kWh: sys.annual_production_kWh,
-      monthly_consumption_kWh: cfe.monthly_kWh,
-      tariff_rate_mxn: cfe.tariff_rate,
-      custom_cost: finParams.manualCost, // Pass manual cost override
-    });
-
-    const totalProduction25yr = sys.annual_production_kWh * SOLAR_CONSTANTS.SYSTEM_LIFE;
-    const co2SavedKg = totalProduction25yr * SOLAR_CONSTANTS.CO2_FACTOR;
-
-    const quoteId = currentQuoteId || Math.random().toString(36).substring(2, 9);
-    
-    const newQuote = {
-      id: quoteId,
+  const createNewProject = (cfeData: any) => {
+    const newProject: SolarProject = {
+      id: crypto.randomUUID(), // Use UUID for Supabase
       created_at: new Date().toISOString(),
-      client_name: cfe.client_name || 'Sin Nombre',
-      city: sys.city,
-      cfe_data: cfe,
-      system: sys,
-      financialParams: finParams, // Persist overrides
-      financial: finResult,
-      environmental: {
-        co2_kg_25yr: co2SavedKg,
-        trees_25yr: co2SavedKg / SOLAR_CONSTANTS.CO2_PER_TREE_KG,
-        cars_25yr: (co2SavedKg / 1000) / SOLAR_CONSTANTS.CO2_PER_CAR_TONS,
-        coal_ton_25yr: (co2SavedKg / 1000) / SOLAR_CONSTANTS.CO2_PER_COAL_TON,
-      },
+      client_name: cfeData.client_name || 'Nuevo Proyecto Solar',
+      client_email: cfeData.client_email,
+      client_phone: cfeData.client_phone,
+      client_address: cfeData.client_address,
+      client_rfc: cfeData.client_rfc,
+      city: cfeData.city,
+      project_type: 'grid-tie',
+      cfe_data: cfeData,
+      proposals: [],
       status: 'draft'
     };
 
-    const existingQuotes = JSON.parse(localStorage.getItem('esun_quotes') || '[]');
-    const index = existingQuotes.findIndex((q: any) => q.id === newQuote.id);
-    if (index !== -1) {
-      existingQuotes[index] = newQuote;
-    } else {
-      existingQuotes.push(newQuote);
-    }
-    localStorage.setItem('esun_quotes', JSON.stringify(existingQuotes));
-    setCurrentQuoteId(newQuote.id);
-    setQuotes(existingQuotes);
-
-    // Auto-create client in CRM if they have a name
-    if (newQuote.client_name && newQuote.client_name !== 'Sin Nombre') {
-      supabase
-        .from('clientes')
-        .select('id')
-        .ilike('nombre_razon_social', newQuote.client_name)
-        .limit(1)
-        .then(({ data: existingClients }) => {
-          if (!existingClients || existingClients.length === 0) {
-            supabase.from('clientes').insert({
-              nombre_razon_social: newQuote.client_name,
-              origen: 'Esun Solar',
-              estatus: 'Prospecto'
-            }).then(() => {
-              console.log('Cliente automático creado en CRM desde Esun Solar');
-            }).catch(e => console.error('Error creando cliente:', e));
-          }
-        })
-        .catch(e => console.error('Error verificando cliente:', e));
-    }
-  }, [currentQuoteId]);
-
-  // Auto-save quote in results view when system or cfeData updates
-  useEffect(() => {
-    if (view === 'results' && cfeData && system) {
-      saveQuote(cfeData, system, financialParams);
-    }
-  }, [view, cfeData, system, financialParams, saveQuote]);
-
-  const loadQuote = (quote: any) => {
-    setCurrentQuoteId(quote.id);
-    setCfeData(quote.cfe_data);
-    setSystem(quote.system);
-    setFinancialParams(quote.financialParams || {
-      isCredit: false,
-      interestRate: 15,
-      termMonths: 36,
-      manualCost: undefined
-    });
-    setView('results');
+    saveAndRouteProject(newProject);
   };
 
-  const deleteQuote = (e: React.MouseEvent, id: string) => {
+  const createOffGridProject = (loadData: any, contactData?: any) => {
+    const newProject: SolarProject = {
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      client_name: contactData?.clientName || 'Nuevo Sistema Aislado',
+      client_email: contactData?.email,
+      client_phone: contactData?.phone,
+      client_address: contactData?.address,
+      client_rfc: contactData?.rfc,
+      city: contactData?.city,
+      project_type: 'off-grid',
+      load_profile: loadData,
+      proposals: [],
+      status: 'draft'
+    };
+
+    saveAndRouteProject(newProject);
+  };
+
+  const syncClientToCRM = async (project: SolarProject) => {
+    if (!project.client_name || project.client_name === 'Nuevo Proyecto Solar' || project.client_name === 'Nuevo Sistema Aislado' || project.client_name === 'Sin Nombre') {
+      return;
+    }
+
+    try {
+      const { data: existingClients } = await supabase
+        .from('clientes')
+        .select('id')
+        .ilike('nombre_razon_social', project.client_name.trim())
+        .limit(1);
+
+      const clientPayload = {
+        nombre_razon_social: project.client_name.trim(),
+        email: project.client_email || null,
+        telefono: project.client_phone || null,
+        direccion: project.client_address || project.city || null,
+        rfc: project.client_rfc || null,
+        origen: project.project_type === 'off-grid' ? 'Esun Aislado' : 'Esun Solar',
+        estatus: 'Prospecto',
+        registered_by: currentUser?.name
+      };
+
+      if (!existingClients || existingClients.length === 0) {
+        await supabase.from('clientes').insert(clientPayload);
+        console.log('Cliente nuevo creado automáticamente en CRM desde Esun:', project.client_name);
+      } else {
+        // Update contact info if provided
+        const existingId = existingClients[0].id;
+        const updateData: any = {};
+        if (project.client_email) updateData.email = project.client_email;
+        if (project.client_phone) updateData.telefono = project.client_phone;
+        if (project.client_address || project.city) updateData.direccion = project.client_address || project.city;
+        if (project.client_rfc) updateData.rfc = project.client_rfc;
+
+        if (Object.keys(updateData).length > 0) {
+          await supabase.from('clientes').update(updateData).eq('id', existingId);
+          console.log('Cliente actualizado en CRM desde Esun:', project.client_name);
+        }
+      }
+    } catch (e) {
+      console.error('Error sincronizando cliente con CRM:', e);
+    }
+  };
+
+  const saveAndRouteProject = (newProject: SolarProject) => {
+    const updated = [newProject, ...projects];
+    saveProjects(updated);
+    setCurrentProjectId(newProject.id);
+    setView('project');
+
+    // Save to Supabase
+    supabase.from('esun_proyectos').insert({
+      id: newProject.id,
+      created_at: newProject.created_at,
+      client_name: newProject.client_name,
+      client_email: newProject.client_email,
+      client_phone: newProject.client_phone,
+      client_address: newProject.client_address,
+      client_rfc: newProject.client_rfc,
+      city: newProject.city,
+      project_type: newProject.project_type,
+      cfe_data: newProject.cfe_data,
+      load_profile: newProject.load_profile,
+      proposals: newProject.proposals,
+      status: newProject.status
+    }).then(({ error }) => {
+      if (error) console.error("Error saving to Supabase:", error);
+    });
+
+    // Auto-create/sync client in CRM
+    syncClientToCRM(newProject);
+  };
+
+  const updateProject = (updated: SolarProject) => {
+    const idx = projects.findIndex(p => p.id === updated.id);
+    if (idx !== -1) {
+      const newProjects = [...projects];
+      newProjects[idx] = updated;
+      saveProjects(newProjects);
+
+      supabase.from('esun_proyectos')
+        .update({
+          client_name: updated.client_name,
+          client_email: updated.client_email,
+          client_phone: updated.client_phone,
+          client_address: updated.client_address,
+          client_rfc: updated.client_rfc,
+          city: updated.city,
+          project_type: updated.project_type,
+          cfe_data: updated.cfe_data,
+          load_profile: updated.load_profile,
+          proposals: updated.proposals,
+          status: updated.status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', updated.id)
+        .then(({ error }) => {
+          if (error) console.error("Error updating in Supabase:", error);
+        });
+
+      // Auto sync update in CRM
+      syncClientToCRM(updated);
+    }
+  };
+
+  const deleteProject = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const updated = quotes.filter((q) => q.id !== id);
-    localStorage.setItem('esun_quotes', JSON.stringify(updated));
-    setQuotes(updated);
-    if (currentQuoteId === id) {
-      handleReset();
+    if (confirm("¿Estás seguro de que deseas eliminar este proyecto y todas sus propuestas?")) {
+      const updated = projects.filter((p) => p.id !== id);
+      saveProjects(updated);
+      
+      supabase.from('esun_proyectos').delete().eq('id', id)
+        .then(({ error }) => {
+          if (error) console.error("Error deleting in Supabase:", error);
+        });
+
+      if (currentProjectId === id) {
+        handleReset();
+      }
     }
   };
 
   const handleReset = () => {
+    setView('welcome');
+    setCurrentProjectId(null);
+    setPendingCfeData(null);
+  };
+
+  const handleStartUpload = () => {
     setView('upload');
-    setCfeData(null);
-    setSystem(null);
-    setCurrentQuoteId(null);
-    setFinancialParams({
-      isCredit: false,
-      interestRate: 15,
-      termMonths: 36,
-      manualCost: undefined
-    });
+    setCurrentProjectId(null);
   };
 
-  const handleTriggerExport = () => {
-    setView('export');
-    
-    // Retrieve quote data
-    const quoteData = quotes.find(q => q.id === currentQuoteId) || {
-      client_name: cfeData?.client_name || 'Sin Nombre',
-      city: system?.city || 'CDMX',
-      system: system,
-      cfe_data: cfeData,
-      financial: calculateFinancials({
-        system_kWp: system?.system_kWp,
-        installed_kWp: system?.installed_kWp,
-        annual_production_kWh: system?.annual_production_kWh,
-        monthly_consumption_kWh: cfeData?.monthly_kWh,
-        tariff_rate_mxn: cfeData?.tariff_rate,
-        custom_cost: financialParams.manualCost,
-      }),
-      financialParams: financialParams
-    };
-
-    // Create the container element for printing
-    const element = document.createElement('div');
-    element.style.padding = "24px";
-    element.style.color = "#1e293b";
-    element.style.backgroundColor = "#ffffff";
-    element.style.fontFamily = "sans-serif";
-    
-    const isCredit = quoteData.financialParams?.isCredit;
-    const rate = quoteData.financialParams?.interestRate || 15;
-    const term = quoteData.financialParams?.termMonths || 36;
-    const inv = quoteData.financial?.investment_mxn || 0;
-    const r = (rate / 100) / 12;
-    const monthlyCreditPayment = isCredit ? (r > 0 ? (inv * r * Math.pow(1 + r, term)) / (Math.pow(1 + r, term) - 1) : inv / term) : 0;
-    
-    element.innerHTML = `
-      <div style="border-bottom: 2px solid #C49825; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <h1 style="color: #C49825; font-size: 24px; font-weight: 800; margin: 0;">eSol Energías</h1>
-          <p style="font-size: 11px; color: #64748b; margin: 2px 0 0 0;">Propuesta de Sistema Solar Fotovoltaico — Esun</p>
-        </div>
-        <div style="text-align: right;">
-          <p style="font-size: 11px; font-weight: bold; color: #0f172a; margin: 0;">Fecha: ${new Date().toLocaleDateString('es-MX')}</p>
-          <p style="font-size: 10px; color: #64748b; margin: 2px 0 0 0;">Servicio: ${quoteData.cfe_data?.service_number || 'N/A'}</p>
-        </div>
-      </div>
-
-      <div style="margin-bottom: 24px;">
-        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Datos del Cliente</h2>
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Cliente:</span> ${quoteData.client_name}</td>
-            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Consumo Bimestral:</span> ${quoteData.cfe_data?.bimonthly_kWh} kWh</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Tarifa CFE:</span> ${quoteData.cfe_data?.tariff}</td>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Pago Promedio CFE:</span> $${quoteData.cfe_data?.total_mxn?.toLocaleString('es-MX')} MXN</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Ciudad:</span> ${quoteData.city}</td>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Costo promedio/kWh:</span> $${quoteData.cfe_data?.tariff_rate?.toFixed(2)} MXN</td>
-          </tr>
-        </table>
-      </div>
-
-      <div style="margin-bottom: 24px;">
-        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Propuesta Técnica del Sistema</h2>
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Capacidad Instalada:</span> ${quoteData.system?.installed_kWp?.toFixed(2)} kWp</td>
-            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Arreglo Eléctrico:</span> ${quoteData.system?.num_strings} strings de ${quoteData.system?.panels_per_string} paneles</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Cantidad de Paneles:</span> ${quoteData.system?.num_panels} módulos de ${quoteData.system?.panel_Wp}W</td>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Voltaje de String Voc:</span> ${quoteData.system?.string_Voc?.toFixed(1)} VDC (${quoteData.system?.is_electrical_safe ? 'Eléctricamente Seguro' : 'Excede límites'})</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Superficie Techo:</span> ${quoteData.system?.area_m2?.toFixed(1)} m²</td>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Producción Anual Estimada:</span> ${Math.round(quoteData.system?.annual_production_kWh || 0)?.toLocaleString('es-MX')} kWh</td>
-          </tr>
-        </table>
-      </div>
-
-      <div style="margin-bottom: 24px;">
-        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Análisis Financiero y Retorno</h2>
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse; margin-bottom: 12px;">
-          <tr>
-            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Inversión Total:</span> $${quoteData.financial?.investment_mxn?.toLocaleString('es-MX')} MXN</td>
-            <td style="padding: 4px 0; width: 50%;"><span style="font-weight: bold; color: #475569;">Valor Presente Neto (NPV):</span> $${quoteData.financial?.npv?.toLocaleString('es-MX')} MXN</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Ahorro Año 1:</span> $${quoteData.financial?.annual_savings_yr1?.toLocaleString('es-MX')} MXN</td>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">ROI 25 años:</span> ${quoteData.financial?.roi_pct?.toFixed(0)}%</td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Período de Retorno:</span> ${quoteData.financial?.payback_years?.toFixed(1)} años</td>
-            <td style="padding: 4px 0;"><span style="font-weight: bold; color: #475569;">Esquema:</span> ${isCredit ? `Crédito (${term} meses, Tasa ${rate}%)` : 'Contado'}</td>
-          </tr>
-        </table>
-        ${isCredit ? `
-        <div style="background-color: #f8fafc; border-left: 4px solid #C49825; padding: 12px; border-radius: 8px; font-size: 10px;">
-          <p style="margin: 0; font-weight: bold; color: #0f172a;">Detalles del Financiamiento:</p>
-          <p style="margin: 4px 0 0 0; color: #334155;">Mensualidad del Crédito: <strong>$${Math.round(monthlyCreditPayment).toLocaleString('es-MX')} MXN</strong>. El ahorro neto anual ya deduce el costo del crédito.</p>
-        </div>
-        ` : ''}
-      </div>
-
-      <div style="margin-bottom: 24px;">
-        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Proyección de Ahorro Acumulado</h2>
-        <table style="width: 100%; border-collapse: collapse; font-size: 10px; text-align: left;">
-          <thead>
-            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
-              <th style="padding: 6px; width: 10%;">Año</th>
-              <th style="padding: 6px; width: 22.5%;">Ahorro Anual</th>
-              <th style="padding: 6px; width: 22.5%;">Pago Sin Solar (6% Inf)</th>
-              <th style="padding: 6px; width: 22.5%;">Pago Con Solar</th>
-              <th style="padding: 6px; width: 22.5%;">Ahorro Neto Acum.</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${[1, 5, 10, 15, 20, 25].map(yr => {
-              const annualSavings = quoteData.financial?.cashflows_25yr[yr - 1] || 0;
-              const bimonthlyTotal = quoteData.cfe_data?.total_mxn || 0;
-              const yearlyPaymentWithoutSolar = (bimonthlyTotal * (quoteData.cfe_data?.is_bimonthly ? 6 : 12)) * Math.pow(1.06, yr - 1);
-              const minAnnualFee = quoteData.cfe_data?.is_bimonthly ? 600 : 1200;
-              const yearlyPaymentWithSolar = Math.max(minAnnualFee, yearlyPaymentWithoutSolar - annualSavings);
-              
-              // Sum up cashflows up to yr
-              let cumulative = 0;
-              for (let i = 0; i < yr; i++) {
-                cumulative += (quoteData.financial?.cashflows_25yr[i] || 0);
-              }
-              // Calculate bimonthly/credit cumulative paid
-              let totalCreditPaidSoFar = 0;
-              if (isCredit) {
-                const nMonths = Math.min(term, yr * 12);
-                totalCreditPaidSoFar = monthlyCreditPayment * nMonths;
-              }
-              const netCumulative = cumulative - (isCredit ? totalCreditPaidSoFar : inv);
-
-              return `
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 6px; font-weight: bold;">Año ${yr}</td>
-                  <td style="padding: 6px;">$${Math.round(annualSavings).toLocaleString('es-MX')} MXN</td>
-                  <td style="padding: 6px; color: #dc2626;">$${Math.round(yearlyPaymentWithoutSolar).toLocaleString('es-MX')} MXN</td>
-                  <td style="padding: 6px; color: #16a34a;">$${Math.round(yearlyPaymentWithSolar).toLocaleString('es-MX')} MXN</td>
-                  <td style="padding: 6px; font-weight: bold; color: #0f172a;">$${Math.round(netCumulative).toLocaleString('es-MX')} MXN</td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      <div style="margin-bottom: 24px;">
-        <h2 style="font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; tracking: 0.05em;">Beneficios Ecológicos en 25 Años</h2>
-        <div style="display: flex; gap: 12px; justify-content: space-between;">
-          <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; text-align: center;">
-            <p style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0;">${(quoteData.environmental?.co2_kg_25yr / 1000).toFixed(1)} t</p>
-            <p style="font-size: 9px; color: #166534; font-weight: bold; margin: 2px 0 0 0; text-transform: uppercase;">CO2 Evitado</p>
-          </div>
-          <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; text-align: center;">
-            <p style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0;">${Math.round(quoteData.environmental?.trees_25yr || 0)}</p>
-            <p style="font-size: 9px; color: #166534; font-weight: bold; margin: 2px 0 0 0; text-transform: uppercase;">Árboles Plantados</p>
-          </div>
-          <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; text-align: center;">
-            <p style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0;">${Math.round(quoteData.environmental?.cars_25yr || 0)}</p>
-            <p style="font-size: 9px; color: #166534; font-weight: bold; margin: 2px 0 0 0; text-transform: uppercase;">Autos Evitados</p>
-          </div>
-          <div style="flex: 1; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; text-align: center;">
-            <p style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0;">${Math.round(quoteData.environmental?.coal_ton_25yr || 0)}</p>
-            <p style="font-size: 9px; color: #166534; font-weight: bold; margin: 2px 0 0 0; text-transform: uppercase;">Tons Carbón</p>
-          </div>
-        </div>
-      </div>
-
-      <div style="border-top: 1px solid #cbd5e1; padding-top: 12px; text-align: center; font-size: 9px; color: #64748b; margin-top: 32px;">
-        <p style="margin: 0;">Este documento es una estimación del dimensionamiento técnico preliminar. eSol Energías Renovables es responsable de la ejecución técnica definitiva.</p>
-        <p style="margin: 2px 0 0 0; font-weight: bold; color: #C49825;">eSol Energías Renovables — Hermosillo, Sonora</p>
-      </div>
-    `;
-
-    const opt = {
-      margin:       15,
-      filename:     `Propuesta_Solar_${quoteData.client_name.replace(/\s+/g, '_')}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2 },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-
-    html2pdf().from(element).set(opt).save()
-      .then(() => {
-        setView('results');
-      })
-      .catch((err) => {
-        console.error("Error al exportar PDF:", err);
-        setView('results');
-      });
-  };
+  const currentProject = projects.find(p => p.id === currentProjectId);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full text-cream font-body">
-      {/* Sidebar - Cotizaciones Guardadas */}
-      <div className="w-full lg:w-64 bg-dark-1 border border-dark-4 p-5 rounded-2xl flex flex-col justify-between shrink-0 space-y-6">
-        <div className="space-y-6">
-          <div className="flex items-center justify-between pb-3 border-b border-dark-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-gold">Cotizaciones</span>
+    <div className="flex flex-col lg:flex-row gap-8 w-full text-cream font-body h-[calc(100vh-6rem)]">
+      {/* Sidebar - Proyectos */}
+      <div className="w-full lg:w-72 bg-dark-1/80 backdrop-blur-xl border border-dark-4 p-5 rounded-3xl flex flex-col shrink-0 h-full overflow-hidden shadow-2xl relative z-10">
+        
+        {/* Glow decoration */}
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-gold/5 to-transparent pointer-events-none"></div>
+
+        <div className="flex items-center justify-between pb-4 border-b border-dark-4 relative z-10">
+          <div className="flex items-center gap-2">
+            <Sun className="w-5 h-5 text-gold" />
+            <span className="text-sm font-bold uppercase tracking-widest text-cream">Proyectos</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <button
-              onClick={handleReset}
-              className="p-1.5 bg-gold/10 hover:bg-gold/20 text-gold rounded-lg border border-gold/20 transition-all cursor-pointer flex items-center gap-1 text-[10px] font-black uppercase"
+              onClick={() => loadProjects()}
+              className="p-1.5 bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-gold rounded-xl transition-all cursor-pointer"
+              title="Recargar de Supabase"
             >
-              <Plus className="h-3.5 w-3.5" />
-              Nueva
+              <RefreshCw className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleStartUpload}
+              className="p-1.5 bg-gold hover:bg-gold-light text-dark-1 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-[0_0_10px_rgba(196,152,37,0.3)] hover:scale-105"
+              title="Nuevo Proyecto"
+            >
+              <Plus className="h-4 w-4 font-bold" />
             </button>
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <span className="text-[10px] text-cream-muted uppercase font-bold tracking-wider block mb-1">Guardadas en Historial</span>
-            {quotes.length === 0 ? (
-              <p className="text-[11px] text-cream-muted leading-relaxed py-2">No hay cotizaciones guardadas aún.</p>
-            ) : (
-              <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                {quotes.map((q) => {
-                  const isActive = q.id === currentQuoteId;
-                  const dateStr = new Date(q.created_at).toLocaleDateString('es-MX', {
-                    day: 'numeric', month: 'short'
-                  });
-                  return (
-                    <div
-                      key={q.id}
-                      onClick={() => loadQuote(q)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex justify-between items-center group ${
-                        isActive
-                          ? 'bg-gold/10 border-gold/40 text-gold'
-                          : 'bg-dark-3/20 border border-dark-4 text-cream-muted hover:border-cream/25 hover:text-cream'
-                      }`}
+        <div className="mt-6 flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar relative z-10">
+          {projects.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="w-8 h-8 text-dark-4 mx-auto mb-3" />
+              <p className="text-xs text-cream-muted leading-relaxed">No hay proyectos. Sube un recibo CFE o crea un sistema aislado.</p>
+            </div>
+          ) : (
+            projects.map((p) => {
+              const isActive = p.id === currentProjectId;
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => {
+                    setCurrentProjectId(p.id);
+                    setView('project');
+                  }}
+                  className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col group relative overflow-hidden ${
+                    isActive
+                      ? 'bg-dark-3/80 border-gold/40 text-cream shadow-lg shadow-gold/5'
+                      : 'bg-dark-3/20 border-dark-4 text-cream-muted hover:border-cream/20 hover:text-cream'
+                  }`}
+                >
+                  {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-gold"></div>}
+                  
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="text-sm font-bold truncate pr-4 text-cream group-hover:text-gold transition-colors">{p.client_name}</p>
+                    <button
+                      onClick={(e) => deleteProject(e, p.id)}
+                      className="p-1 bg-transparent hover:bg-red-500/10 text-dark-4 hover:text-red-400 rounded-md transition-all opacity-0 group-hover:opacity-100 absolute right-2 top-3"
                     >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold truncate">{q.client_name}</p>
-                        <p className="text-[10px] text-cream-muted mt-0.5 flex items-center gap-1.5 font-mono">
-                          <span>{q.system?.installed_kWp?.toFixed(1) || 0} kWp</span>
-                          <span>•</span>
-                          <span>{dateStr}</span>
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => deleteQuote(e, q.id)}
-                        className="p-1 bg-transparent hover:bg-red-500/10 text-cream-muted hover:text-red-400 rounded-lg transition-all"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-cream-muted">
+                        <FileText className="w-3 h-3" /> {p.proposals.length} prop.
+                      </span>
+                      <span className="text-dark-4">•</span>
+                      <span className="text-cream-muted">
+                        {new Date(p.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+
+                    {p.project_type === 'off-grid' ? (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-extrabold tracking-widest">
+                        AISLADO
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[9px] font-extrabold tracking-widest">
+                        CFE
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 space-y-6">
-        <div className="flex justify-between items-center pb-4 border-b border-dark-4">
-          <div>
-            <h1 className="text-2xl font-bold font-display text-gold uppercase tracking-wide">ESUN — Cotizador Solar</h1>
-            <p className="text-cream-muted text-xs">Propuesta y dimensionamiento solar fotovoltaico instantáneo</p>
-          </div>
+      <div className="flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar relative">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gold/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-          <div className="flex items-center gap-2">
-            {view === 'results' && (
-              <button
-                onClick={handleTriggerExport}
-                className="px-4 py-1.5 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs transition-all cursor-pointer uppercase tracking-wider shadow-[0_0_15px_rgba(196,152,37,0.3)] hover:scale-[1.02]"
-              >
-                Exportar Propuesta PDF
+        {view === 'welcome' && (
+          <div className="flex-1 flex flex-col items-center justify-center text-center max-w-2xl mx-auto space-y-8 animate-[fadeIn_0.5s_ease-out] relative z-10">
+            <div className="w-24 h-24 bg-dark-2 border border-dark-4 rounded-full flex items-center justify-center shadow-2xl relative">
+              <div className="absolute inset-0 bg-gold/20 rounded-full animate-ping opacity-20"></div>
+              <Sun className="w-10 h-10 text-gold" />
+            </div>
+            <div className="space-y-4">
+              <h1 className="text-4xl md:text-5xl font-display font-black text-cream tracking-tight">eSun <span className="text-gold">Solar</span></h1>
+              <p className="text-lg text-cream-muted">Plataforma Profesional de Dimensionamiento y Cotización</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full pt-8">
+              <button onClick={handleStartUpload} className="group flex flex-col items-center p-6 bg-dark-2/50 border border-dark-4 hover:border-gold/50 rounded-3xl transition-all hover:bg-dark-3/50 hover:shadow-[0_10px_30px_rgba(196,152,37,0.1)]">
+                <UploadCloud className="w-8 h-8 text-gold mb-3 group-hover:scale-110 transition-transform" />
+                <span className="font-bold text-cream">Nuevo Proyecto CFE</span>
+                <span className="text-xs text-cream-muted mt-2">Interconectado con recibo CFE</span>
               </button>
-            )}
-
-            {view !== 'upload' && (
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-dark-4 bg-dark-3/30 hover:border-gold/30 text-cream-muted hover:text-gold rounded-xl text-xs transition-all cursor-pointer font-bold uppercase tracking-wider"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Atrás / Limpiar</span>
+              
+              <button onClick={() => {
+                setView('offgrid-form');
+              }} className="group flex flex-col items-center p-6 bg-dark-2/50 border border-dark-4 hover:border-emerald-500/50 rounded-3xl transition-all hover:bg-dark-3/50 hover:shadow-[0_10px_30px_rgba(16,185,129,0.1)]">
+                <Battery className="w-8 h-8 text-emerald-400 mb-3 group-hover:scale-110 transition-transform" />
+                <span className="font-bold text-cream">Sistema Aislado</span>
+                <span className="text-xs text-cream-muted mt-2">Off-Grid con baterías</span>
               </button>
-            )}
-          </div>
-        </div>
 
-        {/* Dynamic Views */}
+              <button onClick={() => {
+                setPendingCfeData({ tariff: '1', monthly_kWh: 500, bimonthly_kWh: 1000, total_mxn: 1500, tariff_rate: 1.5, is_bimonthly: true, historic_periods: [] });
+                setView('form');
+              }} className="group flex flex-col items-center p-6 bg-dark-2/50 border border-dark-4 hover:border-cream/30 rounded-3xl transition-all hover:bg-dark-3/50">
+                <Settings className="w-8 h-8 text-cream-muted mb-3 group-hover:scale-110 transition-transform group-hover:text-cream" />
+                <span className="font-bold text-cream">Ingreso Manual</span>
+                <span className="text-xs text-cream-muted mt-2">Crear proyecto sin recibo PDF</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {view === 'upload' && (
-          <div className="animate-[fadeIn_0.2s_ease-out]">
+          <div className="flex-1 animate-[fadeIn_0.3s_ease-out] relative z-10 max-w-4xl mx-auto w-full pt-10">
+             <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl font-display font-black text-cream">Crear Nuevo Proyecto</h2>
+                <p className="text-sm text-cream-muted mt-1">Sube el recibo de luz para extraer los datos con IA</p>
+              </div>
+              <button onClick={handleReset} className="p-2 bg-dark-3 hover:bg-dark-4 rounded-xl transition-all">
+                <ArrowLeft className="w-5 h-5 text-cream-muted" />
+              </button>
+            </div>
             <CFEUploader
               onParsed={(data) => {
-                setCfeData(data);
+                setPendingCfeData(data);
                 setView('form');
               }}
             />
           </div>
         )}
 
-        {view === 'form' && cfeData && (
-          <div className="animate-[fadeIn_0.2s_ease-out]">
+        {view === 'form' && pendingCfeData && (
+          <div className="flex-1 animate-[fadeIn_0.3s_ease-out] relative z-10 max-w-4xl mx-auto w-full pt-10">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl font-display font-black text-cream">Verificar Datos Extraídos</h2>
+                <p className="text-sm text-cream-muted mt-1">Revisa que la IA haya capturado correctamente los consumos</p>
+              </div>
+              <button onClick={handleStartUpload} className="p-2 bg-dark-3 hover:bg-dark-4 rounded-xl transition-all">
+                <ArrowLeft className="w-5 h-5 text-cream-muted" />
+              </button>
+            </div>
             <CFEDataForm
-              data={cfeData}
+              data={pendingCfeData}
               onSubmit={(finalData) => {
-                setCfeData(finalData);
-                setView('results');
+                createNewProject(finalData);
               }}
             />
           </div>
         )}
 
-        {view === 'results' && cfeData && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-[fadeIn_0.3s_ease-out] items-start">
-            {/* Left Column - Sizing proposal */}
-            <div className="space-y-6">
-              <SystemProposal
-                key={currentQuoteId || 'new'}
-                cfeData={cfeData}
-                system={system}
-                onUpdate={setSystem}
-              />
+        {view === 'offgrid-form' && (
+          <div className="flex-1 animate-[fadeIn_0.3s_ease-out] relative z-10 max-w-4xl mx-auto w-full pt-10 pb-20">
+            <div className="flex items-center justify-between mb-8">
+              <button onClick={handleReset} className="flex items-center gap-2 p-2 bg-dark-3 hover:bg-dark-4 rounded-xl transition-all text-cream-muted hover:text-cream">
+                <ArrowLeft className="w-5 h-5" />
+                <span>Volver</span>
+              </button>
             </div>
-
-            {/* Right Column - Financial & Env analysis */}
-            <div className="space-y-6">
-              {system && (
-                <>
-                  <FinancialAnalysis
-                    key={currentQuoteId || 'new-fin'}
-                    system={system}
-                    cfeData={cfeData}
-                    financialParams={financialParams}
-                    onChangeFinancialParams={setFinancialParams}
-                  />
-                  <EnvironmentalImpact
-                    system={system}
-                  />
-                </>
-              )}
-            </div>
+            <LoadProfileForm
+              onSubmit={(data, contactData) => {
+                createOffGridProject(data, contactData);
+              }}
+            />
           </div>
         )}
 
-        {view === 'export' && (
-          <div className="bg-dark-2 border border-dark-4 p-8 rounded-2xl flex flex-col items-center justify-center space-y-6 py-20 animate-[fadeIn_0.2s_ease-out]">
-            <div className="relative flex items-center justify-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-gold"></div>
-              <div className="absolute font-display text-gold text-lg font-black uppercase">eSol</div>
-            </div>
-            <div className="text-center space-y-2">
-              <h3 className="text-lg font-bold font-display text-gold">Generando Reporte de Cotización</h3>
-              <p className="text-xs text-cream-muted max-w-sm">Compilando gráficos, matrices de insumo y equivalencias de carbono en formato PDF de alta calidad...</p>
-            </div>
+        {view === 'project' && currentProject && (
+          <div className="flex-1 w-full animate-[fadeIn_0.3s_ease-out] relative z-10 pb-20">
+            <ProjectDashboard 
+              project={currentProject} 
+              onUpdateProject={updateProject} 
+              onBack={handleReset} 
+            />
           </div>
         )}
+
       </div>
     </div>
   );

@@ -1,0 +1,18 @@
+=== GUÍA DE DESPLIEGUE DEL AGENTE SDR EN HOSTINGER ===
+
+Para que el agente trabaje 24/7 sin depender de tu computadora, sigue estos pasos en tu panel de Hostinger (hPanel):
+
+1. Ve a "Administrador de Archivos" (File Manager) en Hostinger.
+2. Afuera de tu carpeta "public_html", crea una nueva carpeta llamada "sdr_backend".
+3. Sube los archivos de esta carpeta local (run_sdr_agent.mjs, package.json, y el .env) a esa nueva carpeta en Hostinger.
+   NOTA: Renombra el archivo .env.example a .env y asegúrate de que tenga tus contraseñas reales.
+4. En Hostinger, busca la herramienta "Terminal" o "Acceso SSH" y escribe esto para instalar las dependencias:
+   cd sdr_backend
+   npm install
+5. Finalmente, ve a la herramienta "Tareas Programadas" (Cron Jobs) en Hostinger.
+6. Configura el Cron Job para que corra cada 12 horas o cada 24 horas.
+7. En el campo "Comando a ejecutar", pega exactamente esto:
+   cd /home/u821937813/domains/esolenergias.com/sdr_backend && node --env-file=.env run_sdr_agent.mjs "Hoteles boutique en Mérida"
+
+*Nota: Asegúrate de cambiar "u821937813" por tu usuario real de Hostinger si es diferente.
+¡Y listo! Tu IA ahora trabaja para ti mientras duermes.

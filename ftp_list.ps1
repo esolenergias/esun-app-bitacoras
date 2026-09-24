@@ -1,4 +1,4 @@
-$ftpHost = "ftp://esolenergias.com"
+$ftpHost = "ftp://82.29.81.191"
 $ftpUser  = "u821937813.esolenergias.com"
 $ftpPass  = "h+[g5P./*yW5Prd"
 
@@ -19,11 +19,8 @@ function ListDir($remoteUri) {
     } catch { return "ERROR: $_" }
 }
 
-Write-Host "=== /public_html/ ==="
-ListDir "$ftpHost/public_html/"
+Write-Host "=== / ==="
+ListDir "$ftpHost/"
 
-Write-Host "`n=== /public_html/assets/ ==="
-ListDir "$ftpHost/public_html/assets/"
-
-Write-Host "`n=== /public_html/esol-cfe-manager/ ==="
-ListDir "$ftpHost/public_html/esol-cfe-manager/"
+Write-Host "`n=== /assets/ ==="
+ListDir "$ftpHost/assets/"

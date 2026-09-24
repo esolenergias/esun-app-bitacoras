@@ -415,17 +415,66 @@ class SyncRepository(private val context: Context) {
         _syncStatus.value = _syncStatus.value.copy(pendingLogsCount = unsynced)
     }
 
+    fun isWifiConnected(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            ?: return false
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+               capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+    }
+
+    suspend fun deduplicateLocalBitacoras() = withContext(Dispatchers.IO) {
+        try {
+            val allLogs = bitacoraDao.getAllBitacoras().first()
+            val grouped = allLogs.groupBy { "${it.siteName.trim().lowercase()}_${it.date.trim()}" }
+            var cleanedCount = 0
+            for ((_, group) in grouped) {
+                if (group.size > 1) {
+                    val keeper = group.maxByOrNull { log ->
+                        var score = log.id
+                        if (!log.supabaseId.isNullOrEmpty()) score += 1000000
+                        if (log.isSynced) score += 500000
+                        if (!log.photoUri.isNullOrEmpty()) score += 10000
+                        score
+                    }
+                    for (log in group) {
+                        if (log.id != keeper?.id) {
+                            bitacoraDao.deleteBitacora(log)
+                            cleanedCount++
+                        }
+                    }
+                }
+            }
+            if (cleanedCount > 0) {
+                addLog("Limpieza de duplicados: Se eliminaron $cleanedCount reportes duplicados de la base de datos local.")
+            }
+        } catch (e: Exception) {
+            Log.w("SyncRepository", "Error en deduplicación preventiva: ${e.message}")
+        }
+    }
+
     // --- Main Sync Engine ---
-    suspend fun syncPendingBitacoras(): Boolean {
+    suspend fun syncPendingBitacoras(isManualTrigger: Boolean = false): Boolean {
         if (!syncMutex.tryLock()) {
             addLog("Sincronización ya en curso. Omitiendo intento duplicado.")
             return false
         }
         try {
+            val hasWifi = isWifiConnected()
+            if (!hasWifi && !isManualTrigger) {
+                addLog("Auto-sincronización en espera: Red celular detectada. Se sincronizará automáticamente al conectar a Wi-Fi o pulsando 'Sincronizar'.")
+                _syncStatus.value = _syncStatus.value.copy(isSyncing = false)
+                return false
+            }
+
             if (!_syncStatus.value.isOnline) {
                 addLog("Error: No hay conexión a internet para sincronizar.")
                 return false
             }
+
+            // Ejecutar deduplicación preventiva de reportes locales antes de sincronizar
+            deduplicateLocalBitacoras()
 
             return withContext(Dispatchers.IO) {
                 _syncStatus.value = _syncStatus.value.copy(isSyncing = true)
@@ -450,72 +499,65 @@ class SyncRepository(private val context: Context) {
             }
 
             if (supabaseService != null) {
-                // SYNC OBRAS (PROYECTOS) PRIMERO
-                addLog("Verificando Obras locales para sincronizar...")
+                // SYNC OBRAS (PROYECTOS) EN PRODUCCIÓN
+                addLog("Verificando Obras en producción desde Supabase...")
+                val bearerToken = "Bearer $supabaseKey"
                 val todasObras = obraDao.getAllObras().first()
-                if (todasObras.isNotEmpty()) {
-                    val bearerToken = "Bearer $supabaseKey"
-                    var obrasSynced = 0
-                    for (obra in todasObras) {
-                        try {
-                            val req = SupabaseObraRequest(
-                                nombre = obra.nombre,
-                                cliente = obra.cliente,
-                                ubicacion = obra.ubicacion,
-                                fecha_inicio = obra.fechaInicio,
-                                fecha_termino = obra.fechaTermino,
-                                residente = obra.residente,
-                                descripcion = obra.descripcion,
-                                monto_contrato = obra.montoContrato,
-                                status = obra.status
-                            )
-                            val resp = supabaseService.upsertObra(apiKey = supabaseKey, authorization = bearerToken, request = req)
-                            if (resp.isSuccessful) obrasSynced++
-                        } catch (e: Exception) {
-                            // ignore individual fail
-                        }
-                    }
-                    addLog("Obras sincronizadas: $obrasSynced/${todasObras.size}")
-                    
-                    // Sincronizar eliminaciones: Si una obra fue eliminada en la web, eliminarla localmente
-                    try {
-                        val getResp = supabaseService.getObras(apiKey = supabaseKey, authorization = bearerToken)
-                        if (getResp.isSuccessful) {
-                            val remoteObras = getResp.body() ?: emptyList()
-                            val remoteObraNames = remoteObras.map { it.nombre }.toSet()
-                            val localObraNames = todasObras.map { it.nombre }.toSet()
-                            
-                            var deletedCount = 0
-                            for (obra in todasObras) {
-                                if (!remoteObraNames.contains(obra.nombre)) {
-                                    obraDao.deleteObra(obra)
-                                    deletedCount++
-                                }
-                            }
-                            if (deletedCount > 0) addLog("Se eliminaron $deletedCount proyectos locales borrados en la nube.")
+                
+                try {
+                    val getResp = supabaseService.getObras(apiKey = supabaseKey, authorization = bearerToken)
+                    if (getResp.isSuccessful) {
+                        val remoteObras = getResp.body() ?: emptyList()
+                        
+                        // Filtrar estrictamente: ÚNICAMENTE sincronizar obras con estado de producción activo ("si", true, "produccion")
+                        val activeProductionRemoteObras = remoteObras.filter { it.isProduccionActiva() }
 
-                            var addedCount = 0
-                            for (rObra in remoteObras) {
-                                if (!localObraNames.contains(rObra.nombre)) {
-                                    obraDao.insertObra(ObraEntity(
-                                        nombre = rObra.nombre,
-                                        cliente = rObra.cliente,
-                                        ubicacion = rObra.ubicacion,
-                                        fechaInicio = rObra.fecha_inicio,
-                                        fechaTermino = rObra.fecha_termino,
-                                        residente = rObra.residente,
-                                        descripcion = rObra.descripcion,
-                                        montoContrato = rObra.monto_contrato,
-                                        status = rObra.status
-                                    ))
-                                    addedCount++
-                                }
+                        val activeRemoteObraNames = activeProductionRemoteObras.map { it.nombre.trim().lowercase() }.toSet()
+                        
+                        // 1. Limpieza de base de datos local: Eliminar obras que NO estén en el conjunto de produccion="si"
+                        var deletedCount = 0
+                        val namesToKeep = mutableSetOf<String>()
+                        for (obra in todasObras) {
+                            val localNameClean = obra.nombre.trim().lowercase()
+                            val localStatusLower = obra.status.trim().lowercase()
+                            val isRobertoFranco = localNameClean.contains("roberto franco")
+                            val isLocalInactive = localStatusLower == "no" || 
+                                               localStatusLower == "false" || 
+                                               localStatusLower == "inactiva" || 
+                                               localStatusLower == "fuera de produccion"
+
+                            if (!activeRemoteObraNames.contains(localNameClean) || isRobertoFranco || isLocalInactive) {
+                                obraDao.deleteObra(obra)
+                                deletedCount++
+                            } else {
+                                namesToKeep.add(localNameClean)
                             }
-                            if (addedCount > 0) addLog("Se descargaron $addedCount proyectos nuevos desde Supabase.")
                         }
-                    } catch (e: Exception) {
-                        addLog("Error al sincronizar obras con Supabase: ${e.message}")
+                        if (deletedCount > 0) addLog("Se eliminaron $deletedCount proyectos no vigentes o sin producción activa ('no').")
+
+                        // 2. Descargar e insertar únicamente obras activas en producción
+                        var addedCount = 0
+                        for (rObra in activeProductionRemoteObras) {
+                            val rNameClean = rObra.nombre.trim().lowercase()
+                            if (!namesToKeep.contains(rNameClean)) {
+                                obraDao.insertObra(ObraEntity(
+                                    nombre = rObra.nombre,
+                                    cliente = rObra.cliente ?: "",
+                                    ubicacion = rObra.ubicacion ?: "",
+                                    fechaInicio = rObra.fecha_inicio ?: "",
+                                    fechaTermino = rObra.fecha_termino ?: "",
+                                    residente = rObra.residente ?: "",
+                                    descripcion = rObra.descripcion ?: "",
+                                    montoContrato = rObra.monto_contrato ?: "",
+                                    status = "produccion"
+                                ))
+                                addedCount++
+                            }
+                        }
+                        if (addedCount > 0) addLog("Se descargaron $addedCount proyectos activos en producción desde Supabase.")
                     }
+                } catch (e: Exception) {
+                    addLog("Error al sincronizar obras activas con Supabase: ${e.message}")
                 }
             }
 
@@ -613,14 +655,26 @@ class SyncRepository(private val context: Context) {
                             val uri = Uri.parse(uriString)
                             val inputStream = context.contentResolver.openInputStream(uri)
                             if (inputStream != null) {
-                                val bytes = inputStream.readBytes()
+                                // Compresión preventiva para prevenir OutOfMemoryError en fotos de alta resolución
+                                val originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
                                 inputStream.close()
+
+                                val byteArrayOutputStream = java.io.ByteArrayOutputStream()
+                                if (originalBitmap != null) {
+                                    originalBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, byteArrayOutputStream)
+                                    originalBitmap.recycle()
+                                }
+                                val bytes = byteArrayOutputStream.toByteArray()
+                                byteArrayOutputStream.close()
                                 
                                 val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
                                 val json = org.json.JSONObject()
                                 json.put("filename", "evidencia_${log.id}_${System.currentTimeMillis()}_${index}.jpg")
                                 json.put("mimeType", "image/jpeg")
                                 json.put("base64", base64)
+                                json.put("moduleType", "BITACORA")
+                                json.put("siteName", log.siteName)
+                                json.put("folderName", "Bitácora - ${log.siteName}")
 
                                 val url = java.net.URL("https://script.google.com/macros/s/AKfycbwm5qwhrgsD37Hd8tFTZkECfKv-rYUoF3omNjm_GX0hZKeDyxC5tQTdXTPLUWEUUT5s/exec")
                                 val connection = url.openConnection() as java.net.HttpURLConnection
@@ -794,10 +848,10 @@ class SyncRepository(private val context: Context) {
                                 // No existe localmente con este supabaseId.
                                 // ¿Existe por casualidad un reporte local con la misma obra y fecha que no tiene supabaseId?
                                 val localMatchByAttrs = localLogs.firstOrNull { 
-                                    it.supabaseId.isNullOrEmpty() && 
-                                    it.siteName == rLog.site_name && 
-                                    it.date == rLog.date &&
-                                    (it.description == rLog.description || it.crewCount == rLog.crew_count)
+                                    (it.supabaseId == rLog.id) ||
+                                    (it.supabaseId.isNullOrEmpty() && 
+                                     it.siteName.trim().equals(rLog.site_name.trim(), ignoreCase = true) && 
+                                     it.date.trim() == rLog.date.trim())
                                 }
                                 
                                 if (localMatchByAttrs != null) {
@@ -902,8 +956,9 @@ class SyncRepository(private val context: Context) {
                 val response = service.getPresupuestos(apiKey = key, authorization = bearerToken)
                 
                 if (response.isSuccessful) {
-                    val presupuestos = response.body() ?: emptyList()
-                    addLog("Supabase Sync: Presupuestos obtenidos: ${presupuestos.size}")
+                    val rawPresupuestos = response.body() ?: emptyList()
+                    val presupuestos = rawPresupuestos.filter { it.isProduccionActiva() }
+                    addLog("Supabase Sync: Presupuestos obtenidos: ${presupuestos.size} activos de ${rawPresupuestos.size} totales")
                     
                     val conceptResponse = service.getConceptos(apiKey = key, authorization = bearerToken)
                     val allConcepts = if (conceptResponse.isSuccessful) conceptResponse.body() ?: emptyList() else emptyList()
@@ -1076,7 +1131,12 @@ class SyncRepository(private val context: Context) {
         }
     }
 
-    suspend fun syncMantenimientosWithSupabase() = withContext(Dispatchers.IO) {
+    suspend fun syncMantenimientosWithSupabase(isManualTrigger: Boolean = false) = withContext(Dispatchers.IO) {
+        val hasWifi = isWifiConnected()
+        if (!hasWifi && !isManualTrigger) {
+            addLog("Sincronización de Mantenimientos en espera: Se requiere Wi-Fi o activación manual.")
+            return@withContext
+        }
         try {
             val supabaseUrl = BuildConfig.SUPABASE_URL
             val supabaseKey = BuildConfig.SUPABASE_ANON_KEY

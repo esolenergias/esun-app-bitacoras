@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.33.1";
-import { PDFDocument, rgb, StandardFonts } from 'https://cdn.skypack.dev/pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,14 +25,24 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Fetch system details
+    // 1. Fetch system details WITH the linked account (to get the real email)
     const { data: system, error: sysError } = await supabase
       .from('esun_pv_systems')
-      .select('*')
+      .select(`
+        *,
+        account:account_id (
+          id,
+          username,
+          brand
+        )
+      `)
       .eq('id', system_id)
       .single();
 
     if (sysError || !system) throw sysError || new Error("System not found");
+
+    // Derive recipient email from the linked inverter account's username
+    const recipientEmail: string | null = system.account?.username ?? null;
 
     // 2. Fetch AI Alerts for this system
     const { data: alerts } = await supabase
@@ -42,7 +52,17 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(3);
 
-    // 3. Generate PDF
+    // 3. Fetch production logs for recent metrics
+    const { data: logs } = await supabase
+      .from('esun_production_logs')
+      .select('generated_kwh, estimated_consumption_kwh, date')
+      .eq('system_id', system_id)
+      .order('date', { ascending: false })
+      .limit(30);
+
+    const totalGenerated = (logs || []).reduce((acc: number, l: any) => acc + (parseFloat(l.generated_kwh) || 0), 0);
+
+    // 4. Generate PDF
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([600, 800]);
     const { width, height } = page.getSize();
@@ -50,93 +70,88 @@ serve(async (req) => {
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    page.drawText('Reporte Mensual de Energía Fotovoltaica', {
+    // Header Gold/Anthracite
+    page.drawRectangle({
+      x: 0,
+      y: height - 90,
+      width,
+      height: 90,
+      color: rgb(0.08, 0.08, 0.06),
+    });
+
+    page.drawText('eSol Energías · Telemetría Solar', {
       x: 50,
-      y: height - 50,
-      size: 24,
+      y: height - 40,
+      size: 20,
       font: helveticaBold,
-      color: rgb(0.1, 0.4, 0.8),
+      color: rgb(0.77, 0.60, 0.15), // Gold
     });
 
-    page.drawText(`Planta: ${system.plant_name} (Capacidad: ${system.capacity_kwp} kWp)`, {
-      x: 50, y: height - 90, size: 14, font: helveticaFont
+    page.drawText(`Reporte Mensual Fotovoltaico · Periodo ${month}/${year}`, {
+      x: 50,
+      y: height - 65,
+      size: 11,
+      font: helveticaFont,
+      color: rgb(0.94, 0.94, 0.91),
     });
 
-    page.drawText(`Tarifa CFE: ${system.cfe_tariff || 'N/A'}`, {
-      x: 50, y: height - 110, size: 14, font: helveticaFont
+    // System Info Box
+    page.drawRectangle({
+      x: 50,
+      y: height - 200,
+      width: width - 100,
+      height: 90,
+      color: rgb(0.96, 0.96, 0.94),
+      borderColor: rgb(0.85, 0.85, 0.80),
+      borderWidth: 1,
     });
 
+    page.drawText(`Planta: ${system.plant_name}`, {
+      x: 65, y: height - 135, size: 14, font: helveticaBold, color: rgb(0.08, 0.08, 0.06)
+    });
+    page.drawText(`ID de Planta: ${system.plant_id}  |  Marca: ${system.account?.brand || 'Huawei'}`, {
+      x: 65, y: height - 155, size: 10, font: helveticaFont, color: rgb(0.3, 0.3, 0.3)
+    });
+    page.drawText(`Capacidad Instalada: ${system.capacity_kwp} kWp  |  Tarifa CFE: ${system.cfe_tariff || 'DAC'}`, {
+      x: 65, y: height - 175, size: 10, font: helveticaFont, color: rgb(0.3, 0.3, 0.3)
+    });
+    page.drawText(`Generación 30 Días: ${totalGenerated.toFixed(1)} kWh`, {
+      x: 65, y: height - 192, size: 10, font: helveticaBold, color: rgb(0.77, 0.60, 0.15)
+    });
+
+    // Section IA Diagnostics
     page.drawText('Diagnóstico de Inteligencia Artificial (Gemini):', {
-      x: 50, y: height - 160, size: 16, font: helveticaBold, color: rgb(0.2, 0.2, 0.2)
+      x: 50, y: height - 230, size: 13, font: helveticaBold, color: rgb(0.1, 0.1, 0.1)
     });
 
-    let currentY = height - 190;
+    let currentY = height - 260;
     if (alerts && alerts.length > 0) {
       alerts.forEach((alert: any) => {
-        page.drawText(`• Gravedad: ${alert.severity}`, { x: 50, y: currentY, size: 12, font: helveticaBold });
-        page.drawText(`  ${alert.ai_description}`, { x: 50, y: currentY - 15, size: 11, font: helveticaFont });
-        page.drawText(`  Rec: ${alert.ai_recommendation}`, { x: 50, y: currentY - 30, size: 11, font: helveticaFont, color: rgb(0.1, 0.6, 0.1) });
-        currentY -= 60;
+        page.drawText(`• Severidad: ${alert.severity}`, { x: 50, y: currentY, size: 11, font: helveticaBold, color: rgb(0.8, 0.2, 0.2) });
+        page.drawText(`  ${alert.ai_description}`, { x: 50, y: currentY - 15, size: 9.5, font: helveticaFont, color: rgb(0.2, 0.2, 0.2) });
+        if (alert.ai_recommendation) {
+          page.drawText(`  Acción: ${alert.ai_recommendation}`, { x: 50, y: currentY - 30, size: 9.5, font: helveticaFont, color: rgb(0.1, 0.5, 0.1) });
+        }
+        currentY -= 50;
       });
     } else {
-      page.drawText('El sistema operó en condiciones óptimas durante este periodo.', { x: 50, y: currentY, size: 12, font: helveticaFont });
+      page.drawText('El sistema fotovoltaico opera en condiciones óptimas sin anomalías.', { x: 50, y: currentY, size: 10, font: helveticaFont, color: rgb(0.2, 0.6, 0.2) });
     }
 
     const pdfBytes = await pdfDoc.save();
 
-    // 4. Upload to Supabase Storage
-    const fileName = `report_${system_id}_${year}_${month}.pdf`;
-    
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from('reports')
-      .upload(fileName, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true
-      });
-
-    if (uploadError) throw uploadError;
-
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage.from('reports').getPublicUrl(fileName);
-    const pdfUrl = publicUrlData.publicUrl;
-
-    // 5. Send Email via Resend (Mock for now, but fully wired)
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    let emailStatus = "Not Sent (Missing RESEND_API_KEY)";
-
-    if (resendApiKey) {
-      const emailResponse = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: 'Esolenergias <noreply@esolenergias.com>',
-          to: ['cliente@ejemplo.com'], // In a real scenario, this comes from the system/account
-          subject: `Reporte Mensual Fotovoltaico - ${system.plant_name}`,
-          html: `
-            <h2>Hola,</h2>
-            <p>Adjuntamos el enlace para descargar tu reporte de monitoreo fotovoltaico del mes de ${month}/${year}.</p>
-            <p><a href="${pdfUrl}">Descargar Reporte PDF</a></p>
-            <br/>
-            <p>Atentamente,<br/>El equipo de Esolenergias</p>
-          `
-        })
-      });
-      
-      if (emailResponse.ok) {
-        emailStatus = "Sent Successfully";
-      } else {
-        emailStatus = `Failed: ${await emailResponse.text()}`;
-      }
+    // Convert PDF bytes to base64
+    let binary = '';
+    const bytes = new Uint8Array(pdfBytes);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
+    const pdfBase64 = btoa(binary);
 
     return new Response(JSON.stringify({ 
       message: "PDF generated successfully", 
-      url: pdfUrl,
-      emailStatus
+      pdf_base64: pdfBase64,
+      filename: `Reporte_${system.plant_name.replace(/\s+/g, '_')}_${month}_${year}.pdf`,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

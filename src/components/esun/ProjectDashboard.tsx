@@ -1,19 +1,23 @@
 import React, { useState } from 'react';
 import {
   ArrowLeft, Plus, Edit2, FileText, Zap, Battery, DollarSign, Calendar, RefreshCcw,
-  Tv, Printer, FileSpreadsheet, Save, CheckCircle2
+  Tv, Printer, FileSpreadsheet, Save, CheckCircle2, ShieldCheck, Check, Lock, Unlock
 } from 'lucide-react';
-import type { SolarProject, Proposal } from './esunTypes';
+import type { SolarProject, Proposal, AnteproyectoImage, CronogramaParams } from './esunTypes';
+import AnteproyectoManager from './AnteproyectoManager';
 import CFEDataForm from './CFEDataForm';
 import CFEUploader from './CFEUploader';
 import SystemProposal from './SystemProposal';
 import FinancialAnalysis, { getInitialAutoConcepts, getEffectiveConcepts } from './FinancialAnalysis';
 import EnvironmentalImpact from './EnvironmentalImpact';
 import InteractivePresentationModal from './InteractivePresentationModal';
+import OffgridProposal from './offgrid/OffgridProposal';
+import LoadProfileForm from './offgrid/LoadProfileForm';
 import { buildPremiumPDF } from './lib/pdfProposalBuilder';
 import { calculateFinancials } from './lib/financialEngine';
 import { SOLAR_CONSTANTS } from './lib/solarConstants';
 import { savePresupuesto, getMatrices, calculateMatrixDirectCost, calculateMatrixSellingPrice, getPresupuestoDetails } from '../../lib/cotizadorService';
+import { resetProposalDevices } from './lib/proposalSecurity';
 import ErrorBoundary from '../ErrorBoundary';
 interface ProjectDashboardProps {
   project: SolarProject;
@@ -23,7 +27,6 @@ interface ProjectDashboardProps {
 
 export default function ProjectDashboard({ project, onUpdateProject, onBack }: ProjectDashboardProps) {
   const [view, setView] = useState<'dashboard' | 'edit_cfe' | 'upload_cfe' | 'edit_proposal' | 'exporting'>('dashboard');
-  const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
 
   // Modals and action states
   const [showPresentation, setShowPresentation] = useState(false);
@@ -33,9 +36,30 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
   const [isSavingPresupuesto, setIsSavingPresupuesto] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Temporary state for when editing a proposal
-  const [currentSystem, setCurrentSystem] = useState<any>(null);
-  const [currentFinParams, setCurrentFinParams] = useState<any>(null);
+  const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
+  const [currentSystem, setCurrentSystem] = useState<any | null>(null);
+  const [currentFinParams, setCurrentFinParams] = useState<any>({
+    isCredit: false,
+    interestRate: 15,
+    termMonths: 36
+  });
+  const [currentAnteproyectoImages, setCurrentAnteproyectoImages] = useState<AnteproyectoImage[]>([]);
+  const [currentAnteproyectoUnlocked, setCurrentAnteproyectoUnlocked] = useState<boolean>(false);
+  const [currentCronogramaParams, setCurrentCronogramaParams] = useState<CronogramaParams>({
+    startDate: new Date().toISOString().split('T')[0]
+  });
+
+  const effectiveCfeData = project.cfe_data || {
+    tariff: 'Aislado',
+    monthly_kWh: (project.load_profile?.daily_Wh || 0) * 30 / 1000,
+    bimonthly_kWh: (project.load_profile?.daily_Wh || 0) * 60 / 1000,
+    total_mxn: 0,
+    tariff_rate: 0,
+    is_bimonthly: true,
+    historic_periods: [],
+    demand_kw: 0
+  };
+
   const [proposalName, setProposalName] = useState<string>('');
 
   const handleGeneratePDF = async () => {
@@ -65,7 +89,18 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
           }));
         }
 
-        await buildPremiumPDF(project, {
+        await buildPremiumPDF({
+          ...project,
+          cfe_data: project.cfe_data || {
+            tariff: 'Aislado',
+            monthly_kWh: (project.load_profile?.daily_Wh || 0) * 30 / 1000,
+            bimonthly_kWh: (project.load_profile?.daily_Wh || 0) * 60 / 1000,
+            total_mxn: 0,
+            tariff_rate: 0,
+            is_bimonthly: true,
+            historic_periods: []
+          }
+        }, {
           ...currentProposal,
           system: currentSystem,
           financialParams: currentFinParams,
@@ -74,13 +109,13 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
             system_kWp: currentSystem?.system_kWp || 0,
             installed_kWp: currentSystem?.installed_kWp || 0,
             annual_production_kWh: currentSystem?.annual_production_kWh || 0,
-            monthly_consumption_kWh: project.cfe_data?.monthly_kWh || 0,
-            tariff_rate_mxn: project.cfe_data?.tariff_rate || 0,
+            monthly_consumption_kWh: effectiveCfeData.monthly_kWh,
+            tariff_rate_mxn: effectiveCfeData.tariff_rate,
             custom_cost: currentFinParams?.manualCost,
-            historic_periods: project.cfe_data?.historic_periods,
-            is_bimonthly: project.cfe_data?.is_bimonthly,
-            tariff_name: project.cfe_data?.tariff,
-            demand_kw: project.cfe_data?.demand_kw
+            historic_periods: effectiveCfeData.historic_periods,
+            is_bimonthly: effectiveCfeData.is_bimonthly,
+            tariff_name: effectiveCfeData.tariff,
+            demand_kw: effectiveCfeData.demand_kw
           })
         }, presupuestoItems, () => setIsGeneratingQuote(false));
       } else {
@@ -174,9 +209,14 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
   }, [project.client_name]);
 
   const saveCFEData = (newCfe: any) => {
-    const updated = { 
+    const updated: SolarProject = { 
       ...project, 
       client_name: newCfe.client_name || project.client_name,
+      client_email: newCfe.client_email || project.client_email,
+      client_phone: newCfe.client_phone || project.client_phone,
+      client_address: newCfe.client_address || project.client_address,
+      client_rfc: newCfe.client_rfc || project.client_rfc,
+      city: newCfe.city || project.city,
       cfe_data: newCfe 
     };
     
@@ -189,6 +229,10 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
         monthly_consumption_kWh: newCfe.monthly_kWh,
         tariff_rate_mxn: newCfe.tariff_rate,
         custom_cost: prop.financialParams.manualCost,
+        historic_periods: newCfe.historic_periods,
+        is_bimonthly: newCfe.is_bimonthly,
+        tariff_name: newCfe.tariff,
+        demand_kw: newCfe.demand_kw
       });
       return { ...prop, financial: finResult };
     });
@@ -216,6 +260,9 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
     setEditingProposalId(null);
     setCurrentSystem(null);
     setCurrentFinParams({ isCredit: false, interestRate: 15, termMonths: 36 });
+    setCurrentAnteproyectoImages([]);
+    setCurrentAnteproyectoUnlocked(false);
+    setCurrentCronogramaParams({ startDate: new Date().toISOString().split('T')[0] });
     setProposalName(`Propuesta ${project.proposals.length + 1}`);
     setView('edit_proposal');
   };
@@ -224,6 +271,11 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
     setEditingProposalId(prop.id);
     setCurrentSystem(prop.system);
     setCurrentFinParams(prop.financialParams);
+    setCurrentAnteproyectoImages(prop.anteproyecto_images || []);
+    setCurrentAnteproyectoUnlocked(prop.anteproyecto_unlocked || false);
+    setCurrentCronogramaParams(prop.cronograma_params || {
+      startDate: prop.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
+    });
     setProposalName(prop.name);
     setView('edit_proposal');
   };
@@ -235,22 +287,24 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
       system_kWp: currentSystem.system_kWp,
       installed_kWp: currentSystem.installed_kWp,
       annual_production_kWh: currentSystem.annual_production_kWh,
-      monthly_consumption_kWh: project.cfe_data.monthly_kWh,
-      tariff_rate_mxn: project.cfe_data.tariff_rate,
+      monthly_consumption_kWh: effectiveCfeData.monthly_kWh,
+      tariff_rate_mxn: effectiveCfeData.tariff_rate,
       custom_cost: currentFinParams.manualCost,
-      historic_periods: project.cfe_data.historic_periods,
-      is_bimonthly: project.cfe_data.is_bimonthly,
-      tariff_name: project.cfe_data.tariff,
-      demand_kw: project.cfe_data.demand_kw
+      historic_periods: effectiveCfeData.historic_periods,
+      is_bimonthly: effectiveCfeData.is_bimonthly,
+      tariff_name: effectiveCfeData.tariff,
+      demand_kw: effectiveCfeData.demand_kw
     });
 
     const totalProduction25yr = currentSystem.annual_production_kWh * SOLAR_CONSTANTS.SYSTEM_LIFE;
     const co2SavedKg = totalProduction25yr * SOLAR_CONSTANTS.CO2_FACTOR;
 
+    const existingProp = editingProposalId ? project.proposals.find(p => p.id === editingProposalId) : null;
+
     const newProposal: Proposal = {
       id: editingProposalId || Math.random().toString(36).substring(2, 9),
       name: proposalName,
-      created_at: new Date().toISOString(),
+      created_at: existingProp?.created_at || new Date().toISOString(),
       system: currentSystem,
       financialParams: currentFinParams,
       financial: finResult,
@@ -259,7 +313,15 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
         trees_25yr: co2SavedKg / SOLAR_CONSTANTS.CO2_PER_TREE_KG,
         cars_25yr: (co2SavedKg / 1000) / SOLAR_CONSTANTS.CO2_PER_CAR_TONS,
         coal_ton_25yr: (co2SavedKg / 1000) / SOLAR_CONSTANTS.CO2_PER_COAL_TON,
-      }
+      },
+      security: existingProp?.security || {
+        authorized_devices: [],
+        max_devices: 2,
+        created_at: new Date().toISOString()
+      },
+      anteproyecto_images: currentAnteproyectoImages,
+      anteproyecto_unlocked: currentAnteproyectoUnlocked,
+      cronograma_params: currentCronogramaParams
     };
 
     let updatedProposals = [...project.proposals];
@@ -352,9 +414,13 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
           system_kWp: currentSystem.system_kWp,
           installed_kWp: currentSystem.installed_kWp,
           annual_production_kWh: currentSystem.annual_production_kWh,
-          monthly_consumption_kWh: project.cfe_data.monthly_kWh,
-          tariff_rate_mxn: project.cfe_data.tariff_rate,
+          monthly_consumption_kWh: effectiveCfeData.monthly_kWh,
+          tariff_rate_mxn: effectiveCfeData.tariff_rate,
           custom_cost: updatedParams.manualCost,
+          historic_periods: effectiveCfeData.historic_periods,
+          is_bimonthly: effectiveCfeData.is_bimonthly,
+          tariff_name: effectiveCfeData.tariff,
+          demand_kw: effectiveCfeData.demand_kw
         }),
         environmental: { co2_kg_25yr: 0, trees_25yr: 0, cars_25yr: 0, coal_ton_25yr: 0 } // mock for speed
       };
@@ -393,9 +459,39 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
           <button onClick={() => setView('dashboard')} className="p-2 hover:bg-dark-3 rounded-xl transition-all">
             <ArrowLeft className="w-5 h-5 text-cream-muted" />
           </button>
-          <h2 className="text-xl font-display font-bold text-cream">Editar Consumos de CFE</h2>
+          <h2 className="text-xl font-display font-bold text-cream">
+            {project.project_type === 'off-grid' ? 'Editar Levantamiento de Cargas' : 'Editar Consumos de CFE'}
+          </h2>
         </div>
-        <CFEDataForm data={project.cfe_data} onSubmit={saveCFEData} />
+        {project.project_type === 'off-grid' ? (
+          <LoadProfileForm 
+            initialData={project.load_profile}
+            initialClientData={{
+              clientName: project.client_name,
+              email: project.client_email,
+              phone: project.client_phone,
+              address: project.client_address,
+              rfc: project.client_rfc,
+              city: project.city
+            }}
+            onSubmit={(data, contactData) => {
+              const updatedProject: SolarProject = { 
+                ...project, 
+                load_profile: data, 
+                client_name: contactData?.clientName || project.client_name,
+                client_email: contactData?.email || project.client_email,
+                client_phone: contactData?.phone || project.client_phone,
+                client_address: contactData?.address || project.client_address,
+                client_rfc: contactData?.rfc || project.client_rfc,
+                city: contactData?.city || project.city
+              };
+              onUpdateProject(updatedProject);
+              setView('dashboard');
+            }} 
+          />
+        ) : (
+          <CFEDataForm data={project.cfe_data!} onSubmit={saveCFEData} />
+        )}
       </div>
     );
   }
@@ -476,6 +572,33 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
               <span>{isSavingPresupuesto ? 'Enviando...' : 'Generar Presupuesto'}</span>
             </button>
 
+            {/* Indicador de Seguridad por Dispositivo */}
+            {editingProposalId && (
+              <div className="flex items-center gap-2 bg-dark-3/60 border border-dark-4 px-3 py-2 rounded-xl text-xs">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span className="text-cream-muted">
+                  Dispositivos: <strong className="text-cream">{project.proposals.find(p => p.id === editingProposalId)?.security?.authorized_devices?.length || 0}/2</strong>
+                </span>
+                {(project.proposals.find(p => p.id === editingProposalId)?.security?.authorized_devices?.length || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (confirm('¿Deseas reiniciar los dispositivos autorizados de esta propuesta? El cliente e ingeniero podrán volver a vincularse.')) {
+                        const updated = await resetProposalDevices(project.id, editingProposalId, project);
+                        onUpdateProject(updated);
+                        setPresupuestoSuccess('Dispositivos autorizados restablecidos con éxito.');
+                      }
+                    }}
+                    className="text-[10px] text-gold hover:underline font-bold uppercase ml-1 cursor-pointer"
+                    title="Restablecer cupos de dispositivos para esta propuesta"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* 2. Presentación (Interactive HTML Pitch Deck) */}
             <button
               onClick={() => setShowPresentation(true)}
@@ -512,18 +635,41 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
 
         <ErrorBoundary>
           <div className="space-y-6">
-            <SystemProposal
-              key={editingProposalId || 'new'}
-              cfeData={project.cfe_data}
-              system={currentSystem}
-              onUpdate={setCurrentSystem}
-            />
+            {project.project_type === 'off-grid' ? (
+              <OffgridProposal
+                key={editingProposalId || 'new'}
+                loadProfile={project.load_profile!}
+                system={currentSystem}
+                onUpdate={setCurrentSystem}
+              />
+            ) : (
+              <SystemProposal
+                key={editingProposalId || 'new'}
+                cfeData={project.cfe_data!}
+                system={currentSystem}
+                onUpdate={setCurrentSystem}
+              />
+            )}
             {currentSystem && (
               <FinancialAnalysis
                 system={currentSystem}
-                cfeData={project.cfe_data}
+                cfeData={effectiveCfeData}
                 financialParams={currentFinParams}
                 onChangeFinancialParams={setCurrentFinParams}
+              />
+            )}
+            {currentSystem && (
+              <AnteproyectoManager
+                clientName={project.client_name}
+                numPanels={currentSystem.num_panels || Math.ceil((currentSystem.installed_kWp || 5) / 0.55)}
+                isOffGrid={project.project_type === 'off-grid'}
+                tariff={effectiveCfeData.tariff}
+                images={currentAnteproyectoImages}
+                cronogramaParams={currentCronogramaParams}
+                anteproyectoUnlocked={currentAnteproyectoUnlocked}
+                onChangeImages={setCurrentAnteproyectoImages}
+                onChangeCronograma={setCurrentCronogramaParams}
+                onChangeAnteproyectoUnlocked={setCurrentAnteproyectoUnlocked}
               />
             )}
           </div>
@@ -532,32 +678,39 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
         {/* Modals (rendered inside edit_proposal return) */}
         {showPresentation && currentSystem && (
           <InteractivePresentationModal
-            project={project}
+            project={{
+              ...project,
+              cfe_data: effectiveCfeData
+            }}
             proposal={{
               id: editingProposalId || 'current',
               name: proposalName,
-              created_at: new Date().toISOString(),
+              created_at: currentCronogramaParams?.startDate || new Date().toISOString(),
               system: currentSystem,
               financialParams: currentFinParams,
               financial: calculateFinancials({
                 system_kWp: currentSystem.system_kWp,
                 installed_kWp: currentSystem.installed_kWp,
                 annual_production_kWh: currentSystem.annual_production_kWh,
-                monthly_consumption_kWh: project.cfe_data.monthly_kWh,
-                tariff_rate_mxn: project.cfe_data.tariff_rate,
+                monthly_consumption_kWh: effectiveCfeData.monthly_kWh,
+                tariff_rate_mxn: effectiveCfeData.tariff_rate,
                 custom_cost: currentFinParams.manualCost,
-                historic_periods: project.cfe_data.historic_periods,
-                is_bimonthly: project.cfe_data.is_bimonthly,
-                tariff_name: project.cfe_data.tariff,
-                demand_kw: project.cfe_data.demand_kw
+                historic_periods: effectiveCfeData.historic_periods,
+                is_bimonthly: effectiveCfeData.is_bimonthly,
+                tariff_name: effectiveCfeData.tariff,
+                demand_kw: effectiveCfeData.demand_kw
               }),
               environmental: {
                 co2_kg_25yr: currentSystem.annual_production_kWh * 25 * 0.45,
                 trees_25yr: (currentSystem.annual_production_kWh * 25 * 0.45) / 20,
                 cars_25yr: (currentSystem.annual_production_kWh * 25 * 0.45) / 4600,
                 coal_ton_25yr: ((currentSystem.annual_production_kWh * 25 * 0.45) / 1000) / 1
-              }
+              },
+              anteproyecto_images: currentAnteproyectoImages,
+              anteproyecto_unlocked: currentAnteproyectoUnlocked,
+              cronograma_params: currentCronogramaParams
             }}
+            onChangeCronogramaParams={setCurrentCronogramaParams}
             onShare={(method) => {
               try {
                 const savedProp = saveProposal(true);
@@ -672,32 +825,57 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
             <button onClick={handleEditCFE} className="flex items-center gap-2 px-4 py-2 hover:bg-dark-3/80 rounded-xl transition-all text-xs font-bold text-cream-muted hover:text-cream uppercase tracking-wider">
               <Edit2 className="w-4 h-4" /> Editar Datos
             </button>
-            <div className="w-px h-8 bg-dark-4"></div>
-            <button onClick={handleUploadCFE} className="flex items-center gap-2 px-4 py-2 hover:bg-gold/10 hover:text-gold rounded-xl transition-all text-xs font-bold text-cream-muted uppercase tracking-wider">
-              <RefreshCcw className="w-4 h-4" /> Resubir Recibo
-            </button>
+            {project.project_type !== 'off-grid' && (
+              <>
+                <div className="w-px h-8 bg-dark-4"></div>
+                <button onClick={handleUploadCFE} className="flex items-center gap-2 px-4 py-2 hover:bg-gold/10 hover:text-gold rounded-xl transition-all text-xs font-bold text-cream-muted uppercase tracking-wider">
+                  <RefreshCcw className="w-4 h-4" /> Resubir Recibo
+                </button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* CFE Summary Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-          <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
-            <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Tarifa CFE</p>
-            <p className="text-xl font-display font-bold text-gold flex items-center gap-2"><Zap className="w-5 h-5" /> {project.cfe_data.tariff}</p>
+        {/* Summary Grid */}
+        {project.project_type === 'off-grid' && project.load_profile ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+            <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
+              <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Tipo de Sistema</p>
+              <p className="text-xl font-display font-bold text-emerald-400 flex items-center gap-2"><Battery className="w-5 h-5" /> Aislado</p>
+            </div>
+            <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
+              <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Consumo Diario Estimado</p>
+              <p className="text-xl font-display font-bold text-cream">{(project.load_profile.daily_Wh / 1000).toFixed(2)} <span className="text-sm text-cream-muted font-normal">kWh/día</span></p>
+            </div>
+            <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
+              <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Potencia Simulada Mínima</p>
+              <p className="text-xl font-display font-bold text-gold flex items-center"><Zap className="w-5 h-5 opacity-70 mr-1" /> {(project.load_profile.peak_W / 1000).toFixed(2)} <span className="text-sm text-cream-muted font-normal ml-1">kW</span></p>
+            </div>
+            <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
+              <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Equipos Registrados</p>
+              <p className="text-xl font-display font-bold text-cream">{project.load_profile.appliances.length} <span className="text-sm text-cream-muted font-normal">aparatos</span></p>
+            </div>
           </div>
-          <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
-            <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Consumo Bimestral</p>
-            <p className="text-xl font-display font-bold text-cream">{project.cfe_data.bimonthly_kWh.toLocaleString()} <span className="text-sm text-cream-muted font-normal">kWh</span></p>
+        ) : project.cfe_data ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+            <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
+              <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Tarifa CFE</p>
+              <p className="text-xl font-display font-bold text-gold flex items-center gap-2"><Zap className="w-5 h-5" /> {project.cfe_data.tariff}</p>
+            </div>
+            <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
+              <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Consumo Bimestral</p>
+              <p className="text-xl font-display font-bold text-cream">{project.cfe_data.bimonthly_kWh?.toLocaleString()} <span className="text-sm text-cream-muted font-normal">kWh</span></p>
+            </div>
+            <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
+              <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Pago Promedio</p>
+              <p className="text-xl font-display font-bold text-green-400 flex items-center"><DollarSign className="w-5 h-5 opacity-70" /> {project.cfe_data.total_mxn?.toLocaleString('es-MX', {minimumFractionDigits: 2})}</p>
+            </div>
+            <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
+              <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Costo / kWh</p>
+              <p className="text-xl font-display font-bold text-cream">${project.cfe_data.tariff_rate?.toFixed(2)} <span className="text-sm text-cream-muted font-normal">MXN</span></p>
+            </div>
           </div>
-          <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
-            <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Pago Promedio</p>
-            <p className="text-xl font-display font-bold text-green-400 flex items-center"><DollarSign className="w-5 h-5 opacity-70" /> {project.cfe_data.total_mxn.toLocaleString('es-MX', {minimumFractionDigits: 2})}</p>
-          </div>
-          <div className="bg-dark-3/40 border border-dark-4/50 rounded-2xl p-4">
-            <p className="text-[10px] text-cream-muted font-bold uppercase tracking-wider mb-1">Costo / kWh</p>
-            <p className="text-xl font-display font-bold text-cream">${project.cfe_data.tariff_rate.toFixed(2)} <span className="text-sm text-cream-muted font-normal">MXN</span></p>
-          </div>
-        </div>
+        ) : null}
       </div>
 
       {/* Proposals Section */}
@@ -761,9 +939,61 @@ export default function ProjectDashboard({ project, onUpdateProject, onBack }: P
                       <p className="font-bold text-gold">{prop.financial.roi_pct.toFixed(0)}%</p>
                     </div>
                   </div>
+
+                  {/* Device Security Status */}
+                  <div className="mt-3 pt-3 border-t border-dark-4/70 flex items-center justify-between text-[11px] text-cream-muted">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Dispositivos: <strong className="text-cream">{prop.security?.authorized_devices?.length || 0} / {prop.security?.max_devices || 2}</strong></span>
+                    </span>
+                    {(prop.security?.authorized_devices?.length || 0) > 0 && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(`¿Reiniciar dispositivos vinculados para "${prop.name}"?`)) {
+                            const updated = await resetProposalDevices(project.id, prop.id, project);
+                            onUpdateProject(updated);
+                          }
+                        }}
+                        className="text-[10px] text-gold hover:underline uppercase font-bold cursor-pointer"
+                        title="Restablecer cupos de dispositivos"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Engineering Unlock Status & Quick Switch */}
+                  <div className="mt-2 pt-2 border-t border-dark-4/70 flex items-center justify-between text-[11px] text-cream-muted h-7">
+                    <span className="flex items-center gap-1.5 font-medium truncate">
+                      {prop.anteproyecto_unlocked ? (
+                        <Unlock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      ) : (
+                        <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      )}
+                      <span>Planos: <strong className={prop.anteproyecto_unlocked ? 'text-emerald-400' : 'text-amber-400'}>{prop.anteproyecto_unlocked ? 'Abiertos' : 'Protegidos'}</strong></span>
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const updatedProposals = project.proposals.map(p =>
+                          p.id === prop.id ? { ...p, anteproyecto_unlocked: !p.anteproyecto_unlocked } : p
+                        );
+                        onUpdateProject({ ...project, proposals: updatedProposals });
+                      }}
+                      className={`w-20 text-center text-[10px] uppercase font-bold py-1 rounded cursor-pointer transition-colors shrink-0 ${
+                        prop.anteproyecto_unlocked
+                          ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30'
+                          : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30'
+                      }`}
+                      title="Alternar estado de bloqueo de ingeniería para el cliente"
+                    >
+                      {prop.anteproyecto_unlocked ? 'Bloquear' : 'Desbloquear'}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-dark-4 flex justify-between items-center relative z-10">
+                <div className="mt-4 pt-3 border-t border-dark-4 flex justify-between items-center relative z-10">
                   <span className="text-[10px] text-cream-muted uppercase tracking-wider font-bold">Ver / Editar Propuesta</span>
                   <ArrowLeft className="w-4 h-4 text-gold rotate-180 group-hover:translate-x-1 transition-transform" />
                 </div>

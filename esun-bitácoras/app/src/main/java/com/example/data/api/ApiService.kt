@@ -119,8 +119,25 @@ data class SupabasePresupuestoResponse(
     val termino: String?,
     val residente: String?,
     val status: String?,
-    val produccion: Boolean? = null
-)
+    val produccion: Any? = null
+) {
+    fun isProduccionActiva(): Boolean {
+        val raw = produccion
+        if (raw != null) {
+            return when (raw) {
+                is Boolean -> raw == true
+                is String -> {
+                    val valLower = raw.trim().lowercase()
+                    valLower == "si" || valLower == "sí" || valLower == "true" || valLower == "1" || valLower == "produccion"
+                }
+                is Number -> raw.toInt() == 1
+                else -> false
+            }
+        }
+        val statusLower = status?.trim()?.lowercase() ?: ""
+        return statusLower == "si" || statusLower == "sí" || statusLower == "true" || statusLower == "produccion"
+    }
+}
 
 data class SupabaseBitacoraUploadRequest(
     val site_name: String,
@@ -157,15 +174,34 @@ data class SupabaseBitacoraResponse(
 
 data class SupabaseObraRequest(
     val nombre: String,
-    val cliente: String,
-    val ubicacion: String,
-    val fecha_inicio: String,
-    val fecha_termino: String,
-    val residente: String,
-    val descripcion: String,
-    val monto_contrato: String,
-    val status: String
-)
+    val cliente: String? = "",
+    val ubicacion: String? = "",
+    val fecha_inicio: String? = "",
+    val fecha_termino: String? = "",
+    val residente: String? = "",
+    val descripcion: String? = "",
+    val monto_contrato: String? = "",
+    val status: String? = "",
+    @com.squareup.moshi.Json(name = "en_produccion") val en_produccion: Any? = null,
+    @com.squareup.moshi.Json(name = "produccion") val produccion: Any? = null
+) {
+    fun isProduccionActiva(): Boolean {
+        val raw = produccion ?: en_produccion
+        if (raw != null) {
+            return when (raw) {
+                is Boolean -> raw == true
+                is String -> {
+                    val valLower = raw.trim().lowercase()
+                    valLower == "si" || valLower == "sí" || valLower == "true" || valLower == "1" || valLower == "produccion"
+                }
+                is Number -> raw.toInt() == 1
+                else -> false
+            }
+        }
+        val statusLower = status?.trim()?.lowercase() ?: ""
+        return statusLower == "si" || statusLower == "sí" || statusLower == "true" || statusLower == "produccion"
+    }
+}
 
 interface SupabaseApiService {
     @GET("rest/v1/obras_app")
@@ -232,7 +268,6 @@ interface SupabaseApiService {
     suspend fun getPresupuestos(
         @Header("apikey") apiKey: String,
         @Header("Authorization") authorization: String,
-        @Query("produccion") produccion: String = "eq.true",
         @Query("select") select: String = "*"
     ): Response<List<SupabasePresupuestoResponse>>
 

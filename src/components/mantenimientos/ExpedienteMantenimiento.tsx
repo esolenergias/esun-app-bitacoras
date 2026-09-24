@@ -134,6 +134,8 @@ export default function ExpedienteMantenimiento({ obra, reporterName = 'ESOL Té
               filename: `mtto_${obra.folio}_visita${selectedVisita.numero_visita}_${Date.now()}_${file.name}`,
               mimeType: file.type,
               base64: fullBase64,
+              moduleType: 'MANTENIMIENTO',
+              siteName: obra.nombre_obra,
               folderName: `Mantenimiento - ${obra.nombre_obra}`
             })
           });

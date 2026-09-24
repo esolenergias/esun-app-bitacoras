@@ -4,6 +4,14 @@ export interface DailyProductionResult {
   status_code: 'OK' | 'COMM_ERROR' | 'INVERTER_FAULT';
 }
 
+export interface DiscoveredPlant {
+  plant_id: string;
+  plant_name: string;
+  capacity_kwp: number;
+  address?: string;
+  status?: string;
+}
+
 export interface IInverterAdapter {
   /**
    * Authenticates with the provider's API.
@@ -17,4 +25,14 @@ export interface IInverterAdapter {
    * @param date The date to fetch data for (YYYY-MM-DD)
    */
   getDailyProduction(plantId: string, date: string): Promise<DailyProductionResult>;
+
+  /**
+   * Fetches multiple daily production records (history) for a specific plant in batch.
+   */
+  getMultipleDailyProduction?(plantId: string, collectTimeMs?: number): Promise<DailyProductionResult[]>;
+
+  /**
+   * Discovers all PV plants/stations associated with this master account.
+   */
+  listPlants?(): Promise<DiscoveredPlant[]>;
 }

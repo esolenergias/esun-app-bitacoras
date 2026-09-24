@@ -30,30 +30,31 @@ export interface ProposalConceptItem {
 }
 
 export function getInitialAutoConcepts(system: any): ProposalConceptItem[] {
-  const panelQty = system?.num_panels || 1;
+  const isOffGrid = system?.projectType === 'off-grid';
+  const panelQty = system?.num_panels || system?.numberOfPanels || 1;
   const inverterQty = system?.num_inverters || 1;
-  const kWp = system?.installed_kWp || 5;
-  const totalW = Math.round(kWp * 1000);
+  const panelW = system?.panel_w || system?.panelWattage || 550;
+  const totalW = panelQty * panelW;
 
-  return [
+  const base: ProposalConceptItem[] = [
     {
       id: 'auto-panel',
       category: 'Paneles Solares',
       code: 'APU-PANEL-550',
       quantity: panelQty,
       unit: 'pza',
-      description: system?.panel_name || `Suministro e instalación de módulo fotovoltaico ${system?.panel_Wp || 630}W Monocristalino`,
-      unit_price: Math.round((system?.panel_Wp || 630) * 5.2),
+      description: system?.panel_name || `Suministro e instalación de módulo fotovoltaico ${panelW}W Monocristalino`,
+      unit_price: Math.round(panelW * 5.2),
       is_auto: true
     },
     {
       id: 'auto-inverter',
       category: 'Inversor',
-      code: (system?.inverter_kw || 5) >= 10 ? 'APU-INVER-15K' : 'INV 5KW GROW',
+      code: isOffGrid ? 'INV-OFFGRID' : ((system?.inverter_kw || 5) >= 10 ? 'APU-INVER-15K' : 'INV 5KW GROW'),
       quantity: inverterQty,
       unit: 'pza',
-      description: system?.inverter_name || `Inversor Interconexión CFE ${system?.inverter_kw || 5} kW`,
-      unit_price: Math.round(((system?.inverter_kw || 5) * 10500) / inverterQty),
+      description: system?.inverter_name || (isOffGrid ? `Inversor Aislado Off-Grid` : `Inversor Interconexión CFE ${system?.inverter_kw || 5} kW`),
+      unit_price: isOffGrid ? 18000 : Math.round(((system?.inverter_kw || 5) * 10500) / inverterQty),
       is_auto: true
     },
     {
@@ -95,8 +96,24 @@ export function getInitialAutoConcepts(system: any): ProposalConceptItem[] {
       description: 'Suministro e instalacion de material eléctrico en "AC" corriente alterna.',
       unit_price: Math.round(totalW * 1.15),
       is_auto: true
-    },
-    {
+    }
+  ];
+
+  if (isOffGrid) {
+    // Para off-grid las baterías pueden venir en requiredBatteryCapacityAh o depender de la selección de sistema
+    const batQty = system?.num_batteries || (system?.requiredBatteryCapacityAh ? Math.ceil(system.requiredBatteryCapacityAh / 100) : 1);
+    base.push({
+      id: 'auto-battery',
+      category: 'Material electrico DC',
+      code: 'APU-BATERIA-LITIO',
+      quantity: batQty,
+      unit: 'pz',
+      description: system?.battery_name || 'Batería Ciclo Profundo / Litio',
+      unit_price: 24000,
+      is_auto: true
+    });
+  } else {
+    base.push({
       id: 'auto-tramite',
       category: 'Tramites',
       code: 'TR - TRAMITE - CFE',
@@ -105,8 +122,10 @@ export function getInitialAutoConcepts(system: any): ProposalConceptItem[] {
       description: 'Servicio de tramitologia para interconexion a CFE, incluye: armado de expediente, gestion y todo lo necesario para puesta de medidor.',
       unit_price: 4500,
       is_auto: true
-    }
-  ];
+    });
+  }
+
+  return base;
 }
 
 export function getEffectiveConcepts(customConcepts: ProposalConceptItem[] | undefined, system: any): ProposalConceptItem[] {
@@ -133,11 +152,32 @@ export function getEffectiveConcepts(customConcepts: ProposalConceptItem[] | und
     if (c.is_auto) {
       const panelQty = system?.num_panels || 1;
       const inverterQty = system?.num_inverters || 1;
+      const batQty = system?.num_batteries || 1;
       
       if (c.id === 'auto-panel' || c.code === 'APU-PANEL-550') {
-        c = { ...c, quantity: panelQty, description: system?.panel_name || c.description };
-      } else if (c.id === 'auto-inverter' || c.code === 'APU-INVER-15K' || c.code === 'INV 5KW GROW') {
-        c = { ...c, quantity: inverterQty, description: system?.inverter_name || c.description };
+        c = { 
+          ...c, 
+          code: system?.panel_code || c.code,
+          quantity: panelQty, 
+          description: system?.panel_name || c.description,
+          unit_price: system?.panel_price ? Math.round(system.panel_price * 1.15) : c.unit_price // add 15% markup to cost if dynamic
+        };
+      } else if (c.id === 'auto-inverter' || c.code === 'APU-INVER-15K' || c.code === 'INV 5KW GROW' || c.code === 'INV-OFFGRID') {
+        c = { 
+          ...c, 
+          code: system?.inverter_code || c.code,
+          quantity: inverterQty, 
+          description: system?.inverter_name || c.description,
+          unit_price: system?.inverter_price ? Math.round(system.inverter_price * 1.15) : c.unit_price
+        };
+      } else if (c.id === 'auto-battery' || c.code === 'APU-BATERIA-LITIO') {
+        c = { 
+          ...c, 
+          code: system?.battery_code || c.code,
+          quantity: batQty, 
+          description: system?.battery_name || c.description,
+          unit_price: system?.battery_price ? Math.round(system.battery_price * 1.15) : c.unit_price
+        };
       }
       
       if (c.code === 'EST-K2-2N-COMP' || c.code === 'MO - MO - BT') {
@@ -413,6 +453,15 @@ export default function FinancialAnalysis({
 
   const results = calculateFinancials(finInput);
 
+  const dailyGen = results.daily_generation_kWh;
+  const dailyCons = cfeData.monthly_kWh / 30;
+
+  const offgridGenData = [
+    { name: 'Diaria', Generación: Math.round(dailyGen), Consumo: Math.round(dailyCons) },
+    { name: 'Semanal', Generación: Math.round(dailyGen * 7), Consumo: Math.round(dailyCons * 7) },
+    { name: 'Mensual', Generación: Math.round(dailyGen * 30), Consumo: Math.round(dailyCons * 30) }
+  ];
+
   // Calculate Credit Payment parameters
   const investment = results.investment_mxn;
   const r = (interestRate / 100) / 12;
@@ -640,7 +689,7 @@ export default function FinancialAnalysis({
       )}
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className={`grid gap-4 ${system?.projectType === 'off-grid' ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5'}`}>
         {/* Investment */}
         <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1">
           <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">
@@ -652,136 +701,203 @@ export default function FinancialAnalysis({
           {isCredit && <span className="text-[9px] text-emerald-400 block font-bold">100% Financiado</span>}
         </div>
 
-        {/* Year 1 Savings */}
-        <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1">
-          <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">
-            {isCredit ? 'Ahorro Año 1 (Neto)' : 'Ahorro Año 1'}
-          </span>
-          <span className="text-base font-black font-mono text-gold block leading-tight">
-            ${Math.round(displaySavingsYr1).toLocaleString('es-MX')}
-          </span>
-          <span className="text-[9px] text-cream-muted block font-mono">
-            ${Math.round(displaySavingsYr1 / 12).toLocaleString('es-MX')}/mes
-          </span>
-        </div>
+        {system?.projectType === 'off-grid' && (
+          <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1">
+            <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">Generación Promedio</span>
+            <span className="text-base font-black font-mono text-emerald-400 block leading-tight">
+              {results.daily_generation_kWh.toFixed(1)} <span className="text-sm">kWh/día</span>
+            </span>
+            <span className="text-[9px] text-cream-muted block font-mono">Energía disponible</span>
+          </div>
+        )}
 
-        {/* Payback */}
-        <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1">
-          <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">Retorno de Inversión</span>
-          <span className="text-base font-black font-mono text-cream block leading-tight">
-            {displayPayback === 0 ? 'Inmediato' : `${displayPayback.toFixed(1)}`}
-          </span>
-          <span className="text-[9px] text-cream-muted block">años en recuperarse</span>
-        </div>
+        {system?.projectType !== 'off-grid' && (
+          <>
+            {/* Year 1 Savings */}
+            <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1">
+              <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">
+                {isCredit ? 'Ahorro Año 1 (Neto)' : 'Ahorro Año 1'}
+              </span>
+              <span className="text-base font-black font-mono text-gold block leading-tight">
+                ${Math.round(displaySavingsYr1).toLocaleString('es-MX')}
+              </span>
+              <span className="text-[9px] text-cream-muted block font-mono">
+                ${Math.round(displaySavingsYr1 / 12).toLocaleString('es-MX')}/mes
+              </span>
+            </div>
 
-        {/* ROI */}
-        <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1">
-          <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">ROI Acumulado</span>
-          <span className="text-base font-black font-mono text-cream block leading-tight">
-            {displayROI.toFixed(0)}%
-          </span>
-          <span className="text-[9px] text-cream-muted block font-mono">de retorno total</span>
-        </div>
+            {/* Payback */}
+            <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1">
+              <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">Retorno de Inversión</span>
+              <span className="text-base font-black font-mono text-cream block leading-tight">
+                {displayPayback === 0 ? 'Inmediato' : `${displayPayback.toFixed(1)}`}
+              </span>
+              <span className="text-[9px] text-cream-muted block">años en recuperarse</span>
+            </div>
 
-        {/* NPV */}
-        <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1 col-span-2 md:col-span-1">
-          <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">Valor Presente Neto</span>
-          <span className={`text-base font-black font-mono block leading-tight ${displayNPV >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            ${Math.round(displayNPV).toLocaleString('es-MX')}
-          </span>
-          <span className="text-[9px] text-cream-muted block font-mono">VAN a 10% tasa desc</span>
-        </div>
+            {/* ROI */}
+            <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1">
+              <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">ROI Acumulado</span>
+              <span className="text-base font-black font-mono text-cream block leading-tight">
+                {displayROI.toFixed(0)}%
+              </span>
+              <span className="text-[9px] text-cream-muted block font-mono">de retorno total</span>
+            </div>
+
+            {/* NPV */}
+            <div className="p-3.5 bg-dark-1/55 border border-dark-4 rounded-xl space-y-1 col-span-2 md:col-span-1">
+              <span className="text-[9px] text-cream-muted font-bold uppercase tracking-wider block">Valor Presente Neto</span>
+              <span className={`text-base font-black font-mono block leading-tight ${displayNPV >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                ${Math.round(displayNPV).toLocaleString('es-MX')}
+              </span>
+              <span className="text-[9px] text-cream-muted block font-mono">VAN a 10% tasa desc</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Recharts Graphical Projections */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart 1: Bar Chart of Savings */}
-        <div className="p-4 bg-dark-1/45 border border-dark-4 rounded-xl space-y-3">
-          <span className="text-[10px] text-cream-muted font-bold uppercase tracking-wider block">Ahorro Neto Acumulado vs Inversión (MXN)</span>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="year" stroke="#64748b" fontSize={10} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="Ahorro Acumulado" name="Balance Net" fill="#C49825" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+      {system?.projectType !== 'off-grid' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Chart 1: Bar Chart of Savings */}
+          <div className="p-4 bg-dark-1/45 border border-dark-4 rounded-xl space-y-3">
+            <span className="text-[10px] text-cream-muted font-bold uppercase tracking-wider block">Ahorro Neto Acumulado vs Inversión (MXN)</span>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartsData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="year" stroke="#64748b" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="Ahorro Acumulado" name="Balance Net" fill="#C49825" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
 
-        {/* Chart 2: Line Chart CFE Projections */}
-        <div className="p-4 bg-dark-1/45 border border-dark-4 rounded-xl space-y-3">
-          <span className="text-[10px] text-cream-muted font-bold uppercase tracking-wider block">Proyección de Pagos a CFE (Anual)</span>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="year" stroke="#64748b" fontSize={10} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 10, fontFamily: 'sans-serif' }} />
-                <Line type="monotone" dataKey="Sin Solar" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                <Line type="monotone" dataKey="Con Solar" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
+          {/* Chart 2: Line Chart CFE Projections */}
+          <div className="p-4 bg-dark-1/45 border border-dark-4 rounded-xl space-y-3">
+            <span className="text-[10px] text-cream-muted font-bold uppercase tracking-wider block">Proyección de Pagos a CFE (Anual)</span>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartsData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="year" stroke="#64748b" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 10, fontFamily: 'sans-serif' }} />
+                  <Line type="monotone" dataKey="Sin Solar" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="Con Solar" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {system?.projectType === 'off-grid' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-dark-4">
+          <div className="p-4 bg-dark-1/45 border border-dark-4 rounded-xl space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] text-cream-muted font-bold uppercase tracking-wider block">Proyección de Generación vs Consumo (kWh)</span>
+            </div>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={offgridGenData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 10, fontFamily: 'sans-serif' }} />
+                  <Line type="monotone" dataKey="Consumo" name="Consumo Estimado" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="Generación" name="Generación Solar" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="p-4 bg-dark-1/45 border border-dark-4 rounded-xl space-y-3">
+            <span className="text-[10px] text-cream-muted font-bold uppercase tracking-wider block">Tabla de Proyección de Energía (kWh)</span>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-dark-2 text-cream-muted text-[10px] font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3">Periodo</th>
+                    <th className="p-3 text-right">Generación PV</th>
+                    <th className="p-3 text-right">Consumo</th>
+                    <th className="p-3 text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-dark-4 font-mono text-[11px]">
+                  {offgridGenData.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-dark-3/30 transition-colors">
+                      <td className="p-3 font-bold text-cream">{row.name}</td>
+                      <td className="p-3 text-right text-emerald-400">{row.Generación.toLocaleString('es-MX')} kWh</td>
+                      <td className="p-3 text-right text-red-400">{row.Consumo.toLocaleString('es-MX')} kWh</td>
+                      <td className="p-3 text-right text-gold">{(row.Generación - row.Consumo).toLocaleString('es-MX')} kWh</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Grid: Monthly Breakdown Table (Left Column) & Impacto Ambiental (Right Column) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-dark-4">
+      <div className={`grid grid-cols-1 ${system?.projectType === 'off-grid' ? '' : 'lg:grid-cols-2'} gap-6 pt-4 border-t border-dark-4`}>
         {/* 1. Monthly Breakdown Table */}
-        <div className="p-4 bg-dark-1/45 border border-dark-4 rounded-xl space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] text-cream-muted font-bold uppercase tracking-wider block">Tabla de Comparativa Mensual CFE</span>
-            <span className="text-[10px] text-gold font-mono font-bold">
-              {cfeData.is_bimonthly ? 'Bimestral' : 'Mensual'} ({results.monthly_breakdown.length} Períodos)
-            </span>
-          </div>
-          <div className="overflow-x-auto max-h-72 overflow-y-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="sticky top-0 bg-dark-2 text-cream-muted text-[10px] font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="p-2">Periodo</th>
-                  <th className="p-2 text-right">Consumo</th>
-                  <th className="p-2 text-right">Pago Actual</th>
-                  <th className="p-2 text-right">Pago Nuevo</th>
-                  <th className="p-2 text-right">Ahorro</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-4 font-mono text-[11px]">
-                {results.monthly_breakdown.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-dark-3/30 transition-colors">
-                    <td className="p-2 font-bold text-cream">{row.month}</td>
-                    <td className="p-2 text-right text-cream-muted">{Math.round(row.kwh).toLocaleString()} kWh</td>
-                    <td className="p-2 text-right text-red-400">${Math.round(row.original_mxn).toLocaleString('es-MX')}</td>
-                    <td className="p-2 text-right text-emerald-400">${Math.round(row.new_mxn).toLocaleString('es-MX')}</td>
-                    <td className="p-2 text-right text-gold">${Math.round(row.savings_mxn).toLocaleString('es-MX')}</td>
+        {system?.projectType !== 'off-grid' && (
+          <div className="p-4 bg-dark-1/45 border border-dark-4 rounded-xl space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] text-cream-muted font-bold uppercase tracking-wider block">Tabla de Comparativa Mensual CFE</span>
+              <span className="text-[10px] text-gold font-mono font-bold">
+                {cfeData.is_bimonthly ? 'Bimestral' : 'Mensual'} ({results.monthly_breakdown.length} Períodos)
+              </span>
+            </div>
+            <div className="overflow-x-auto max-h-72 overflow-y-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 bg-dark-2 text-cream-muted text-[10px] font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-2">Periodo</th>
+                    <th className="p-2 text-right">Consumo</th>
+                    <th className="p-2 text-right">Pago Actual</th>
+                    <th className="p-2 text-right">Pago Nuevo</th>
+                    <th className="p-2 text-right">Ahorro</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot className="sticky bottom-0 bg-dark-2 font-mono font-bold text-xs border-t border-dark-4">
-                <tr>
-                  <td className="p-2 text-cream uppercase">Total</td>
-                  <td className="p-2 text-right text-cream">
-                    {Math.round(results.monthly_breakdown.reduce((acc, r) => acc + r.kwh, 0)).toLocaleString()} kWh
-                  </td>
-                  <td className="p-2 text-right text-red-400">
-                    ${Math.round(results.monthly_breakdown.reduce((acc, r) => acc + r.original_mxn, 0)).toLocaleString('es-MX')}
-                  </td>
-                  <td className="p-2 text-right text-emerald-400">
-                    ${Math.round(results.monthly_breakdown.reduce((acc, r) => acc + r.new_mxn, 0)).toLocaleString('es-MX')}
-                  </td>
-                  <td className="p-2 text-right text-gold">
-                    ${Math.round(results.monthly_breakdown.reduce((acc, r) => acc + r.savings_mxn, 0)).toLocaleString('es-MX')}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-dark-4 font-mono text-[11px]">
+                  {results.monthly_breakdown.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-dark-3/30 transition-colors">
+                      <td className="p-2 font-bold text-cream">{row.month}</td>
+                      <td className="p-2 text-right text-cream-muted">{Math.round(row.kwh).toLocaleString()} kWh</td>
+                      <td className="p-2 text-right text-red-400">${Math.round(row.original_mxn).toLocaleString('es-MX')}</td>
+                      <td className="p-2 text-right text-emerald-400">${Math.round(row.new_mxn).toLocaleString('es-MX')}</td>
+                      <td className="p-2 text-right text-gold">${Math.round(row.savings_mxn).toLocaleString('es-MX')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="sticky bottom-0 bg-dark-2 font-mono font-bold text-xs border-t border-dark-4">
+                  <tr>
+                    <td className="p-2 text-cream uppercase">Total</td>
+                    <td className="p-2 text-right text-cream">
+                      {Math.round(results.monthly_breakdown.reduce((acc, r) => acc + r.kwh, 0)).toLocaleString()} kWh
+                    </td>
+                    <td className="p-2 text-right text-red-400">
+                      ${Math.round(results.monthly_breakdown.reduce((acc, r) => acc + r.original_mxn, 0)).toLocaleString('es-MX')}
+                    </td>
+                    <td className="p-2 text-right text-emerald-400">
+                      ${Math.round(results.monthly_breakdown.reduce((acc, r) => acc + r.new_mxn, 0)).toLocaleString('es-MX')}
+                    </td>
+                    <td className="p-2 text-right text-gold">
+                      ${Math.round(results.monthly_breakdown.reduce((acc, r) => acc + r.savings_mxn, 0)).toLocaleString('es-MX')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 2. Impacto Ambiental (Side by Side in Right Column) */}
         <div>

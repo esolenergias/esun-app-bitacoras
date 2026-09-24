@@ -4,13 +4,18 @@ import {
   X, Sparkles, Zap, ShieldCheck, DollarSign, TrendingUp,
   Sun, Leaf, CheckCircle2, Award, Trees, Car, Factory,
   Sliders, Layers, FileText, ChevronDown, Check, ArrowUpRight,
-  Maximize2, Eye, Compass, Cpu, HelpCircle, Activity
+  Maximize2, Eye, Compass, Cpu, HelpCircle, Activity, Battery, BatteryCharging
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area, Cell, LineChart, Line, Legend
 } from 'recharts';
 import type { SolarProject, Proposal } from './esunTypes';
 import { calculateCFEMinimumFee } from './lib/financialEngine';
+import { getSeasonalSolarMultiplier } from './lib/solarConstants';
+import OffGridAnimatedDiagram from './OffGridAnimatedDiagram';
+import GridTiedAnimatedDiagram from './GridTiedAnimatedDiagram';
+import AnteproyectoPresentationSection from './AnteproyectoPresentationSection';
+import CronogramaPresentationSection from './CronogramaPresentationSection';
 
 interface InteractivePresentationModalProps {
   project: SolarProject;
@@ -18,6 +23,7 @@ interface InteractivePresentationModalProps {
   onClose: () => void;
   isClientView?: boolean;
   onShare?: (method: 'whatsapp' | 'copy') => void;
+  onChangeCronogramaParams?: (params: any) => void;
 }
 
 // Custom hook for smooth scroll reveal
@@ -107,7 +113,7 @@ function AnimatedNumber({
 }
 
 // GoldenShaderBackground (Flowing liquid gold lines from mrmeny)
-function LightweightHeroLines({ scrollY, opacity }: { scrollY: number, opacity?: number }) {
+function LightweightHeroLines({ scrollY, opacity, isOffGrid }: { scrollY: number, opacity?: number, isOffGrid?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef(scrollY);
   const velocityRef = useRef(0);
@@ -151,17 +157,17 @@ function LightweightHeroLines({ scrollY, opacity }: { scrollY: number, opacity?:
 
     const getGoldColor = (plane: 1 | 2 | 3, index: number) => {
       const opacities = { 
-        1: [0.75, 0.65, 0.55, 0.70, 0.60], 
-        2: [0.55, 0.48, 0.40, 0.50, 0.42], 
-        3: [0.42, 0.36, 0.30, 0.38, 0.34] 
+        1: [1.00, 0.95, 0.90, 0.95, 0.85], 
+        2: [0.85, 0.80, 0.75, 0.80, 0.70], 
+        3: [0.70, 0.65, 0.60, 0.65, 0.55] 
       };
       
       const colorsList = [
-        '197, 168, 128', // rich gold
-        '163, 135, 95',  // deep bronze
-        '212, 175, 55',  // bright gold
-        '188, 160, 120', // soft gold
-        '145, 120, 88',  // shadow gold
+        '196, 152, 37',  // ESOL primary gold
+        '254, 225, 128', // ESOL light gold
+        '218, 165, 32',  // Goldenrod
+        '255, 215, 0',   // Bright Gold
+        '184, 134, 11',  // Dark Goldenrod
       ];
           
       const rgb = colorsList[index % colorsList.length];
@@ -180,7 +186,7 @@ function LightweightHeroLines({ scrollY, opacity }: { scrollY: number, opacity?:
         speed: 0.0008 + Math.random() * 0.001,
         color: getGoldColor(3, i),
         phase: Math.random() * Math.PI * 2,
-        lineWidth: 0.8 + Math.random() * 0.6,
+        lineWidth: 1.5 + Math.random() * 1.0,
         plane: 3
       });
     }
@@ -196,7 +202,7 @@ function LightweightHeroLines({ scrollY, opacity }: { scrollY: number, opacity?:
         speed: 0.0015 + Math.random() * 0.002,
         color: getGoldColor(2, i),
         phase: Math.random() * Math.PI * 2,
-        lineWidth: 1.5 + Math.random() * 0.8,
+        lineWidth: 2.5 + Math.random() * 1.5,
         plane: 2
       });
     }
@@ -212,7 +218,7 @@ function LightweightHeroLines({ scrollY, opacity }: { scrollY: number, opacity?:
         speed: 0.002 + Math.random() * 0.003,
         color: getGoldColor(1, i),
         phase: Math.random() * Math.PI * 2,
-        lineWidth: 2.2 + Math.random() * 1.0,
+        lineWidth: 3.5 + Math.random() * 2.0,
         plane: 1
       });
     }
@@ -231,11 +237,11 @@ function LightweightHeroLines({ scrollY, opacity }: { scrollY: number, opacity?:
 
         // Add premium gold glow shadow
         ctx.shadowColor = wave.plane === 1
-          ? 'rgba(212, 160, 23, 0.85)'
+          ? 'rgba(255, 215, 0, 1.0)'
           : wave.plane === 2
-          ? 'rgba(212, 160, 23, 0.65)'
-          : 'rgba(212, 160, 23, 0.45)';
-        ctx.shadowBlur = wave.plane === 1 ? 14 : wave.plane === 2 ? 8 : 4;
+          ? 'rgba(218, 165, 32, 0.9)'
+          : 'rgba(196, 152, 37, 0.6)';
+        ctx.shadowBlur = wave.plane === 1 ? 20 : wave.plane === 2 ? 12 : 6;
 
         // Parallax scroll reaction (reduced by 70%)
         const scrollFactor = wave.plane === 1 ? 1.0 : wave.plane === 2 ? 0.6 : 0.3;
@@ -256,11 +262,15 @@ function LightweightHeroLines({ scrollY, opacity }: { scrollY: number, opacity?:
             ctx.lineTo(x, yVal);
           }
         }
-        
         ctx.stroke();
         
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
+        // Metallic inner highlight
+        if (wave.plane === 1 || wave.plane === 2) {
+          ctx.lineWidth = wave.lineWidth * 0.3;
+          ctx.strokeStyle = `rgba(255, 250, 220, ${wave.plane === 1 ? 0.9 : 0.5})`;
+          ctx.shadowBlur = 0;
+          ctx.stroke();
+        }
         
         wave.phase += currentSpeed;
         wave.y += Math.sin(wave.phase * 0.1) * 0.1 * scrollFactor;
@@ -284,7 +294,7 @@ function LightweightHeroLines({ scrollY, opacity }: { scrollY: number, opacity?:
   return (
     <canvas 
       ref={canvasRef} 
-      className="fixed inset-0 w-full h-full pointer-events-none z-0 mix-blend-multiply" 
+      className={`fixed inset-0 w-full h-full pointer-events-none z-0 ${isOffGrid ? '' : 'mix-blend-multiply'}`}
       style={{ opacity: dynamicOpacity }}
     />
   );
@@ -295,11 +305,22 @@ export default function InteractivePresentationModal({
   proposal,
   onClose,
   isClientView,
-  onShare
+  onShare,
+  onChangeCronogramaParams
 }: InteractivePresentationModalProps) {
   const [copied, setCopied] = useState(false);
   const { system, financial, environmental } = proposal;
-  const cfe = project.cfe_data;
+  const isOffGrid = project.project_type === 'off-grid';
+  const cfe = project.cfe_data || {
+    tariff: '1',
+    is_bimonthly: true,
+    tariff_rate: 0,
+    demand_kw: 0,
+    monthly_kWh: 0,
+    bimonthly_kWh: 0,
+    total_mxn: 0,
+    historic_periods: []
+  };
 
   // State for interactive financial simulator
   const [inflationRate, setInflationRate] = useState<number>(7.5);
@@ -406,6 +427,7 @@ export default function InteractivePresentationModal({
 
   // Parallax Scroll Tracking Engine
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const techCardsRef = useRef<HTMLDivElement>(null);
   const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
@@ -427,20 +449,26 @@ export default function InteractivePresentationModal({
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Calculate dynamic parallax offset based on actual screen position (distance from center)
+  // Calculate dynamic parallax offset based on actual screen position of the 2 hardware cards
   let techOffset = 0;
   let specsSectionOpacity = 0;
   
-  if (techReveal.ref.current) {
-    const rect = techReveal.ref.current.getBoundingClientRect();
+  if (techCardsRef.current) {
+    const rect = techCardsRef.current.getBoundingClientRect();
     const elementCenterY = rect.top + rect.height / 2;
     const windowCenterY = typeof window !== 'undefined' ? window.innerHeight / 2 : 500;
     
-    // Calculate how far the center of the element is from the center of the screen
+    // Calculate how far the center of the cards is from the center of the screen
     const distFromCenter = Math.abs(elementCenterY - windowCenterY);
     
-    // Create a 250px "dead zone" where it stays perfectly fixed, then slide out
-    techOffset = Math.max(0, distFromCenter - 250) * 0.75;
+    // Create a 200px "dead zone" where cards stay perfectly centered (techOffset = 0), then smoothly slide in/out
+    techOffset = Math.min(250, Math.max(0, distFromCenter - 200) * 0.6);
+  } else if (techReveal.ref.current) {
+    const rect = techReveal.ref.current.getBoundingClientRect();
+    const elementCenterY = rect.top + Math.min(rect.height / 2, 250);
+    const windowCenterY = typeof window !== 'undefined' ? window.innerHeight / 2 : 500;
+    const distFromCenter = Math.abs(elementCenterY - windowCenterY);
+    techOffset = Math.min(250, Math.max(0, distFromCenter - 200) * 0.6);
   }
   
   if (specsReveal.ref.current) {
@@ -448,12 +476,12 @@ export default function InteractivePresentationModal({
     const elementCenterY = rect.top + rect.height / 2;
     const windowCenterY = typeof window !== 'undefined' ? window.innerHeight / 2 : 500;
     const distFromCenter = Math.abs(elementCenterY - windowCenterY);
-    // Specs section bg opacity peaks at 0.5 when centered
-    specsSectionOpacity = Math.max(0, 0.5 * (1 - distFromCenter / 700));
+    // Specs section bg opacity peaks at max when centered
+    specsSectionOpacity = Math.max(0, (isOffGrid ? 0.2 : 0.5) * (1 - distFromCenter / 700));
   }
   
-  const heroOpacity = Math.max(0, 0.5 * (1 - scrollY / 800));
-  const dynamicCanvasOpacity = Math.min(0.5, heroOpacity + specsSectionOpacity);
+  const heroOpacity = Math.max(0, (isOffGrid ? 0.2 : 0.5) * (1 - scrollY / 800));
+  const dynamicCanvasOpacity = Math.min(isOffGrid ? 0.2 : 0.5, heroOpacity + specsSectionOpacity);
 
   return createPortal(
     <div 
@@ -546,31 +574,35 @@ export default function InteractivePresentationModal({
           const rect = e.currentTarget.getBoundingClientRect();
           setHeroMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
         }}
-        className="w-full min-h-screen bg-[#fdfbf7] relative z-10 overflow-hidden text-slate-800 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] mb-[450px] sm:mb-[380px]"
+        className={`w-full min-h-screen ${isOffGrid ? 'bg-[#dae2ed] text-slate-800' : 'bg-[#fdfbf7] text-slate-800'} relative z-10 overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] mb-[450px] sm:mb-[380px]`}
       >
-        <LightweightHeroLines scrollY={scrollY} opacity={dynamicCanvasOpacity} />
+        <LightweightHeroLines scrollY={scrollY} opacity={dynamicCanvasOpacity} isOffGrid={isOffGrid} />
 
         {/* --- CORRUGATED PAPER TEXTURE OVERLAY BEHIND TEXT CONTENT --- */}
-        <div 
-          className="absolute inset-0 pointer-events-none z-0 opacity-35 mix-blend-multiply"
-          style={{
-            backgroundImage: `
-              repeating-linear-gradient(
-                90deg,
-                rgba(0, 0, 0, 0.05) 0px,
-                rgba(0, 0, 0, 0.05) 2px,
-                transparent 2px,
-                transparent 4px,
-                rgba(255, 255, 255, 0.75) 4px,
-                rgba(255, 255, 255, 0.75) 6px,
-                transparent 6px,
-                transparent 8px
-              )
-            `
-          }}
-        ></div>
-        <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(#cbd5e1_0.75px,transparent_0.75px)] [background-size:14px_14px] opacity-20"></div>
-        <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(#cbd5e1_0.75px,transparent_0.75px)] [background-size:14px_14px] opacity-25"></div>
+        {!isOffGrid && (
+          <>
+            <div 
+              className="absolute inset-0 pointer-events-none z-0 opacity-35 mix-blend-multiply"
+              style={{
+                backgroundImage: `
+                  repeating-linear-gradient(
+                    90deg,
+                    rgba(0, 0, 0, 0.05) 0px,
+                    rgba(0, 0, 0, 0.05) 2px,
+                    transparent 2px,
+                    transparent 4px,
+                    rgba(255, 255, 255, 0.75) 4px,
+                    rgba(255, 255, 255, 0.75) 6px,
+                    transparent 6px,
+                    transparent 8px
+                  )
+                `
+              }}
+            ></div>
+            <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(#cbd5e1_0.75px,transparent_0.75px)] [background-size:14px_14px] opacity-20"></div>
+            <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(#cbd5e1_0.75px,transparent_0.75px)] [background-size:14px_14px] opacity-25"></div>
+          </>
+        )}
 
         {/* --- HEADER INSIDE LETTER BOX --- */}
         <header className="relative z-10 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-[#C49825]/40 px-8 py-5 text-white flex items-center justify-between">
@@ -586,7 +618,7 @@ export default function InteractivePresentationModal({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3.5 py-1 bg-[#C49825]/20 border border-[#C49825]/40 rounded-full text-xs text-[#FEE180] font-bold">
               <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '6s' }} />
-              <span>Cobertura {coveragePct.toFixed(1)}% CFE</span>
+              <span>{isOffGrid ? '100% Autonomía Energética' : `Cobertura ${coveragePct.toFixed(1)}% CFE`}</span>
             </div>
           </div>
         </header>
@@ -634,7 +666,7 @@ export default function InteractivePresentationModal({
                 <div className="w-[100vw] relative left-1/2 -translate-x-1/2 bg-slate-900/[0.02] backdrop-blur-sm border-y border-slate-400/30 shadow-[0_8px_30px_rgba(0,0,0,0.04)] py-6 sm:py-8 mt-12">
                   <div className="max-w-[1000px] mx-auto px-6 sm:px-12 space-y-6">
                     <p className="text-sm sm:text-base text-slate-700 font-medium leading-relaxed text-center max-w-3xl mx-auto">
-                      <strong className="text-slate-900">{proposal.name}</strong> — Un sistema fotovoltaico diseñado bajo normas NOM-001-SEDE para eliminar hasta el 99% de tu gasto CFE con total certidumbre financiera.
+                      <strong className="text-slate-900">{proposal.name}</strong> — Un sistema fotovoltaico diseñado bajo normas NOM-001-SEDE para {isOffGrid ? 'brindar autonomía energética total sin depender de CFE' : 'eliminar hasta el 99% de tu gasto CFE con total certidumbre financiera'}.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 pt-2 text-[11px] sm:text-xs font-bold text-slate-700">
@@ -654,7 +686,8 @@ export default function InteractivePresentationModal({
             </div>
           </section>
 
-          {/* 2. DIAGNÓSTICO CFE */}
+          {/* 2. DIAGNÓSTICO CFE / PERFIL ENERGÉTICO */}
+          {!isOffGrid ? (
           <section>
             <div 
               ref={cfeReveal.ref}
@@ -790,31 +823,130 @@ export default function InteractivePresentationModal({
               )}
 
               {/* Line Chart */}
-              {cfe.historic_periods && cfe.historic_periods.length > 0 && (
-                <div className="mt-6 p-6 bg-white border border-slate-200 rounded-2xl shadow-md h-80">
-                  <h3 className="text-sm font-bold text-slate-800 text-center mb-6">Proyección Comparativa de Pagos Históricos</h3>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={[...cfe.historic_periods].reverse().map(p => ({ name: p.period, 'Gasto CFE': p.amount, 'Pago ESOL': minFee }))}
-                      margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} minTickGap={20} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(val) => `$${val.toLocaleString('es-MX')}`} />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 600, fontSize: '13px' }}
-                        formatter={(value: number) => [`$${value.toLocaleString('es-MX')} MXN`, '']}
-                      />
-                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                      <Line type="monotone" dataKey="Gasto CFE" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="Pago ESOL" stroke="#10b981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+              {cfe.historic_periods && cfe.historic_periods.length > 0 && (() => {
+                const basePeriodGenKwh = (proposal.system?.annual_production_kWh || 0) / (cfe.is_bimonthly ? 6 : 12);
+                
+                const chartData = [...cfe.historic_periods].reverse().map((p, idx) => {
+                  const periodStr = p.period || '';
+                  const seasonalMultiplier = getSeasonalSolarMultiplier(periodStr, idx);
+                  const genKwh = Math.round(basePeriodGenKwh * seasonalMultiplier);
+                  const genValorMxn = Math.round(genKwh * (cfe.tariff_rate || 4.5));
+
+                  return {
+                    name: periodStr,
+                    'Gasto CFE': p.amount,
+                    'Generación Solar': genValorMxn,
+                    'Pago ESOL': minFee,
+                    genKwh,
+                    kwhConsumo: p.kwh
+                  };
+                });
+
+                return (
+                  <div className="mt-6 p-6 bg-white border border-slate-200 rounded-2xl shadow-md h-88">
+                    <h3 className="text-sm font-bold text-slate-800 text-center mb-6">Proyección Comparativa de Pagos Históricos</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={chartData}
+                        margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={true} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} minTickGap={20} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(val) => `$${val.toLocaleString('es-MX')}`} />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 600, fontSize: '13px' }}
+                          formatter={(value: number, name: string, props: any) => {
+                            if (name === 'Generación Solar') {
+                              const kwh = props?.payload?.genKwh;
+                              return [`$${value.toLocaleString('es-MX')} MXN (${kwh ? kwh.toLocaleString() + ' kWh' : ''})`, name];
+                            }
+                            if (name === 'Gasto CFE') {
+                              const kwh = props?.payload?.kwhConsumo;
+                              return [`$${value.toLocaleString('es-MX')} MXN (${kwh ? kwh.toLocaleString() + ' kWh' : ''})`, name];
+                            }
+                            return [`$${value.toLocaleString('es-MX')} MXN`, name];
+                          }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                        <Line type="monotone" dataKey="Gasto CFE" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="Generación Solar" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#f59e0b' }} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="Pago ESOL" stroke="#10b981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
 
             </div>
           </section>
+          ) : (
+          <section>
+            <div 
+              ref={cfeReveal.ref}
+              className={`transition-all duration-1000 transform ${
+                cfeReveal.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+              }`}
+            >
+              <div className="text-center mb-10">
+                <div className="mb-4">
+                  <span className="px-4 py-1.5 bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider rounded-full shadow-sm">
+                    Perfil Energético Aislado
+                  </span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                  Demanda de Energía Diaria
+                </h2>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-3 sm:p-6 md:p-8 shadow-xl">
+                <div className="w-full">
+                  <table className="w-full text-[10px] sm:text-sm text-left table-fixed">
+                    <thead className="text-[9px] sm:text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="w-[36%] px-2 sm:px-4 py-2 sm:py-3 rounded-tl-lg">Aparato</th>
+                        <th className="w-[14%] px-1 sm:px-3 py-2 sm:py-3 text-center">Cant.</th>
+                        <th className="w-[16%] px-1 sm:px-3 py-2 sm:py-3 text-right">Potencia</th>
+                        <th className="w-[16%] px-1 sm:px-3 py-2 sm:py-3 text-right">Uso/Día</th>
+                        <th className="w-[18%] px-1.5 sm:px-4 py-2 sm:py-3 text-right rounded-tr-lg">kWh/Día</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(project.load_profile?.appliances || []).map((d: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-2 sm:px-4 py-2 sm:py-3 font-semibold text-slate-800 truncate" title={d.name}>
+                            {d.name}
+                          </td>
+                          <td className="px-1 sm:px-3 py-2 sm:py-3 text-center text-slate-600 font-medium">
+                            {d.quantity}
+                          </td>
+                          <td className="px-1 sm:px-3 py-2 sm:py-3 text-right text-slate-500 font-mono text-[10px] sm:text-xs">
+                            {d.watts}W
+                          </td>
+                          <td className="px-1 sm:px-3 py-2 sm:py-3 text-right text-slate-500 font-mono text-[10px] sm:text-xs">
+                            {d.hoursPerDay}h
+                          </td>
+                          <td className="px-1.5 sm:px-4 py-2 sm:py-3 text-right font-bold text-amber-600 font-mono text-[10px] sm:text-sm">
+                            {((d.quantity * d.watts * d.hoursPerDay * (d.daysPerWeek / 7)) / 1000).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-50/80 border-t border-slate-200">
+                        <td colSpan={4} className="px-2 sm:px-4 py-2.5 sm:py-4 text-right rounded-bl-lg font-bold text-slate-600 uppercase text-[9px] sm:text-xs tracking-wider">
+                          Consumo Total Estimado
+                        </td>
+                        <td className="px-1.5 sm:px-4 py-2.5 sm:py-4 text-right rounded-br-lg font-black text-xs sm:text-lg text-red-500 font-mono whitespace-nowrap">
+                          {((project.load_profile?.daily_Wh || 0) / 1000).toFixed(2)} <span className="text-[9px] sm:text-sm font-bold text-red-400">kWh</span>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+          )}
 
           {/* 3. SHOWCASE TECNOLÓGICO */}
           <section>
@@ -834,56 +966,84 @@ export default function InteractivePresentationModal({
               </div>
 
               {/* Card Showcase */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                
-                {/* Panel Image */}
-                <div 
-                  className="bg-white border border-slate-200 rounded-2xl p-5 shadow-lg flex flex-col hover:shadow-xl transition-all duration-500 ease-out"
-                  style={{ transform: `translateX(-${techOffset}px)` }}
-                >
-                  <div className="mb-4 text-center sm:text-left">
-                    <span className="text-xs font-bold text-[#997015] uppercase tracking-wider block">
-                      Tecnología Fotovoltaica
-                    </span>
-                    <h3 className="text-base font-bold text-slate-800 mt-1">
-                      Módulos de Alta Eficiencia
-                    </h3>
-                  </div>
-                  <div className="relative rounded-xl overflow-hidden bg-slate-50 flex-1 flex items-center justify-center">
-                    <img
-                      src="/crosssection_panel.png"
-                      alt="Corte transversal del panel fotovoltaico"
-                      className="w-full h-auto object-cover max-h-[350px] transition-transform duration-700 hover:scale-105"
-                    />
-                  </div>
-                </div>
+              {!isOffGrid ? (
+                <>
+                  <div ref={techCardsRef} className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                    
+                    {/* Panel Image */}
+                    <div 
+                      className="bg-white border border-slate-200 rounded-2xl p-5 shadow-lg flex flex-col hover:shadow-xl transition-all duration-500 ease-out"
+                      style={{ transform: `translateX(-${techOffset}px)` }}
+                    >
+                      <div className="mb-4 text-center sm:text-left">
+                        <span className="text-xs font-bold text-[#997015] uppercase tracking-wider block">
+                          Tecnología Fotovoltaica
+                        </span>
+                        <h3 className="text-base font-bold text-slate-800 mt-1">
+                          Módulos de Alta Eficiencia
+                        </h3>
+                      </div>
+                      <div className="relative rounded-xl overflow-hidden bg-slate-50 flex-1 flex items-center justify-center">
+                        <img
+                          src="/crosssection_panel.png"
+                          alt="Corte transversal del panel fotovoltaico"
+                          className="w-full h-auto object-cover max-h-[350px] transition-transform duration-700 hover:scale-105"
+                        />
+                      </div>
+                    </div>
 
-                {/* Growatt Inverter Image */}
-                <div 
-                  className="bg-white border border-slate-200 rounded-2xl p-5 shadow-lg flex flex-col hover:shadow-xl transition-all duration-500 ease-out"
-                  style={{ transform: `translateX(${techOffset}px)` }}
-                >
-                  <div className="mb-4 text-center sm:text-left">
-                    <span className="text-xs font-bold text-[#997015] uppercase tracking-wider block">
-                      Inversores de Interconexión
-                    </span>
-                    <h3 className="text-base font-bold text-slate-800 mt-1">
-                      Arquitectura Interna y Componentes
-                    </h3>
+                    {/* Growatt Inverter Image */}
+                    <div 
+                      className="bg-white border border-slate-200 rounded-2xl p-5 shadow-lg flex flex-col hover:shadow-xl transition-all duration-500 ease-out"
+                      style={{ transform: `translateX(${techOffset}px)` }}
+                    >
+                      <div className="mb-4 text-center sm:text-left">
+                        <span className="text-xs font-bold text-[#997015] uppercase tracking-wider block">
+                          Inversores de Interconexión
+                        </span>
+                        <h3 className="text-base font-bold text-slate-800 mt-1">
+                          Arquitectura Interna y Componentes
+                        </h3>
+                      </div>
+                      <div className="relative rounded-xl overflow-hidden bg-slate-50 flex-1 flex items-center justify-center">
+                        <img
+                          src="/crosssection_growatt.jpg"
+                          alt="Corte transversal del inversor Growatt"
+                          className="w-full h-auto object-cover max-h-[350px] transition-transform duration-700 hover:scale-105"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="relative rounded-xl overflow-hidden bg-slate-50 flex-1 flex items-center justify-center">
-                    <img
-                      src="/crosssection_growatt.jpg"
-                      alt="Corte transversal del inversor Growatt"
-                      className="w-full h-auto object-cover max-h-[350px] transition-transform duration-700 hover:scale-105"
-                    />
-                  </div>
-                </div>
-              </div>
+
+                  {/* Corte Arquitectónico y Dinámica Energética Interconectada a CFE */}
+                  <GridTiedAnimatedDiagram project={project} proposal={proposal} />
+                </>
+              ) : (
+                <OffGridAnimatedDiagram />
+              )}
             </div>
           </section>
 
-          {/* 4. ESPECIFICACIONES DEL SISTEMA */}
+          {/* 4. ANTEPROYECTO & LÁMINAS TÉCNICAS (Sólo se renderiza si hay imágenes cargadas, regla de cero espacios en blanco) */}
+          <AnteproyectoPresentationSection
+            images={proposal.anteproyecto_images || []}
+            clientName={project.client_name}
+            isUnlocked={proposal.anteproyecto_unlocked}
+            isAdmin={!isClientView}
+          />
+
+          {/* 5. PLAN DE EJECUCIÓN Y CRONOGRAMA DE OBRA (Cálculo automático de ruta crítica) */}
+          <CronogramaPresentationSection
+            numPanels={system.num_panels || Math.ceil((system.installed_kWp || 5) / 0.55)}
+            startDate={proposal.created_at || project.created_at}
+            isOffGrid={isOffGrid}
+            tariff={cfe.tariff}
+            cronogramaParams={proposal.cronograma_params}
+            onChangeCronogramaParams={onChangeCronogramaParams}
+            isAdmin={!isClientView}
+          />
+
+          {/* 6. ESPECIFICACIONES DEL SISTEMA */}
           <section className="w-[100vw] relative left-1/2 -translate-x-1/2 bg-slate-900/[0.02] backdrop-blur-sm border-y border-slate-400/30 shadow-[0_8px_30px_rgba(0,0,0,0.04)] py-12 sm:py-16 my-12 z-0">
             <div 
               ref={specsReveal.ref}
@@ -924,7 +1084,7 @@ export default function InteractivePresentationModal({
                   <div className="space-y-4 border-t border-slate-700/50 pt-6 mt-2">
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                      <span className="text-sm text-slate-300 font-medium">Gestión e Interconexión CFE incluida</span>
+                      <span className="text-sm text-slate-300 font-medium">{isOffGrid ? 'Almacenamiento en baterías de litio incluido' : 'Gestión e Interconexión CFE incluida'}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
@@ -936,64 +1096,90 @@ export default function InteractivePresentationModal({
                     </div>
                   </div>
 
-                  <div className="mt-6 p-4 bg-slate-950/40 rounded-2xl border border-slate-700/50 flex flex-col gap-2 relative z-10 backdrop-blur-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[#FEE180] font-bold text-xs uppercase tracking-wider">Retorno de Inversión (ROI)</span>
-                      <span className="font-bold text-emerald-400 text-lg tracking-wide">{Number(displayPayback).toFixed(1)} Años</span>
+                  {!isOffGrid ? (
+                    <div className="mt-6 p-4 bg-slate-950/40 rounded-2xl border border-slate-700/50 flex flex-col gap-2 relative z-10 backdrop-blur-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[#FEE180] font-bold text-xs uppercase tracking-wider">Retorno de Inversión (ROI)</span>
+                        <span className="font-bold text-emerald-400 text-lg tracking-wide">{Number(displayPayback).toFixed(1)} Años</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500/90 leading-relaxed border-t border-slate-700/50 pt-2">
+                        *Tiempo estimado de recuperación basado exclusivamente en tus hábitos de consumo actuales y las tarifas vigentes de CFE.
+                      </p>
                     </div>
-                    <p className="text-[10px] text-slate-500/90 leading-relaxed border-t border-slate-700/50 pt-2">
-                      *Tiempo estimado de recuperación basado exclusivamente en tus hábitos de consumo actuales y las tarifas vigentes de CFE.
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="mt-6 p-4 bg-slate-950/40 rounded-2xl border border-slate-700/50 flex flex-col gap-2 relative z-10 backdrop-blur-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[#FEE180] font-bold text-xs uppercase tracking-wider">Autonomía del Sistema</span>
+                        <span className="font-bold text-emerald-400 text-lg tracking-wide">Independencia 24/7</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500/90 leading-relaxed border-t border-slate-700/50 pt-2">
+                        *Genera, almacena y consume tu propia energía sin depender de la red eléctrica nacional.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {/* BENTO BOX SPECS */}
-                <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* BENTO BOX SPECS (2 Columns on Mobile) */}
+                <div className="lg:col-span-6 grid grid-cols-2 gap-2.5 sm:gap-4">
                   {/* Capacidad */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                      <Zap className="w-6 h-6" />
+                  <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start gap-2.5 sm:gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-2 sm:p-3 bg-blue-50 text-blue-600 rounded-lg sm:rounded-xl shrink-0">
+                      <Zap className="w-4 h-4 sm:w-6 sm:h-6" />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Potencia Instalada</span>
-                      <span className="text-xl font-black text-slate-900">{system.installed_kWp.toFixed(2)} kWp</span>
-                      <p className="text-xs text-slate-500 mt-1 font-medium">Generación estimada: {(system.annual_production_kWh).toLocaleString()} kWh/año</p>
+                      <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Potencia Instalada</span>
+                      <span className="text-sm sm:text-xl font-black text-slate-900 leading-tight block mt-0.5">{system.installed_kWp.toFixed(2)} kWp</span>
+                      <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 font-medium line-clamp-1">{(system.annual_production_kWh).toLocaleString()} kWh/año</p>
                     </div>
                   </div>
 
                   {/* Paneles */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0">
-                      <Sun className="w-6 h-6" />
+                  <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start gap-2.5 sm:gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-2 sm:p-3 bg-amber-50 text-amber-600 rounded-lg sm:rounded-xl shrink-0">
+                      <Sun className="w-4 h-4 sm:w-6 sm:h-6" />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Módulos Solares</span>
-                      <span className="text-xl font-black text-slate-900">{system.num_panels} Pzas</span>
-                      <p className="text-xs text-slate-500 mt-1 font-medium">{system.panel_name} {system.panel_Wp}W</p>
+                      <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Módulos Solares</span>
+                      <span className="text-sm sm:text-xl font-black text-slate-900 leading-tight block mt-0.5">{system.num_panels} Pzas</span>
+                      <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 font-medium line-clamp-1">{system.panel_Wp}W {system.panel_name}</p>
                     </div>
                   </div>
 
                   {/* Inversores */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
-                    <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0">
-                      <Cpu className="w-6 h-6" />
+                  <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start gap-2.5 sm:gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-2 sm:p-3 bg-purple-50 text-purple-600 rounded-lg sm:rounded-xl shrink-0">
+                      <Cpu className="w-4 h-4 sm:w-6 sm:h-6" />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Inversores</span>
-                      <span className="text-xl font-black text-slate-900">{system.num_inverters} Pzas</span>
-                      <p className="text-xs text-slate-500 mt-1 font-medium">{system.inverter_name} {system.inverter_kw}kW</p>
+                      <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block">{isOffGrid ? 'Inv. Cargadores' : 'Inversores'}</span>
+                      <span className="text-sm sm:text-xl font-black text-slate-900 leading-tight block mt-0.5">{system.num_inverters} Pzas</span>
+                      <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 font-medium line-clamp-1">{system.inverter_kw}kW {system.inverter_name}</p>
                     </div>
                   </div>
 
+                  {/* Baterías (Only for offgrid) */}
+                  {isOffGrid && (
+                    <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start gap-2.5 sm:gap-4 hover:shadow-md transition-shadow">
+                      <div className="p-2 sm:p-3 bg-red-50 text-red-600 rounded-lg sm:rounded-xl shrink-0">
+                        <Activity className="w-4 h-4 sm:w-6 sm:h-6" />
+                      </div>
+                      <div>
+                        <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Baterías</span>
+                        <span className="text-sm sm:text-xl font-black text-slate-900 leading-tight block mt-0.5">{system.num_batteries || 1} Pzas</span>
+                        <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 font-medium line-clamp-1">{system.battery_name || 'Litio'}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Área */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
-                      <Layers className="w-6 h-6" />
+                  <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start gap-2.5 sm:gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-2 sm:p-3 bg-emerald-50 text-emerald-600 rounded-lg sm:rounded-xl shrink-0">
+                      <Layers className="w-4 h-4 sm:w-6 sm:h-6" />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Área & Montaje</span>
-                      <span className="text-xl font-black text-slate-900">~{system.area_m2} m²</span>
-                      <p className="text-xs text-slate-500 mt-1 font-medium">Estructura K2 Systems Anodizada</p>
+                      <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Área & Montaje</span>
+                      <span className="text-sm sm:text-xl font-black text-slate-900 leading-tight block mt-0.5">~{Number(system.area_m2 || 0).toFixed(1)} m²</span>
+                      <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 font-medium line-clamp-1">Estructura K2 Anodizada</p>
                     </div>
                   </div>
                 </div>
@@ -1001,7 +1187,8 @@ export default function InteractivePresentationModal({
             </div>
           </section>
 
-          {/* 5. SIMULADOR FINANCIERO */}
+          {/* 5. SIMULADOR FINANCIERO / PROYECCIÓN DE ENERGÍA */}
+          {!isOffGrid ? (
           <section>
             <div 
               ref={calcReveal.ref}
@@ -1109,6 +1296,78 @@ export default function InteractivePresentationModal({
               </div>
             </div>
           </section>
+          ) : (
+          <section>
+            <div 
+              ref={calcReveal.ref}
+              className={`transition-all duration-1000 transform ${
+                calcReveal.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+              }`}
+            >
+              <div className="text-center mb-10">
+                <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs font-bold uppercase tracking-wider rounded-full">
+                  Proyección de Energía Limpia
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
+                  Generación vs Consumo
+                </h2>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 shadow-xl max-w-5xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-center">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Generación Diaria</span>
+                    <span className="text-2xl font-black text-amber-500">{((system.annual_production_kWh || 0) / 365).toFixed(1)} <span className="text-sm font-bold">kWh</span></span>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Consumo Diario</span>
+                    <span className="text-2xl font-black text-red-500">{((project.load_profile?.daily_Wh || 0) / 1000).toFixed(1)} <span className="text-sm font-bold">kWh</span></span>
+                  </div>
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block mb-1">Balance Energético</span>
+                    <span className="text-2xl font-black text-emerald-600">Positivo</span>
+                  </div>
+                </div>
+
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={[
+                        {
+                          name: 'Diario',
+                          'Generación': (system.annual_production_kWh || 0) / 365,
+                          'Consumo': (project.load_profile?.daily_Wh || 0) / 1000
+                        },
+                        {
+                          name: 'Semanal',
+                          'Generación': ((system.annual_production_kWh || 0) / 365) * 7,
+                          'Consumo': ((project.load_profile?.daily_Wh || 0) / 1000) * 7
+                        },
+                        {
+                          name: 'Mensual',
+                          'Generación': (system.annual_production_kWh || 0) / 12,
+                          'Consumo': ((project.load_profile?.daily_Wh || 0) / 1000) * 30
+                        }
+                      ]}
+                      margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(val) => `${val.toFixed(0)} kWh`} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 600, fontSize: '13px' }}
+                        formatter={(value: number) => [`${value.toFixed(1)} kWh`, '']}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                      <Line type="monotone" dataKey="Generación" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="Consumo" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </section>
+          )}
 
           {/* 5. IMPACTO AMBIENTAL */}
           <section>
@@ -1130,35 +1389,35 @@ export default function InteractivePresentationModal({
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 relative z-10">
-                  <div className="p-6 bg-slate-950/40 border border-slate-700/50 rounded-2xl text-center shadow-xl backdrop-blur-sm group hover:border-emerald-500/30 transition-colors">
-                    <div className="w-14 h-14 mx-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Factory className="w-7 h-7" />
+                <div className="grid grid-cols-3 gap-2 sm:gap-5 relative z-10">
+                  <div className="p-2.5 sm:p-6 bg-slate-950/40 border border-slate-700/50 rounded-xl sm:rounded-2xl text-center shadow-xl backdrop-blur-sm group hover:border-emerald-500/30 transition-colors flex flex-col justify-between items-center">
+                    <div className="w-8 h-8 sm:w-14 sm:h-14 mx-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg sm:rounded-2xl flex items-center justify-center mb-1.5 sm:mb-4 group-hover:scale-110 transition-transform">
+                      <Factory className="w-4 h-4 sm:w-7 sm:h-7" />
                     </div>
-                    <div className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono mb-1 tracking-tight">
+                    <div className="text-xs sm:text-2xl md:text-3xl font-black text-emerald-400 font-mono mb-0.5 sm:mb-1 tracking-tight truncate w-full">
                       <AnimatedNumber value={(environmental.co2_kg_25yr || 0) / 1000} decimals={1} suffix=" Ton" />
                     </div>
-                    <h4 className="text-xs font-bold text-slate-400 tracking-wider uppercase">CO2 Evitado</h4>
+                    <h4 className="text-[8px] sm:text-xs font-bold text-slate-400 tracking-tighter sm:tracking-wider uppercase leading-tight">CO2 Evitado</h4>
                   </div>
 
-                  <div className="p-6 bg-slate-950/40 border border-slate-700/50 rounded-2xl text-center shadow-xl backdrop-blur-sm group hover:border-emerald-500/30 transition-colors">
-                    <div className="w-14 h-14 mx-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Trees className="w-7 h-7" />
+                  <div className="p-2.5 sm:p-6 bg-slate-950/40 border border-slate-700/50 rounded-xl sm:rounded-2xl text-center shadow-xl backdrop-blur-sm group hover:border-emerald-500/30 transition-colors flex flex-col justify-between items-center">
+                    <div className="w-8 h-8 sm:w-14 sm:h-14 mx-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg sm:rounded-2xl flex items-center justify-center mb-1.5 sm:mb-4 group-hover:scale-110 transition-transform">
+                      <Trees className="w-4 h-4 sm:w-7 sm:h-7" />
                     </div>
-                    <div className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono mb-1 tracking-tight">
-                      <AnimatedNumber value={environmental.trees_25yr || 0} suffix=" Árboles" />
+                    <div className="text-xs sm:text-2xl md:text-3xl font-black text-emerald-400 font-mono mb-0.5 sm:mb-1 tracking-tight truncate w-full">
+                      <AnimatedNumber value={environmental.trees_25yr || 0} suffix=" Árb." />
                     </div>
-                    <h4 className="text-xs font-bold text-slate-400 tracking-wider uppercase">Árboles Plantados</h4>
+                    <h4 className="text-[8px] sm:text-xs font-bold text-slate-400 tracking-tighter sm:tracking-wider uppercase leading-tight">Árboles</h4>
                   </div>
 
-                  <div className="p-6 bg-slate-950/40 border border-slate-700/50 rounded-2xl text-center shadow-xl backdrop-blur-sm group hover:border-emerald-500/30 transition-colors">
-                    <div className="w-14 h-14 mx-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Car className="w-7 h-7" />
+                  <div className="p-2.5 sm:p-6 bg-slate-950/40 border border-slate-700/50 rounded-xl sm:rounded-2xl text-center shadow-xl backdrop-blur-sm group hover:border-emerald-500/30 transition-colors flex flex-col justify-between items-center">
+                    <div className="w-8 h-8 sm:w-14 sm:h-14 mx-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg sm:rounded-2xl flex items-center justify-center mb-1.5 sm:mb-4 group-hover:scale-110 transition-transform">
+                      <Car className="w-4 h-4 sm:w-7 sm:h-7" />
                     </div>
-                    <div className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono mb-1 tracking-tight">
+                    <div className="text-xs sm:text-2xl md:text-3xl font-black text-emerald-400 font-mono mb-0.5 sm:mb-1 tracking-tight truncate w-full">
                       <AnimatedNumber value={environmental.cars_25yr || 0} suffix=" Autos" />
                     </div>
-                    <h4 className="text-xs font-bold text-slate-400 tracking-wider uppercase">Autos Retirados</h4>
+                    <h4 className="text-[8px] sm:text-xs font-bold text-slate-400 tracking-tighter sm:tracking-wider uppercase leading-tight">Autos</h4>
                   </div>
                 </div>
               </div>
@@ -1185,7 +1444,9 @@ export default function InteractivePresentationModal({
                 </h2>
 
                 <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed">
-                  Únete a las cientos de empresas y hogares que ya transformaron su gasto de energía CFE en un activo rentable de por vida.
+                  {isOffGrid 
+                    ? 'Únete a quienes ya disfrutan de independencia energética total con tecnología solar de vanguardia y respaldo 24/7.' 
+                    : 'Únete a las cientos de empresas y hogares que ya transformaron su gasto de energía CFE en un activo rentable de por vida.'}
                 </p>
 
                 {/* Animated Magnetic CTA Button */}

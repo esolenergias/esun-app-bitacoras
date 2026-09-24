@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.content.ContentValues
+import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
@@ -14,6 +15,9 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.content.Intent
 import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.RecognitionListener
+import android.os.Bundle
 import android.app.Activity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -38,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +56,8 @@ import com.example.ui.theme.SolarAmber
 import coil.compose.AsyncImage
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.BitacoraViewModel
+import com.example.ui.components.SignaturePadView
+import com.example.utils.PdfReportGenerator
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -100,24 +105,22 @@ fun NewBitacoraScreen(
     var expActivities by remember { mutableStateOf(true) }
     var expIncidents by remember { mutableStateOf(false) }
     var expConceptos by remember { mutableStateOf(false) }
+    var expSignature by remember { mutableStateOf(false) }
     
-    // State variables for the advanced form
-    var internalCrew by remember { mutableStateOf("12") }
-    var subCrew by remember { mutableStateOf("8") }
-    var machineryUsed by remember { mutableStateOf("Excavadora Cat 320, Grúa Telescópica") }
-    var activitiesText by remember { mutableStateOf("Instalación de estructuras metálicas en zona norte y canalización subterránea.") }
-    var progressVal by remember { mutableStateOf(45f) }
-    var safetyRemarks by remember { mutableStateOf("Charcos por lluvia previa, se acordonó el área.") }
+    // State variables for the form: Inician en 0 y vacíos por defecto
+    var internalCrew by remember { mutableStateOf("0") }
+    var subCrew by remember { mutableStateOf("0") }
+    var machineryUsed by remember { mutableStateOf("") }
+    var activitiesText by remember { mutableStateOf("") }
+    var progressVal by remember { mutableStateOf(0f) }
+    var safetyRemarks by remember { mutableStateOf("") }
     var toolsMaterials by remember { mutableStateOf("") }
+    var signatureBase64 by remember { mutableStateOf("") }
     
-    // Launchers for Camera and Gallery
-    // Permiso de cámara
+    // Permiso de cámara y lanzador
     val cameraPermission = rememberPermissionState(android.Manifest.permission.CAMERA)
-
-    // URI mutable para la foto que se tomará con TakePicture
     var photoUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Crea un URI en MediaStore para guardar la foto con alta calidad
     fun createPhotoUri(): Uri? {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val contentValues = ContentValues().apply {
@@ -128,7 +131,6 @@ fun NewBitacoraScreen(
         return context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
     }
 
-    // Launcher de galería
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
@@ -140,7 +142,6 @@ fun NewBitacoraScreen(
         }
     }
 
-    // Launcher de cámara con TakePicture — guarda la foto en MediaStore con calidad original
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -154,6 +155,14 @@ fun NewBitacoraScreen(
     
     val recordAudioPermission = rememberPermissionState(android.Manifest.permission.RECORD_AUDIO)
 
+    // =========================================================================
+    // DICTADO CONTINUO POR VOZ EN VENTANA EMERGENTE (No se apaga con pausas)
+    // =========================================================================
+    var isDictatingContinuous by remember { mutableStateOf(false) }
+    var showDictationDialog by remember { mutableStateOf(false) }
+    var liveDictatedText by remember { mutableStateOf("") }
+    var speechRmsLevel by remember { mutableStateOf(0f) }
+
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -162,8 +171,83 @@ fun NewBitacoraScreen(
             val matches = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             if (!matches.isNullOrEmpty()) {
                 val spokenText = matches[0]
+                liveDictatedText = if (liveDictatedText.isEmpty()) spokenText else "$liveDictatedText $spokenText"
                 activitiesText = if (activitiesText.isEmpty()) spokenText else "$activitiesText $spokenText"
+                Toast.makeText(context, "¡Dictado capturado!", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    val speechRecognizer = remember {
+        if (SpeechRecognizer.isRecognitionAvailable(context)) {
+            try { SpeechRecognizer.createSpeechRecognizer(context) } catch (e: Exception) { null }
+        } else {
+            null
+        }
+    }
+
+    val speechIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es-MX")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 30000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 30000L)
+        }
+    }
+
+    DisposableEffect(speechRecognizer) {
+        val listener = object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {
+                speechRmsLevel = rmsdB
+            }
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {
+                if (isDictatingContinuous) {
+                    try { speechRecognizer?.startListening(speechIntent) } catch (e: Exception) {}
+                }
+            }
+            override fun onError(error: Int) {
+                android.util.Log.d("SpeechRec", "onError code: $error")
+                // Reiniciar escucha continua automáticamente ante cualquier código de timeout o corte por silencio
+                if (isDictatingContinuous) {
+                    try {
+                        speechRecognizer?.cancel()
+                        speechRecognizer?.startListening(speechIntent)
+                    } catch (e: Exception) {}
+                }
+            }
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    val text = matches[0]
+                    if (text.isNotEmpty()) {
+                        liveDictatedText = if (liveDictatedText.isEmpty()) text else "$liveDictatedText $text"
+                    }
+                }
+                if (isDictatingContinuous) {
+                    try { speechRecognizer?.startListening(speechIntent) } catch (e: Exception) {}
+                }
+            }
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    val pText = matches[0]
+                    if (pText.isNotEmpty() && !liveDictatedText.contains(pText)) {
+                        liveDictatedText = if (liveDictatedText.isEmpty()) pText else "$liveDictatedText $pText"
+                    }
+                }
+            }
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        }
+
+        speechRecognizer?.setRecognitionListener(listener)
+
+        onDispose {
+            try { speechRecognizer?.destroy() } catch (e: Exception) {}
         }
     }
     
@@ -250,52 +334,128 @@ fun NewBitacoraScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Quién Reporta", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
-                            Text(userName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
-                            if (userRole.equals("Master", ignoreCase = true)) {
-                                Text(
-                                    text = if (selectedCustomDate != null) "Fecha: $selectedCustomDate" else "Ajustar Fecha/Hora",
-                                    fontSize = 11.sp,
-                                    color = ConnectedBlue,
-                                    modifier = Modifier
-                                        .padding(top = 4.dp)
-                                        .clickable {
-                                            val c = Calendar.getInstance()
-                                            DatePickerDialog(context, { _, y, m, d ->
-                                                TimePickerDialog(context, { _, h, min ->
-                                                    val formattedDate = String.format("%04d-%02d-%02d %02d:%02d", y, m + 1, d, h, min)
-                                                    selectedCustomDate = formattedDate
-                                                    viewModel.setCustomReportDate(formattedDate)
-                                                }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true).show()
-                                            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
-                                        }
-                                )
-                            }
+                        Column {
+                            Text("Residente / Autor", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                            Text(userName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Supervisor a Cargo", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
-                            Text(supervisorName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
+                        Column {
+                            Text("Supervisor", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                            Text(supervisorName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SlateDeep)
                         }
                     }
 
-                    HorizontalDivider(color = SubtleOutline.copy(alpha = 0.5f), thickness = 1.dp)
+                    // Selector opcional de fecha de reporte
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Fecha de Registro", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
+                            Text(selectedCustomDate ?: currentDateStr, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = SlateDeep)
+                        }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Clima de Hoy", fontSize = 10.sp, color = OnSurfaceVariant, fontWeight = FontWeight.Bold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            WeatherChip(icon = Icons.Default.WbSunny, label = "Soleado", selected = weather == "Soleado") { viewModel.setWeather("Soleado") }
-                            WeatherChip(icon = Icons.Default.Cloud, label = "Nublado", selected = weather == "Nublado") { viewModel.setWeather("Nublado") }
-                            WeatherChip(icon = Icons.Default.WaterDrop, label = "Lluvia", selected = weather == "Lluvia") { viewModel.setWeather("Lluvia") }
+                        Button(
+                            onClick = {
+                                val cal = Calendar.getInstance()
+                                DatePickerDialog(
+                                    context,
+                                    { _, year, month, dayOfMonth ->
+                                        val calSel = Calendar.getInstance()
+                                        calSel.set(year, month, dayOfMonth)
+                                        TimePickerDialog(
+                                            context,
+                                            { _, hourOfDay, minute ->
+                                                calSel.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                                calSel.set(Calendar.MINUTE, minute)
+                                                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                                                val formatted = sdf.format(calSel.time)
+                                                selectedCustomDate = formatted
+                                                viewModel.setCustomReportDate(formatted)
+                                            },
+                                            cal.get(Calendar.HOUR_OF_DAY),
+                                            cal.get(Calendar.MINUTE),
+                                            true
+                                        ).show()
+                                    },
+                                    cal.get(Calendar.YEAR),
+                                    cal.get(Calendar.MONTH),
+                                    cal.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = LightGrayBg, contentColor = ConnectedBlue),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Cambiar Fecha", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    HorizontalDivider(color = SubtleOutline, thickness = 1.dp)
+
+                    // Clima selector ordenado en rejilla de igual tamaño
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "CONDICIÓN DEL CLIMA", 
+                            fontSize = 11.sp, 
+                            fontWeight = FontWeight.ExtraBold, 
+                            color = ConnectedBlue,
+                            letterSpacing = 1.sp
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                "Despejado" to Icons.Default.WbSunny, 
+                                "Nublado" to Icons.Default.Cloud, 
+                                "Lluvia" to Icons.Default.Thunderstorm
+                            ).forEach { (wName, icon) ->
+                                val isSel = weather == wName
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(42.dp)
+                                        .clickable { viewModel.setWeather(wName) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSel) ConnectedBlue else LightGrayBg,
+                                    border = BorderStroke(1.dp, if (isSel) ConnectedBlue else SubtleOutline)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = icon, 
+                                            contentDescription = null, 
+                                            tint = if (isSel) PureWhite else SlateDeep, 
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = wName, 
+                                            fontSize = 12.sp, 
+                                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium, 
+                                            color = if (isSel) PureWhite else SlateDeep
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-            
+
             // --- 2. PERSONAL EN OBRA ---
             ExpandableFormSection(
                 title = "Personal en Obra",
-                icon = Icons.Default.People,
+                icon = Icons.Default.Group,
                 isExpanded = expPersonnel,
                 onToggle = { expPersonnel = !expPersonnel }
             ) {
@@ -304,15 +464,28 @@ fun NewBitacoraScreen(
                         value = internalCrew,
                         onValueChange = { internalCrew = it },
                         label = { Text("Plantilla Interna") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused && (internalCrew == "0" || internalCrew == "11" || internalCrew == "12")) {
+                                    internalCrew = ""
+                                }
+                            },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = outlinedTextFieldColors()
                     )
+
                     OutlinedTextField(
                         value = subCrew,
                         onValueChange = { subCrew = it },
                         label = { Text("Contratistas") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused && (subCrew == "0" || subCrew == "8")) {
+                                    subCrew = ""
+                                }
+                            },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = outlinedTextFieldColors()
                     )
@@ -330,62 +503,322 @@ fun NewBitacoraScreen(
                     value = machineryUsed,
                     onValueChange = { machineryUsed = it },
                     label = { Text("Equipo Mayor Utilizado") },
-                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Ej: Excavadora, Grúa, Generadores...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused && machineryUsed.startsWith("Excavadora Cat 320")) {
+                                machineryUsed = ""
+                            }
+                        },
                     minLines = 2,
                     colors = outlinedTextFieldColors()
                 )
             }
 
-            // --- CONCEPTOS ---
+            // --- CONCEPTOS VINCULADOS ---
+            var showConceptBottomSheet by remember { mutableStateOf(false) }
+            var conceptSearchQuery by remember { mutableStateOf("") }
+
             ExpandableFormSection(
-                title = "Concepto Vinculado",
-                icon = Icons.Default.List,
+                title = "Concepto Vinculado de Obra",
+                icon = Icons.Default.ListAlt,
                 isExpanded = expConceptos,
                 onToggle = { expConceptos = !expConceptos }
             ) {
-                var isDropdownExpanded by remember { mutableStateOf(false) }
+                val selectedItem = budgetItems.firstOrNull { it.description == selectedConceptoName }
                 
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = selectedConceptoName ?: "",
-                        onValueChange = { 
-                            viewModel.setConcepto(null, it)
-                            isDropdownExpanded = true 
-                        },
-                        label = { Text("Concepto Asociado (Escribe o Selecciona)") },
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { showConceptBottomSheet = true },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (selectedConceptoName.isNullOrEmpty()) LightGrayBg else ConnectedBlue.copy(alpha = 0.05f)
+                    ),
+                    border = BorderStroke(1.dp, if (selectedConceptoName.isNullOrEmpty()) SubtleOutline else ConnectedBlue)
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .onFocusChanged { if (it.isFocused) isDropdownExpanded = true },
-                        trailingIcon = {
-                            IconButton(onClick = { isDropdownExpanded = !isDropdownExpanded }) {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Seleccionar")
-                            }
-                        },
-                        colors = outlinedTextFieldColors()
-                    )
-                    
-                    DropdownMenu(
-                        expanded = isDropdownExpanded,
-                        onDismissRequest = { isDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(0.9f)
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        budgetItems.forEach { item ->
-                            DropdownMenuItem(
-                                text = { Text(item.description, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                                onClick = {
-                                    viewModel.setConcepto(item.id.toString(), item.description)
-                                    isDropdownExpanded = false
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .background(if (selectedConceptoName.isNullOrEmpty()) Color.Gray.copy(alpha = 0.15f) else ConnectedBlue, RoundedCornerShape(10.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Category,
+                                    contentDescription = null,
+                                    tint = if (selectedConceptoName.isNullOrEmpty()) SlateDeep else PureWhite,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                if (selectedItem != null && selectedItem.code.isNotEmpty()) {
+                                    Text(
+                                        text = "CÓDIGO: ${selectedItem.code}",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = ConnectedBlue
+                                    )
                                 }
+                                Text(
+                                    text = (selectedConceptoName ?: "").ifEmpty { "Seleccionar o Vincular Concepto..." },
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selectedConceptoName.isNullOrEmpty()) FontWeight.Medium else FontWeight.Bold,
+                                    color = if (selectedConceptoName.isNullOrEmpty()) OnSurfaceVariant else SlateDeep,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        
+                        Button(
+                            onClick = { showConceptBottomSheet = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ConnectedBlue,
+                                contentColor = PureWhite
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = if (selectedConceptoName.isNullOrEmpty()) "Explorar" else "Cambiar",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                        Divider(color = SubtleOutline)
-                        DropdownMenuItem(
-                            text = { Text("+ Nuevo Concepto", fontWeight = FontWeight.Bold, color = ConnectedBlue) },
+                    }
+                }
+            }
+
+            // MODAL BOTTOM SHEET ELEGANTE PARA CONCEPTOS
+            if (showConceptBottomSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { 
+                        showConceptBottomSheet = false 
+                        conceptSearchQuery = ""
+                    },
+                    containerColor = PureWhite,
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    dragHandle = {
+                        Box(
+                            modifier = Modifier
+                                .padding(vertical = 10.dp)
+                                .width(40.dp)
+                                .height(4.dp)
+                                .background(SubtleOutline, RoundedCornerShape(2.dp))
+                        )
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.85f)
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                    ) {
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Conceptos de Obra",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = SlateDeep
+                                )
+                                Text(
+                                    text = "Selecciona la partida o trabajo a ejecutar",
+                                    fontSize = 12.sp,
+                                    color = OnSurfaceVariant,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            IconButton(onClick = { 
+                                showConceptBottomSheet = false 
+                                conceptSearchQuery = ""
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = SlateDeep)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Search Bar
+                        OutlinedTextField(
+                            value = conceptSearchQuery,
+                            onValueChange = { conceptSearchQuery = it },
+                            placeholder = { Text("Buscar por código, descripción o categoría...") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ConnectedBlue) },
+                            trailingIcon = {
+                                if (conceptSearchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { conceptSearchQuery = "" }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = outlinedTextFieldColors(),
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        val filteredItems = remember(budgetItems, conceptSearchQuery) {
+                            if (conceptSearchQuery.isBlank()) {
+                                budgetItems
+                            } else {
+                                budgetItems.filter { item ->
+                                    item.description.contains(conceptSearchQuery, ignoreCase = true) ||
+                                    item.code.contains(conceptSearchQuery, ignoreCase = true) ||
+                                    item.categoryName.contains(conceptSearchQuery, ignoreCase = true)
+                                }
+                            }
+                        }
+
+                        if (filteredItems.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("No se encontraron conceptos coincidentes", fontSize = 13.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Button(
+                                        onClick = {
+                                            viewModel.setConcepto(null, conceptSearchQuery)
+                                            showConceptBottomSheet = false
+                                            conceptSearchQuery = ""
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ConnectedBlue)
+                                    ) {
+                                        Text("+ Usar \"$conceptSearchQuery\" como concepto manual", fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        } else {
+                            androidx.compose.foundation.lazy.LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(filteredItems.size) { index ->
+                                    val item = filteredItems[index]
+                                    val isSelected = selectedConceptoName == item.description
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                viewModel.setConcepto(item.id.toString(), item.description)
+                                                showConceptBottomSheet = false
+                                                conceptSearchQuery = ""
+                                            },
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isSelected) ConnectedBlue.copy(alpha = 0.08f) else PureWhite
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, if (isSelected) ConnectedBlue else SubtleOutline)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(
+                                                selected = isSelected,
+                                                onClick = {
+                                                    viewModel.setConcepto(item.id.toString(), item.description)
+                                                    showConceptBottomSheet = false
+                                                    conceptSearchQuery = ""
+                                                },
+                                                colors = RadioButtonDefaults.colors(selectedColor = ConnectedBlue)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    if (item.code.isNotEmpty()) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .background(ConnectedBlue.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = item.code,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Black,
+                                                                color = ConnectedBlue
+                                                            )
+                                                        }
+                                                    }
+                                                    if (item.categoryName.isNotEmpty()) {
+                                                        Text(
+                                                            text = item.categoryName,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = OnSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = item.description,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = SlateDeep
+                                                )
+                                                if (item.unit.isNotEmpty() || item.quantity > 0) {
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = "Unidad: ${item.unit} | Cantidad Programada: ${item.quantity}",
+                                                        fontSize = 11.sp,
+                                                        color = OnSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
                             onClick = {
                                 viewModel.setConcepto(null, "")
-                                isDropdownExpanded = false
-                            }
-                        )
+                                showConceptBottomSheet = false
+                                conceptSearchQuery = ""
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = LightGrayBg, contentColor = SlateDeep),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, SubtleOutline)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("+ Ingresar Concepto Libre / No Catalogado", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
             }
@@ -399,80 +832,234 @@ fun NewBitacoraScreen(
                 onToggle = { expActivities = !expActivities }
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Texto de Actividades con Botón de Dictado Continuo (No se apaga con pausas de silencio)
                     OutlinedTextField(
                         value = activitiesText,
                         onValueChange = { activitiesText = it },
                         label = { Text("Descripción de trabajos ejecutados") },
-                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Describe las actividades y avances ejecutados hoy...") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused && activitiesText.startsWith("Instalación de estructuras")) {
+                                    activitiesText = ""
+                                }
+                            },
                         minLines = 3,
                         colors = outlinedTextFieldColors(),
                         trailingIcon = {
                             IconButton(onClick = {
                                 if (recordAudioPermission.status.isGranted) {
-                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                                    val network = cm.activeNetwork
+                                    val capabilities = cm.getNetworkCapabilities(network)
+                                    val isOffline = network == null || capabilities == null || !capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+
+                                    val speechIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                                         putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
-                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla para dictar")
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es-MX")
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla tu dictado. Puedes pausar.")
+                                        if (isOffline) {
+                                            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                                        }
+                                        // Increase silence length to allow thinking pauses
+                                        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L)
+                                        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 60000L)
+                                        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 60000L)
                                     }
-                                    speechRecognizerLauncher.launch(intent)
+
+                                    try {
+                                        speechRecognizerLauncher.launch(speechIntent)
+                                    } catch (e: Exception) {
+                                        if (isOffline) {
+                                            Toast.makeText(context, "Para usar voz sin internet, descarga el paquete 'Español (México)' en los ajustes de Google.", Toast.LENGTH_LONG).show()
+                                        } else {
+                                            Toast.makeText(context, "Servicio de voz no disponible en este dispositivo", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 } else {
                                     recordAudioPermission.launchPermissionRequest()
                                 }
                             }) {
-                                Icon(Icons.Default.Mic, contentDescription = "Dictar", tint = ConnectedBlue)
+                                Icon(
+                                    imageVector = Icons.Default.Mic,
+                                    contentDescription = "Dictar por voz",
+                                    tint = ConnectedBlue
+                                )
                             }
                         }
                     )
-                    
-                    if (isAiModelLoaded) {
-                        Button(
-                            onClick = { 
-                                if (activitiesText.isNotEmpty()) {
-                                    viewModel.improveTextWithAi(activitiesText) { improved, err ->
-                                        if (improved != null) {
-                                            activitiesText = improved
+
+                    // VENTANA EMERGENTE DE DICTADO POR VOZ (Solo se cierra cuando el usuario da clic en Finalizar)
+                    if (showDictationDialog) {
+                        AlertDialog(
+                            onDismissRequest = {
+                                isDictatingContinuous = false
+                                try { speechRecognizer?.stopListening() } catch (e: Exception) {}
+                                showDictationDialog = false
+                            },
+                            title = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Red, strokeWidth = 2.dp)
+                                    Text("Dictado por Voz Activo 🎙️", fontWeight = FontWeight.Black, fontSize = 16.sp, color = SlateDeep)
+                                }
+                            },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(
+                                        text = "Habla con libertad. Puedes pausar para pensar el tiempo que requieras sin que se cancele.",
+                                        fontSize = 12.sp,
+                                        color = OnSurfaceVariant
+                                    )
+                                    
+                                    // Visualizador de audio / nivel de micrófono
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
+                                            .background(LightGrayBg, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .fillMaxWidth((speechRmsLevel.coerceIn(0f, 10f) / 10f).coerceAtLeast(0.05f))
+                                                .background(if (speechRmsLevel > 2f) ConnectedBlue else Color.Gray, RoundedCornerShape(4.dp))
+                                        )
+                                    }
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 110.dp, max = 200.dp),
+                                        colors = CardDefaults.cardColors(containerColor = LightGrayBg),
+                                        border = BorderStroke(1.dp, ConnectedBlue.copy(alpha = 0.3f))
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp)
+                                                .verticalScroll(rememberScrollState())
+                                        ) {
+                                            Text(
+                                                text = liveDictatedText.ifEmpty { "🔴 Escuchando... Comienza a hablar tu dictado." },
+                                                fontSize = 13.sp,
+                                                fontWeight = if (liveDictatedText.isEmpty()) FontWeight.Normal else FontWeight.Medium,
+                                                color = if (liveDictatedText.isEmpty()) Color.Gray else SlateDeep
+                                            )
                                         }
+                                    }
+
+                                    // Botón secundario para usar la pantalla oficial de Google si el dispositivo lo requiere
+                                    OutlinedButton(
+                                        onClick = {
+                                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+                                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla tu dictado...")
+                                            }
+                                            speechRecognizerLauncher.launch(intent)
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, SolarAmber),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SolarAmber)
+                                    ) {
+                                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("🎙️ Abrir Ventana Directa de Google", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = SolarAmber),
-                            enabled = !isAiProcessing && activitiesText.isNotEmpty()
-                        ) {
-                            if (isAiProcessing) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Mejorando redacción con Gemma...", fontWeight = FontWeight.Bold, color = Color.White)
-                            } else {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = "IA", tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("✨ Redactar con IA", fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                    } else {
-                        Text("Ve a Configuración para cargar Gemma y usar IA Local.", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        isDictatingContinuous = false
+                                        try { speechRecognizer?.stopListening() } catch (e: Exception) {}
+                                        if (liveDictatedText.isNotEmpty()) {
+                                            activitiesText = if (activitiesText.isEmpty()) liveDictatedText else "$activitiesText $liveDictatedText"
+                                            Toast.makeText(context, "¡Dictado aplicado correctamente!", Toast.LENGTH_SHORT).show()
+                                        }
+                                        showDictationDialog = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = ConnectedBlue, contentColor = PureWhite),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("FINALIZAR Y APLICAR DICTADO 🛑", fontWeight = FontWeight.Black, fontSize = 12.sp)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = {
+                                        isDictatingContinuous = false
+                                        try { speechRecognizer?.stopListening() } catch (e: Exception) {}
+                                        showDictationDialog = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Cancelar Dictado", color = Color.Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            },
+                            containerColor = PureWhite,
+                            shape = RoundedCornerShape(20.dp)
+                        )
                     }
+                    
+                    // Botón de Redacción y Formateo con IA Local (Gemma / Local STT Engine)
+                    Button(
+                        onClick = { 
+                            if (activitiesText.isNotEmpty()) {
+                                viewModel.improveTextWithAi(activitiesText) { improved, err ->
+                                    if (improved != null) {
+                                        activitiesText = improved
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Escribe o dicta algo primero", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (activitiesText.isNotEmpty()) SolarAmber else Color.Gray),
+                        enabled = !isAiProcessing
+                    ) {
+                        if (isAiProcessing) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Redactando con IA...", fontWeight = FontWeight.Bold, color = Color.White)
+                        } else {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "IA Local", tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("✨ Mejorar Redacción con IA", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                    
                     Column {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("Avance Diario Estimado", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = SlateDeep)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (isAiModelLoaded) {
-                                    IconButton(
-                                        onClick = {
-                                            if (activitiesText.isNotEmpty()) {
-                                                viewModel.extractProgress(activitiesText) { p, err ->
-                                                    if (p != null && p in 0..100) {
-                                                        progressVal = p.toFloat()
-                                                    } else {
-                                                        Toast.makeText(context, "No se pudo extraer el avance", Toast.LENGTH_SHORT).show()
-                                                    }
+                                IconButton(
+                                    onClick = {
+                                        if (activitiesText.isNotEmpty()) {
+                                            viewModel.extractProgress(activitiesText) { p, err ->
+                                                if (p != null && p in 0..100) {
+                                                    progressVal = p.toFloat()
+                                                } else {
+                                                    Toast.makeText(context, "No se pudo extraer el avance", Toast.LENGTH_SHORT).show()
                                                 }
                                             }
-                                        },
-                                        enabled = !isAiProcessing
-                                    ) {
-                                        Icon(Icons.Default.AutoAwesome, contentDescription = "Extraer Avance", tint = SolarAmber)
-                                    }
+                                        }
+                                    },
+                                    enabled = !isAiProcessing
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = "Extraer Avance", tint = SolarAmber)
                                 }
                                 Text("${progressVal.toInt()}%", fontWeight = FontWeight.Black, fontSize = 13.sp, color = ConnectedBlue)
                             }
@@ -488,37 +1075,11 @@ fun NewBitacoraScreen(
                         value = toolsMaterials,
                         onValueChange = { toolsMaterials = it },
                         label = { Text("Materiales y Herramientas Usados") },
+                        placeholder = { Text("Ej: Páneles 550W, Cable solar 10 AWG, Inversor...") },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
                         colors = outlinedTextFieldColors()
                     )
-                    
-                    if (isAiModelLoaded) {
-                        Button(
-                            onClick = { 
-                                if (activitiesText.isNotEmpty()) {
-                                    viewModel.extractMaterials(activitiesText) { extracted, err ->
-                                        if (extracted?.isNotEmpty() == true) {
-                                            toolsMaterials = extracted ?: ""
-                                        }
-                                    }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = SolarAmber),
-                            enabled = !isAiProcessing && activitiesText.isNotEmpty()
-                        ) {
-                            if (isAiProcessing) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Extrayendo...", fontWeight = FontWeight.Bold, color = Color.White)
-                            } else {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = "IA", tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("✨ Extraer Materiales", fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                    }
                 }
             }
 
@@ -533,13 +1094,20 @@ fun NewBitacoraScreen(
                     value = safetyRemarks,
                     onValueChange = { safetyRemarks = it },
                     label = { Text("Observaciones / Riesgos / Accidentes") },
-                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Observaciones de seguridad en campo...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused && safetyRemarks.startsWith("Charcos por lluvia")) {
+                                safetyRemarks = ""
+                            }
+                        },
                     minLines = 2,
                     colors = outlinedTextFieldColors()
                 )
             }
 
-            // --- 6. EVIDENCIA FOTOGRÁFICA (CAMARA Y GALERIA) ---
+            // --- 6. EVIDENCIA FOTOGRÁFICA ---
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -562,7 +1130,6 @@ fun NewBitacoraScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Botón 1: Camara
                         Button(
                             onClick = {
                                 if (cameraPermission.status.isGranted) {
@@ -591,7 +1158,6 @@ fun NewBitacoraScreen(
                             Text("Cámara", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
 
-                        // Button 2: Galería
                         Button(
                             onClick = { galleryLauncher.launch("image/*") },
                             modifier = Modifier
@@ -610,7 +1176,6 @@ fun NewBitacoraScreen(
                         }
                     }
 
-                    // Previsualizar las imágenes capturadas
                     if (capturedPhotoUris.isNotEmpty()) {
                         androidx.compose.foundation.lazy.LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -631,7 +1196,6 @@ fun NewBitacoraScreen(
                                         contentScale = ContentScale.Crop
                                     )
 
-                                    // Clean Remove Button
                                     IconButton(
                                         onClick = { viewModel.removeCapturedPhotoUri(uri) },
                                         modifier = Modifier
@@ -650,91 +1214,106 @@ fun NewBitacoraScreen(
                                 }
                             }
                         }
-                    } else {
-                        // Empty photo state
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp)
-                                .background(LightGrayBg, RoundedCornerShape(12.dp))
-                                .border(BorderStroke(1.dp, SubtleOutline.copy(alpha = 0.5f)), RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = OnSurfaceVariant.copy(alpha = 0.7f))
-                                Text(
-                                    text = "Ninguna evidencia adjuntada aún.",
-                                    fontSize = 12.sp,
-                                    color = OnSurfaceVariant,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // --- 7. FIRMA DIGITAL DE CONFORMIDAD ---
+            ExpandableFormSection(
+                title = "Firma Digital de Conformidad",
+                icon = Icons.Default.Draw,
+                isExpanded = expSignature,
+                onToggle = { expSignature = !expSignature }
+            ) {
+                SignaturePadView(
+                    onSignatureCaptured = { base64 -> signatureBase64 = base64 },
+                    onClear = { signatureBase64 = "" }
+                )
+            }
 
-            // Save Button
-            Button(
-                onClick = {
-                    if (isSaving) return@Button
-                    isSaving = true
-                    coroutineScope.launch {
-                        saveButtonText = "GUARDANDO..."
-                        delay(800)
-
-                        // Pasar todos los campos al ViewModel
-                        viewModel.setSiteName(projectName)
-                        viewModel.setDescription(activitiesText)
-                        val totalCrew = (internalCrew.toIntOrNull() ?: 0) + (subCrew.toIntOrNull() ?: 0)
-                        viewModel.setCrewCount(totalCrew)
-                        val prog = progressVal.toDouble()
-                        viewModel.setPhysicalProgress(prog)
-                        
-                        // El progreso financiero se calcula en base al presupuesto del concepto vinculado
-                        var calcFin = 0.0
-                        if (selectedConceptoId != null) {
-                            val bItem = budgetItems.find { it.id.toString() == selectedConceptoId }
-                            if (bItem != null) {
-                                calcFin = (prog / 100.0) * bItem.totalBudget
-                            }
+            // --- 8. BOTÓN FINAL: GUARDAR Y GENERAR PDF ---
+            val totalCrew = (internalCrew.toIntOrNull() ?: 0) + (subCrew.toIntOrNull() ?: 0)
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Botón Generar PDF Offline
+                OutlinedButton(
+                    onClick = {
+                        val tempLog = com.example.data.database.BitacoraEntity(
+                            siteName = projectName,
+                            date = selectedCustomDate ?: currentDateStr,
+                            weather = weather,
+                            crewCount = totalCrew,
+                            description = activitiesText.ifEmpty { "Sin descripción" },
+                            physicalProgress = progressVal.toDouble(),
+                            financialProgress = 0.0,
+                            budgetEstimate = 0.0,
+                            latitude = 0.0,
+                            longitude = 0.0,
+                            photoUri = capturedPhotoUris.joinToString(","),
+                            safetyRemarks = safetyRemarks,
+                            machinery = machineryUsed,
+                            concepto_name = selectedConceptoName
+                        )
+                        val pdfFile = PdfReportGenerator.generateBitacoraPdf(context, tempLog)
+                        if (pdfFile != null) {
+                            Toast.makeText(context, "📄 PDF Generado: ${pdfFile.name}", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "Error al generar PDF", Toast.LENGTH_SHORT).show()
                         }
-                        viewModel.setFinancialProgress(calcFin)
-                        
-                        // Pasar los nuevos campos
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, ConnectedBlue)
+                ) {
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = ConnectedBlue)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Generar PDF", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = ConnectedBlue)
+                }
+
+                // Botón Guardar
+                Button(
+                    onClick = {
+                        if (isSaving) return@Button
+                        isSaving = true
+                        saveButtonText = "GUARDANDO EN BASE DE DATOS..."
+
+                        viewModel.setCrewCount(totalCrew)
+                        viewModel.setDescription(activitiesText.ifEmpty { "Sin descripción de actividades." })
+                        viewModel.setPhysicalProgress(progressVal.toDouble())
                         viewModel.setSafetyRemarks(safetyRemarks)
                         viewModel.setMachinery(machineryUsed)
 
-                        viewModel.submitDailyLog {
-                            coroutineScope.launch {
-                                isSaving = false
-                                saveButtonText = "¡LISTO!"
-                                delay(500)
+                        coroutineScope.launch {
+                            delay(600)
+                            viewModel.submitDailyLog {
+                                Toast.makeText(context, "¡Reporte guardado exitosamente!", Toast.LENGTH_LONG).show()
                                 onNavigateToDashboard()
                             }
                         }
+                    },
+                    modifier = Modifier
+                        .weight(1.5f)
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ConnectedBlue,
+                        contentColor = PureWhite
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    enabled = !isSaving
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = PureWhite, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                    } else {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                enabled = !isSaving
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(color = PureWhite, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(saveButtonText, fontWeight = FontWeight.Black, fontSize = 16.sp, color = PureWhite)
-                } else {
-                    Icon(Icons.Default.Draw, contentDescription = null, tint = PureWhite)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(saveButtonText, fontWeight = FontWeight.Black, fontSize = 16.sp, color = PureWhite)
+                    Text(saveButtonText, fontWeight = FontWeight.Black, fontSize = 12.sp)
                 }
             }
 
@@ -754,7 +1333,7 @@ fun ExpandableFormSection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(12.dp)),
+            .border(BorderStroke(1.dp, SubtleOutline), RoundedCornerShape(16.dp)),
         colors = CardDefaults.cardColors(containerColor = PureWhite)
     ) {
         Column {
@@ -766,28 +1345,27 @@ fun ExpandableFormSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(icon, contentDescription = null, tint = ConnectedBlue)
-                    Text(title, fontWeight = FontWeight.Black, fontSize = 15.sp, color = SlateDeep)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon, contentDescription = null, tint = ConnectedBlue, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(title, fontWeight = FontWeight.Black, fontSize = 14.sp, color = SlateDeep)
                 }
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
+                    contentDescription = "Expandir/Colapsar",
                     tint = OnSurfaceVariant
                 )
             }
-            
+
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(animationSpec = tween(300)),
                 exit = shrinkVertically(animationSpec = tween(300))
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .padding(bottom = 8.dp)
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                 ) {
+                    HorizontalDivider(color = SubtleOutline, thickness = 1.dp, modifier = Modifier.padding(bottom = 12.dp))
                     content()
                 }
             }
@@ -796,36 +1374,11 @@ fun ExpandableFormSection(
 }
 
 @Composable
-fun RowScope.WeatherChip(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
-    val bgColor = if (selected) ConnectedBlue else LightGrayBg
-    val contentColor = if (selected) PureWhite else OnSurfaceVariant
-    val borderColor = if (selected) ConnectedBlue else SubtleOutline
-
-    Row(
-        modifier = Modifier
-            .weight(1f)
-            .height(48.dp)
-            .background(bgColor, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(8.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = contentColor)
-    }
-}
-
-@Composable
 fun outlinedTextFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = ConnectedBlue,
     unfocusedBorderColor = SubtleOutline,
-    focusedContainerColor = PureWhite,
-    unfocusedContainerColor = LightGrayBg,
     focusedLabelColor = ConnectedBlue,
     unfocusedLabelColor = OnSurfaceVariant,
-    focusedTextColor = Color.Black,
-    unfocusedTextColor = Color.Black
+    focusedTextColor = SlateDeep,
+    unfocusedTextColor = SlateDeep
 )

@@ -5,6 +5,7 @@ import {
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 import { supabase } from '../../context/supabase';
+import { useApp } from '../../context/AppContext';
 import { 
   getPresupuestoDetails, 
   savePresupuesto, 
@@ -99,6 +100,7 @@ interface PresupuestosTabProps {
 }
 
 export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabProps) {
+  const { currentUser } = useApp();
   // State variables
   const [presupuestos, setPresupuestos] = useState<PresupuestoWithTotals[]>([]);
   const [matrices, setMatrices] = useState<Matriz[]>([]);
@@ -135,7 +137,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
   
   // PDF download options states
   const [isPDFDialogOpen, setIsPDFDialogOpen] = useState<boolean>(false);
-  const [selectedPDFSections, setSelectedPDFSections] = useState<{ resumen: boolean; explosion: boolean }>({ resumen: true, explosion: true });
+  const [selectedPDFSections, setSelectedPDFSections] = useState<{ resumen: boolean; explosion: boolean; explosionPrices: boolean }>({ resumen: true, explosion: true, explosionPrices: true });
   const [pdfBudgetDetails, setPdfBudgetDetails] = useState<PresupuestoDetalle | null>(null);
   
   // Deletion Confirmation states
@@ -670,6 +672,8 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
         status: formStatus,
         produccion: formProduccion,
         ubicacion: (formClientAddress || '').trim(),
+        indirect_percentage: formIndirect,
+        utility_percentage: formUtility,
         ...(editingPresupuesto?.id ? { id: editingPresupuesto.id } : {})
       };
 
@@ -700,7 +704,8 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
             nombre_razon_social: formClientName.trim(),
             direccion: (formClientAddress || '').trim(),
             origen: 'Presupuestos Esol',
-            estatus: 'Prospecto'
+            estatus: 'Prospecto',
+            registered_by: currentUser?.name
           });
         }
       }
@@ -778,7 +783,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
     try {
       const details = await getPresupuestoDetails(id);
       setPdfBudgetDetails(details);
-      setSelectedPDFSections({ resumen: true, explosion: true });
+      setSelectedPDFSections({ resumen: true, explosion: true, explosionPrices: true });
       setIsPDFDialogOpen(true);
     } catch (err: any) {
       console.error('Error loading budget details for PDF:', err);
@@ -1087,22 +1092,27 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
               };
             }
           });
-        } else if (c.type === 'insumo_directo') {
-          const insCode = c.code || `DIRECTO-${c.id}`;
-          const insType = c.unit?.trim().toLowerCase() === 'jor' || c.description.toLowerCase().includes('mano de obra') ? 'labor' : 'material';
-          const insumo: Insumo = {
-            id: c.id,
-            code: insCode,
-            type: insType as any,
-            description: c.description,
-            unit: c.unit,
-            cost: Number(c.cost_price)
-          };
+        } else if (c.type === 'insumo_directo' || !c.matriz) {
+          let insumo = insumosCatalog.find(i => i.description === c.description && i.unit === c.unit);
+          
+          if (!insumo) {
+            const insCode = c.code || `DIRECTO-${c.id}`;
+            const insType = c.unit?.trim().toLowerCase() === 'jor' || c.description.toLowerCase().includes('mano de obra') ? 'labor' : 'material';
+            insumo = {
+              id: c.id,
+              code: insCode,
+              type: insType as any,
+              description: c.description,
+              unit: c.unit,
+              cost: Number(c.cost_price)
+            };
+          }
+
           if (insumosAggregation[insumo.code]) {
             insumosAggregation[insumo.code].totalQuantity += conceptQty;
           } else {
             insumosAggregation[insumo.code] = {
-              insumo,
+              insumo: { ...insumo, cost: Number(c.cost_price) || insumo.cost },
               totalQuantity: conceptQty
             };
           }
@@ -1165,7 +1175,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
         let rowsHtml = `
           <!-- Category Group Header Row -->
           <tr style="background-color: #f8fafc; font-weight: bold; page-break-inside: avoid; page-break-after: avoid;">
-            <td colspan="6" class="font-bold" style="color: #0f172a; font-family: 'Cinzel', serif; font-size: 11px; padding: 6px 10px; border-left: 4px solid #C49825; border-bottom: 1px solid #cbd5e1;">
+            <td colspan="${sections.explosionPrices ? '6' : '4'}" class="font-bold" style="color: #0f172a; font-family: 'Cinzel', serif; font-size: 11px; padding: 6px 10px; border-left: 4px solid #C49825; border-bottom: 1px solid #cbd5e1;">
               ${title}
             </td>
           </tr>`;
@@ -1177,8 +1187,10 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
               <td style="color: #1e293b; text-align: left; padding: 4px 10px;">${row.insumo.description}</td>
               <td class="text-center font-mono" style="color: #64748b; padding: 4px 10px; text-align: center;">${row.insumo.unit}</td>
               <td class="text-center font-mono" style="padding: 4px 10px; text-align: center;">${formatQty(row.totalQuantity, row.insumo.unit, 2)}</td>
-              <td class="text-right font-mono" style="color: #64748b; padding: 4px 10px;">${formatCurrencyMXN(row.insumo.cost)}</td>
-              <td class="text-right font-mono font-bold" style="color: #1e293b; padding: 4px 10px;">${formatCurrencyMXN(row.totalCost)}</td>
+              ${sections.explosionPrices ? `
+                <td class="text-right font-mono" style="color: #64748b; padding: 4px 10px;">${formatCurrencyMXN(row.insumo.cost)}</td>
+                <td class="text-right font-mono font-bold" style="color: #1e293b; padding: 4px 10px;">${formatCurrencyMXN(row.totalCost)}</td>
+              ` : ''}
             </tr>`;
         });
         
@@ -1208,11 +1220,13 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
           <thead>
             <tr>
               <th style="width: 12%; text-align: center; vertical-align: middle;">Código</th>
-              <th style="width: 42%; text-align: center; vertical-align: middle;">Descripción</th>
+              <th style="width: ${sections.explosionPrices ? '42%' : '72%'}; text-align: center; vertical-align: middle;">Descripción</th>
               <th style="width: 7%; text-align: center; vertical-align: middle;">Unidad</th>
               <th style="width: 9%; text-align: center; vertical-align: middle;">Cantidad</th>
-              <th style="width: 15%; text-align: center; vertical-align: middle;">Costo Unit.</th>
-              <th style="width: 15%; text-align: center; vertical-align: middle;">Importe</th>
+              ${sections.explosionPrices ? `
+                <th style="width: 15%; text-align: center; vertical-align: middle;">Costo Unit.</th>
+                <th style="width: 15%; text-align: center; vertical-align: middle;">Importe</th>
+              ` : ''}
             </tr>
           </thead>
           <tbody>
@@ -1228,11 +1242,29 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
           </tbody>
         </table>`;
 
-      innerHtml += `
-        <!-- Explosion Total -->
-        <div style="margin-top: 25px; font-weight: bold; font-size: 11px; text-align: right; border-top: 1px solid #cbd5e1; padding-top: 15px; color: #1e293b;">
-          Costo de Insumos Consolidado (Explosión): <span style="color: #C49825; margin-left: 10px; font-size: 13px;">${formatCurrencyMXN(aggregated.overallInsumosCost)}</span>
-        </div>`;
+      if (sections.explosionPrices) {
+        const explosionIva = aggregated.overallInsumosCost * 0.16;
+        const explosionTotal = aggregated.overallInsumosCost * 1.16;
+        
+        innerHtml += `
+          <!-- Explosion Totals -->
+          <div class="totals-grid">
+            <table class="totals-tab" style="width: 350px;">
+              <tr>
+                <td style="color: #64748b;">Subtotal Insumos (Explosión):</td>
+                <td class="text-right font-mono">${formatCurrencyMXN(aggregated.overallInsumosCost)}</td>
+              </tr>
+              <tr>
+                <td style="color: #64748b;">IVA (16%):</td>
+                <td class="text-right font-mono">${formatCurrencyMXN(explosionIva)}</td>
+              </tr>
+              <tr>
+                <td class="font-bold" style="color: #C49825;">TOTAL INSUMOS (IVA Inc.):</td>
+                <td class="text-right font-mono font-bold" style="color: #C49825; font-size: 13px;">${formatCurrencyMXN(explosionTotal)}</td>
+              </tr>
+            </table>
+          </div>`;
+      }
     }
 
     contentDiv.innerHTML = innerHtml;
@@ -1284,20 +1316,32 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
       if (concepto.type === 'group') continue;
       const conceptQty = Number(concepto.quantity);
 
-      if (concepto.type === 'insumo_directo') {
-        const insumo = insumosCatalog.find(i => i.description === concepto.description && i.unit === concepto.unit);
-        if (insumo) {
-          const isPza = insumo.unit?.trim().toLowerCase() === 'pza';
-          const neededQty = isPza ? Math.round(conceptQty) : conceptQty;
-          
-          if (insumosAggregation[insumo.code]) {
-            insumosAggregation[insumo.code].totalQuantity += neededQty;
-          } else {
-            insumosAggregation[insumo.code] = {
-              insumo: { ...insumo, cost: Number(concepto.cost_price) || insumo.cost },
-              totalQuantity: neededQty
-            };
-          }
+      if (concepto.type === 'insumo_directo' || !concepto.matriz) {
+        let insumo = insumosCatalog.find(i => i.description === concepto.description && i.unit === concepto.unit);
+        
+        if (!insumo) {
+          const insCode = `DIRECTO-${concepto.id}`;
+          const insType = concepto.unit?.trim().toLowerCase() === 'jor' || concepto.description.toLowerCase().includes('mano de obra') ? 'labor' : 'material';
+          insumo = {
+            id: concepto.id,
+            code: insCode,
+            type: insType as any,
+            description: concepto.description,
+            unit: concepto.unit,
+            cost: Number(concepto.cost_price)
+          };
+        }
+
+        const isPza = insumo.unit?.trim().toLowerCase() === 'pza';
+        const neededQty = isPza ? Math.round(conceptQty) : conceptQty;
+        
+        if (insumosAggregation[insumo.code]) {
+          insumosAggregation[insumo.code].totalQuantity += neededQty;
+        } else {
+          insumosAggregation[insumo.code] = {
+            insumo: { ...insumo, cost: Number(concepto.cost_price) || insumo.cost },
+            totalQuantity: neededQty
+          };
         }
       } else {
         const matrix = concepto.matriz;
@@ -2238,7 +2282,7 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
                       <button
                         onClick={() => {
                           setPdfBudgetDetails(reportDetails);
-                          setSelectedPDFSections({ resumen: true, explosion: true });
+                          setSelectedPDFSections({ resumen: true, explosion: true, explosionPrices: true });
                           setIsPDFDialogOpen(true);
                         }}
                         className="px-4 py-2 bg-gold hover:bg-gold-light text-dark-1 font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-gold/5"
@@ -2305,6 +2349,21 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
                     <span className="text-[10px] text-cream-muted block mt-0.5">Muestra la lista consolidada de materiales, mano de obra, herramientas y equipos.</span>
                   </div>
                 </label>
+                
+                {selectedPDFSections.explosion && (
+                  <label className="flex items-center gap-3 p-3 ml-6 bg-dark-1/30 border border-dark-4 rounded-xl cursor-pointer hover:border-gold/30 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={selectedPDFSections.explosionPrices}
+                      onChange={(e) => setSelectedPDFSections(prev => ({ ...prev, explosionPrices: e.target.checked }))}
+                      className="accent-gold w-4 h-4 rounded cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-cream block">Incluir Costos en Explosión</span>
+                      <span className="text-[10px] text-cream-muted block mt-0.5">Muestra los costos unitarios y totales (con IVA).</span>
+                    </div>
+                  </label>
+                )}
               </div>
             </div>
             

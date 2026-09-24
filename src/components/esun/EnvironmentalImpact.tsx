@@ -101,6 +101,28 @@ export default function EnvironmentalImpact({ system }: EnvironmentalImpactProps
           </p>
         </div>
       </div>
+
+      {/* Daily Generation & Ecological Summary Footer (Sunwise Matched Metrics) */}
+      <div className="pt-4 border-t border-dark-4 grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+        <div className="bg-dark-3/30 p-3 rounded-xl border border-dark-4">
+          <span className="text-[10px] text-cream-muted uppercase font-semibold block">Generación Diaria del Sistema</span>
+          <span className="text-sm font-black text-gold font-mono">
+            {(annualProduction / 365).toFixed(2)} kWh/día
+          </span>
+        </div>
+        <div className="bg-dark-3/30 p-3 rounded-xl border border-dark-4">
+          <span className="text-[10px] text-cream-muted uppercase font-semibold block">Ahorro CO₂ Diario</span>
+          <span className="text-sm font-black text-emerald-400 font-mono">
+            {((annualProduction * SOLAR_CONSTANTS.CO2_FACTOR) / 365).toFixed(2)} kg/día
+          </span>
+        </div>
+        <div className="bg-dark-3/30 p-3 rounded-xl border border-dark-4 col-span-2 md:col-span-1">
+          <span className="text-[10px] text-cream-muted uppercase font-semibold block">Valor Energía Salvada USD</span>
+          <span className="text-sm font-black text-cream font-mono">
+            ${((annualProduction * 0.12)).toFixed(2)} USD/año
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

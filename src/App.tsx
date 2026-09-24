@@ -11,16 +11,10 @@ import { Footer } from './components/Footer';
 import { Portal } from './components/Portal';
 import { LoginModal } from './components/LoginModal';
 import PresupuestoDashboardPage from './components/cotizador/PresupuestoDashboardPage';
+import EsunPropuestaViewer from './components/esun/EsunPropuestaViewer';
 
 function AppContent() {
   const { currentView, isPortalOpen, closePortal, currentUser, content } = useApp();
-
-  const searchParams = new URLSearchParams(window.location.search);
-  const presupuestoId = searchParams.get('presupuestoId');
-
-  if (presupuestoId) {
-    return <PresupuestoDashboardPage id={presupuestoId} />;
-  }
 
   // Automatically clean up old chatbot test leads to avoid CRM contamination
   useEffect(() => {
@@ -79,6 +73,21 @@ function AppContent() {
 }
 
 function App() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const esunPropuesta = searchParams.get('esun_propuesta');
+  const presupuestoId = searchParams.get('presupuestoId');
+
+  if (esunPropuesta) {
+    const [projectId, proposalId] = esunPropuesta.split('_');
+    if (projectId && proposalId) {
+      return <EsunPropuestaViewer projectId={projectId} proposalId={proposalId} />;
+    }
+  }
+
+  if (presupuestoId) {
+    return <PresupuestoDashboardPage id={presupuestoId} />;
+  }
+
   return (
     <AppProvider>
       <AppContent />

@@ -646,9 +646,14 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
     }
 
     // --- Repository Triggers ---
-    fun triggerManualSync() {
+    fun triggerManualSync(isManual: Boolean = true) {
         viewModelScope.launch {
-            val result = repository.syncPendingBitacoras()
+            // Sincronizar bitácoras y obras
+            val result = repository.syncPendingBitacoras(isManualTrigger = isManual)
+            
+            // Sincronizar presupuestos/matrices
+            triggerProductionBudgetSync()
+
             if (result) {
                 simulatePushNotification(
                     title = "Sincronización Exitosa",
@@ -775,9 +780,9 @@ class BitacoraViewModel(private val repository: SyncRepository, private val cont
         return repository.getVisitasForPolizaFlow(polizaId)
     }
 
-    fun syncMantenimientos() {
+    fun syncMantenimientos(isManual: Boolean = false) {
         viewModelScope.launch {
-            repository.syncMantenimientosWithSupabase()
+            repository.syncMantenimientosWithSupabase(isManualTrigger = isManual)
         }
     }
 

@@ -55,7 +55,7 @@ export const generateObraReport = async (obra: ObraApp, bitacoras: Bitacora[], r
       const parsedDate = new Date(date + 'T12:00:00');
       const dayLabel = parsedDate.toLocaleDateString('es-MX', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
 
-      const eventCards = items.map(bit => {
+      const eventHtmls = items.map(bit => {
         const uris = bit.photo_uri ? bit.photo_uri.split(',').map(u => u.trim()).filter(Boolean) : [];
         const photoHtml = uris.length > 0 ? `
           <div class="photo-grid">
@@ -87,15 +87,21 @@ export const generateObraReport = async (obra: ObraApp, bitacoras: Bitacora[], r
           <div class="report-desc">${(bit.description.charAt(0).toUpperCase() + bit.description.slice(1)).replace(/\n/g, '<br>')}</div>
           ${photoHtml}
         </div>`;
-      }).join('');
+      });
+
+      const firstEvent = eventHtmls[0] || '';
+      const restEvents = eventHtmls.slice(1).join('');
 
       return `
         <div class="day-container">
-          <div class="day-header">
-            <span class="day-title">${dayLabel}</span>
-            <span class="day-badge">${items.length} EVENTO${items.length !== 1 ? 'S' : ''}</span>
+          <div style="page-break-inside: avoid;">
+            <div class="day-header">
+              <span class="day-title">${dayLabel}</span>
+              <span class="day-badge">${items.length} EVENTO${items.length !== 1 ? 'S' : ''}</span>
+            </div>
+            ${firstEvent}
           </div>
-          ${eventCards}
+          ${restEvents}
         </div>`;
     }).join('');
 
@@ -264,23 +270,8 @@ export const generateObraReport = async (obra: ObraApp, bitacoras: Bitacora[], r
           .set(opt)
           .from(container)
           .toPdf()
-          .get('pdf')
-          .then((pdf: any) => {
-            const n = pdf.internal.getNumberOfPages();
-            const w = pdf.internal.pageSize.getWidth();
-            
-            // jsPDF 1.5.3 (usado por html2pdf) no soporta bien HEX aquí, por eso salía negro. Usamos RGB.
-            pdf.setFillColor(248, 247, 242); // Beige
-            for (let i = 1; i <= n; i++) {
-              pdf.setPage(i);
-              // Pintamos el margen superior solapando 0.3mm para ocultar la línea de corte.
-              pdf.rect(0, 0, w, 10.3, 'F');
-            }
-            
-            // Si por alguna razón se genera una página en blanco al final, la eliminamos.
-            // Aunque con margin-bottom: 0 no debería ocurrir.
-            resolve(pdf.output('blob'));
-          })
+          .outputPdf('blob')
+          .then((blob: Blob) => resolve(blob))
           .catch(reject);
       });
       const blobUrl = URL.createObjectURL(pdfBlob);

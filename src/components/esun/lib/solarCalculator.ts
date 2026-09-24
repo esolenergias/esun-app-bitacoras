@@ -9,12 +9,15 @@ export interface SizingInput {
   inverter_max_vdc: number;
   inverter_kw: number;
   historic_periods?: CFEHistoricPeriod[];
+  override_num_panels?: number;
+  override_num_inverters?: number;
 }
 
 export interface SizingResult {
   system_kWp: number;
   installed_kWp: number;
   num_panels: number;
+  num_inverters: number;
   panels_per_string: number;
   num_strings: number;
   string_Voc: number;
@@ -30,6 +33,7 @@ export function calculateSizing(input: SizingInput): SizingResult {
       system_kWp: 0,
       installed_kWp: 0,
       num_panels: 0,
+      num_inverters: 0,
       panels_per_string: 0,
       num_strings: 0,
       string_Voc: 0,
@@ -57,28 +61,50 @@ export function calculateSizing(input: SizingInput): SizingResult {
   const system_kWp = (effectiveMonthlyKWh * SOLAR_CONSTANTS.SIZING_MARGIN) / (psh * SOLAR_CONSTANTS.DAYS_IN_MONTH * pr);
   
   // 2. Initial number of panels
-  const initial_num_panels = Math.ceil((system_kWp * 1000) / input.panel_Wp);
+  let num_panels = input.override_num_panels !== undefined 
+    ? input.override_num_panels 
+    : Math.ceil((system_kWp * 1000) / input.panel_Wp);
 
-  // 3. Electrical strings check & Balancing
+  // 3. System DC Capacity based on selected panels
+  const initial_installed_kWp = (num_panels * input.panel_Wp) / 1000;
+
+  // Calculate num inverters needed based on actual panel system capacity or override
+  let num_inverters = 1;
+  if (input.override_num_inverters !== undefined) {
+    num_inverters = input.override_num_inverters;
+  } else if (input.inverter_kw > 0) {
+    const requiredAcKw = initial_installed_kWp / SOLAR_CONSTANTS.DC_AC_RATIO;
+    num_inverters = Math.ceil(requiredAcKw / input.inverter_kw);
+    if (num_inverters < 1) num_inverters = 1;
+  }
+
+  // 4. Electrical strings check & Balancing per Inverter
   const max_panels_per_string = Math.floor(input.inverter_max_vdc / (input.panel_Voc * SOLAR_CONSTANTS.TEMP_COEFF_VOC));
-  const num_strings = max_panels_per_string > 0 ? Math.ceil(initial_num_panels / max_panels_per_string) : 0;
   
-  // Distribute panels evenly across strings
-  const panels_per_string = num_strings > 0 ? Math.ceil(initial_num_panels / num_strings) : 0;
+  const panels_per_inverter = Math.ceil(num_panels / num_inverters);
+  const strings_per_inverter = max_panels_per_string > 0 
+    ? Math.ceil(panels_per_inverter / max_panels_per_string) 
+    : 1;
   
-  // Adjust num_panels to match balanced configuration (strings * panels_per_string)
-  const num_panels = num_strings * panels_per_string;
+  const num_strings = strings_per_inverter * num_inverters;
+  
+  if (input.override_num_panels === undefined) {
+    // Balance panels so strings are evenly filled
+    const panels_per_string = num_strings > 0 ? Math.ceil(num_panels / num_strings) : 0;
+    num_panels = num_strings * panels_per_string;
+  }
 
+  const panels_per_string = num_strings > 0 ? Math.ceil(num_panels / num_strings) : 0;
   const string_Voc = panels_per_string * input.panel_Voc * SOLAR_CONSTANTS.TEMP_COEFF_VOC;
   const is_electrical_safe = max_panels_per_string > 0 && string_Voc <= input.inverter_max_vdc;
 
-  // Calculate actual installed capacity based on balanced panels
+  // Calculate final actual installed capacity based on balanced panels
   const installed_kWp = (num_panels * input.panel_Wp) / 1000;
 
-  // 4. Area
+  // 5. Area
   const area_m2 = num_panels * SOLAR_CONSTANTS.AREA_PER_PANEL_M2 * SOLAR_CONSTANTS.AREA_SPACING;
 
-  // 5. Production
+  // 6. Production
   const annual_production_kWh = installed_kWp * psh * SOLAR_CONSTANTS.DAYS_IN_YEAR * pr;
   const monthly_production_kWh = annual_production_kWh / 12;
 
@@ -86,6 +112,7 @@ export function calculateSizing(input: SizingInput): SizingResult {
     system_kWp,
     installed_kWp,
     num_panels,
+    num_inverters,
     panels_per_string,
     num_strings,
     string_Voc,
