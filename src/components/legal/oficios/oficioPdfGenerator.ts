@@ -110,6 +110,55 @@ export function buildOficioHtml(oficio: OficioData): string {
           </div>
         ` : ''}
 
+        <!-- Tabla de Insumos / Partidas (si existen partidas) -->
+        ${oficio.partidas && oficio.partidas.length > 0 ? (() => {
+          const mostrarPrecios = oficio.mostrarPreciosEnPdf ?? true;
+          const totalImporte = oficio.partidas.reduce((acc, p) => acc + (p.importe ?? ((p.cantidad || 0) * (p.precio_unitario || 0))), 0);
+          return `
+            <div style="margin: 12px 0 16px 0; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; page-break-inside: avoid;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 9.5px; text-align: left;">
+                <thead>
+                  <tr style="background-color: #0f172a; color: #ffffff;">
+                    <th style="padding: 6px 8px; border: 1px solid #334155; width: 28px; text-align: center;">#</th>
+                    <th style="padding: 6px 8px; border: 1px solid #334155;">DESCRIPCIÓN / CONCEPTO</th>
+                    <th style="padding: 6px 8px; border: 1px solid #334155; width: 55px; text-align: center;">UNIDAD</th>
+                    <th style="padding: 6px 8px; border: 1px solid #334155; width: 50px; text-align: center;">CANT.</th>
+                    ${mostrarPrecios ? `
+                      <th style="padding: 6px 8px; border: 1px solid #334155; width: 80px; text-align: right;">P. UNITARIO</th>
+                      <th style="padding: 6px 8px; border: 1px solid #334155; width: 85px; text-align: right;">IMPORTE</th>
+                    ` : ''}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${oficio.partidas.map((item, idx) => {
+                    const rowBg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+                    const pu = Number(item.precio_unitario || 0);
+                    const imp = Number(item.importe ?? (item.cantidad * pu));
+                    return `
+                      <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: center; color: #64748b; font-weight: 600;">${idx + 1}</td>
+                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 600;">${item.descripcion}</td>
+                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: center; color: #475569; font-family: monospace;">${item.unidad || 'PZA'}</td>
+                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: center; color: #0f172a; font-weight: 700; font-family: monospace;">${item.cantidad}</td>
+                        ${mostrarPrecios ? `
+                          <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: right; color: #475569; font-family: monospace;">$${pu.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: right; color: #0f172a; font-weight: 700; font-family: monospace;">$${imp.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        ` : ''}
+                      </tr>
+                    `;
+                  }).join('')}
+                  ${mostrarPrecios ? `
+                    <tr style="background-color: #f1f5f9; font-weight: 700;">
+                      <td colspan="5" style="padding: 6px 10px; border: 1px solid #cbd5e1; text-align: right; color: #0f172a; font-size: 10px;">TOTAL ESTIMADO (MXN):</td>
+                      <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right; color: #d4af37; font-size: 10.5px; font-family: monospace; font-weight: 800; background-color: #0f172a;">$${totalImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  ` : ''}
+                </tbody>
+              </table>
+            </div>
+          `;
+        })() : ''}
+
         <!-- Fundamentación Técnica / Normativa si existe -->
         ${oficio.fundamentacion && oficio.fundamentacion.trim() ? `
           <div style="background: #fdfbf7; border: 1px solid #fef3c7; border-left: 3px solid #d4af37; padding: 10px 14px; border-radius: 4px; margin: 12px 0;">

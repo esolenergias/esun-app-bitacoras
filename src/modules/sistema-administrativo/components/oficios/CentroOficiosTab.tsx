@@ -124,6 +124,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
   // Items/Partidas para trámites de compra/insumos
   const [partidas, setPartidas] = useState<PartidaCompra[]>([]);
+  const [mostrarPreciosEnPdf, setMostrarPreciosEnPdf] = useState<boolean>(true);
   const [selectedInsumoId, setSelectedInsumoId] = useState('');
   const [customDescripcion, setCustomDescripcion] = useState('');
   const [itemUnidad, setItemUnidad] = useState('PZA');
@@ -324,7 +325,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
     const updated = [...partidas, nuevaPartida];
     setPartidas(updated);
 
-    // Formatear texto para anexar al cuerpo del oficio
+    // Sincronizar en oficio y opcionalmente en el cuerpo
     actualizarCuerpoConPartidas(updated);
 
     // Reset inputs
@@ -341,21 +342,19 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   };
 
   const actualizarCuerpoConPartidas = (currentPartidas: PartidaCompra[]) => {
-    if (currentPartidas.length === 0) return;
+    setOficio(prev => ({
+      ...prev,
+      partidas: currentPartidas,
+      mostrarPreciosEnPdf
+    }));
+  };
 
-    const total = currentPartidas.reduce((acc, p) => acc + (p.importe || (p.cantidad * p.precio_unitario)), 0);
-    const partidasTxt = currentPartidas
-      .map((p, i) => `${i + 1}. [${p.cantidad} ${p.unidad}] ${p.descripcion} (P.U: $${p.precio_unitario.toLocaleString('es-MX', { minimumFractionDigits: 2 })} | Total: $${p.importe.toLocaleString('es-MX', { minimumFractionDigits: 2 })})`)
-      .join('\n');
-
-    setOficio(prev => {
-      // Reemplazar o insertar sección de insumos
-      const baseHeader = prev.cuerpo.split('\n--- DESGLOSE DE PARTIDAS ---')[0];
-      return {
-        ...prev,
-        cuerpo: `${baseHeader.trim()}\n\n--- DESGLOSE DE PARTIDAS ---\n${partidasTxt}\n\nIMPORTE TOTAL ESTIMADO: $${total.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN.`
-      };
-    });
+  const handleToggleMostrarPrecios = (show: boolean) => {
+    setMostrarPreciosEnPdf(show);
+    setOficio(prev => ({
+      ...prev,
+      mostrarPreciosEnPdf: show
+    }));
   };
 
   const handleSelectInsumoCatalogo = (insumoId: string) => {
@@ -512,6 +511,8 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
   const handleCargarOficioHistorial = (item: OficioData) => {
     setOficio({ ...item });
+    setPartidas(item.partidas || []);
+    setMostrarPreciosEnPdf(item.mostrarPreciosEnPdf ?? true);
     setClearedFields({});
     setAiNotes('');
     setCustomAiPrompt('');
@@ -532,6 +533,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
       folio: nextFolio
     });
     setPartidas([]);
+    setMostrarPreciosEnPdf(true);
     setSelectedClienteId('');
     setSelectedProyectoId('');
     setSelectedProveedorId('');
@@ -782,141 +784,13 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
           </div>
 
-          {/* PASO 3: CONSTRUCTOR DE PARTIDAS (SI ES COMPRA, RECEPCIÓN O MATERIAL) */}
-          {(tipoTramite === 'solicitud_compra' || tipoTramite === 'orden_compra' || tipoTramite === 'recepcion_mercancia' || tipoTramite === 'solicitud_material' || tipoTramite === 'vale_entrega') && (
-            <div className="bg-dark-2 p-5 rounded-3xl border border-dark-4 shadow-xl space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase text-gold tracking-wider flex items-center gap-2">
-                  <ShoppingCart className="w-4 h-4 text-gold" />
-                  <span>Paso 3 &bull; Desglose de Insumos y Materiales</span>
-                </span>
-                <span className="text-xs font-mono font-bold text-cream">
-                  Partidas agregadas: {partidas.length}
-                </span>
-              </div>
-
-              {/* Add item row */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3.5 rounded-2xl bg-dark-3/60 border border-dark-4 text-xs items-end">
-                <div className="sm:col-span-4">
-                  <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">Catálogo Maestro</label>
-                  <select
-                    value={selectedInsumoId}
-                    onChange={(e) => handleSelectInsumoCatalogo(e.target.value)}
-                    className="w-full p-2 bg-dark-2 border border-dark-4 rounded-xl text-cream text-xs focus:border-gold focus:outline-none"
-                  >
-                    <option value="">-- Insumo Predefinido --</option>
-                    <option value="custom">✏️ Partida Personalizada / Libre</option>
-                    {insumos.map(i => (
-                      <option key={i.id} value={i.id}>
-                        {i.nombre} - ${i.precio_unitario.toLocaleString('es-MX')} ({i.unidad})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-3">
-                  <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">Descripción / Concepto</label>
-                  <input
-                    type="text"
-                    value={customDescripcion}
-                    onChange={(e) => setCustomDescripcion(e.target.value)}
-                    placeholder="Descripción del material..."
-                    className="w-full p-2 bg-dark-2 border border-dark-4 rounded-xl text-cream text-xs focus:border-gold focus:outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-1">
-                  <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">Unidad</label>
-                  <input
-                    type="text"
-                    value={itemUnidad}
-                    onChange={(e) => setItemUnidad(e.target.value.toUpperCase())}
-                    className="w-full p-2 bg-dark-2 border border-dark-4 rounded-xl text-cream text-xs font-mono text-center focus:border-gold focus:outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-1">
-                  <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">Cant.</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={itemCantidad}
-                    onChange={(e) => setItemCantidad(Math.max(1, Number(e.target.value)))}
-                    className="w-full p-2 bg-dark-2 border border-dark-4 rounded-xl text-cream text-xs font-mono text-center focus:border-gold focus:outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">P. Unitario ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={itemPrecio}
-                    onChange={(e) => setItemPrecio(Math.max(0, Number(e.target.value)))}
-                    className="w-full p-2 bg-dark-2 border border-dark-4 rounded-xl text-cream text-xs font-mono focus:border-gold focus:outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-1">
-                  <button
-                    onClick={handleAddItem}
-                    className="w-full py-2 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs flex items-center justify-center gap-1 shadow-md transition-all"
-                    title="Agregar Partida"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              {partidas.length > 0 && (
-                <div className="overflow-x-auto rounded-2xl border border-dark-4">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-dark-3 text-cream-muted uppercase font-bold">
-                      <tr>
-                        <th className="py-2.5 px-3">#</th>
-                        <th className="py-2.5 px-3">Descripción</th>
-                        <th className="py-2.5 px-3 text-center">Unidad</th>
-                        <th className="py-2.5 px-3 text-center">Cantidad</th>
-                        <th className="py-2.5 px-3 text-right">P. Unitario</th>
-                        <th className="py-2.5 px-3 text-right">Importe</th>
-                        <th className="py-2.5 px-3 text-center">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-dark-4">
-                      {partidas.map((p, idx) => (
-                        <tr key={idx} className="hover:bg-dark-3/50">
-                          <td className="py-2 px-3 text-cream-dim">{idx + 1}</td>
-                          <td className="py-2 px-3 font-semibold text-cream">{p.descripcion}</td>
-                          <td className="py-2 px-3 text-center font-mono text-cream-muted">{p.unidad}</td>
-                          <td className="py-2 px-3 text-center font-mono font-bold text-cream">{p.cantidad}</td>
-                          <td className="py-2 px-3 text-right font-mono text-cream-muted">${p.precio_unitario.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
-                          <td className="py-2 px-3 text-right font-mono font-bold text-emerald-400">${p.importe.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
-                          <td className="py-2 px-3 text-center">
-                            <button
-                              onClick={() => handleRemoveItem(idx)}
-                              className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* PASO 4: REDACCIÓN INTELIGENTE CON IA Y FORMULARIO ESTRUCTURADO */}
+          {/* PASO 3: REDACCIÓN INTELIGENTE CON IA Y FORMULARIO ESTRUCTURADO */}
           <div className="bg-dark-2 p-5 sm:p-6 rounded-3xl border border-dark-4 shadow-xl space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-dark-4 pb-3">
               <div>
                 <span className="text-[11px] font-black uppercase text-gold tracking-wider flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-gold animate-pulse" />
-                  <span>Paso 4 &bull; Redacción del Documento Oficial con IA</span>
+                  <span>Paso 3 &bull; Redacción del Documento Oficial con IA</span>
                 </span>
                 <p className="text-[11px] text-cream-muted mt-0.5">
                   Potenciado con IA en tono semi-formal y primera persona. Al hacer clic en cualquier campo para editarlo, se limpiará automáticamente.
@@ -1339,6 +1213,196 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                   className="w-full p-3.5 bg-dark-3 border border-dark-4 rounded-2xl text-cream text-xs leading-relaxed font-mono focus:border-gold focus:outline-none"
                 />
               </div>
+
+              {/* TABLA DE INSUMOS Y CONCEPTOS (PARA SOLICITUD DE COMPRA, ORDEN DE COMPRA, ACTA DE ENTREGA/RECEPCIÓN Y VALES) */}
+              {(tipoTramite === 'solicitud_compra' || tipoTramite === 'orden_compra' || tipoTramite === 'recepcion_mercancia' || tipoTramite === 'solicitud_material' || tipoTramite === 'vale_entrega') && (
+                <div className="bg-dark-3/60 p-4 sm:p-5 rounded-2xl border border-gold/30 shadow-lg space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-dark-4/80 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-gold/20 flex items-center justify-center text-gold border border-gold/40">
+                        <ShoppingCart className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-cream block">
+                          Tabla de Insumos, Conceptos y Materiales
+                        </span>
+                        <p className="text-[10.5px] text-cream-muted">
+                          Ingresa conceptos manualmente o selecciónalos del catálogo maestro.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Selector de visibilidad de precios y totales */}
+                    <div className="flex items-center gap-2 bg-dark-2 px-3 py-1.5 rounded-xl border border-dark-4">
+                      <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-cream">
+                        <input
+                          type="checkbox"
+                          checked={mostrarPreciosEnPdf}
+                          onChange={(e) => handleToggleMostrarPrecios(e.target.checked)}
+                          className="rounded border-dark-4 text-gold focus:ring-gold"
+                        />
+                        <span className="text-[11px] text-cream-dim">Mostrar precios e importes totales en el reporte</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Formulario para agregar partida (manual o catálogo) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3 rounded-xl bg-dark-2/90 border border-dark-4 text-xs items-end">
+                    <div className="sm:col-span-4">
+                      <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">
+                        Catálogo de Insumos
+                      </label>
+                      <select
+                        value={selectedInsumoId}
+                        onChange={(e) => handleSelectInsumoCatalogo(e.target.value)}
+                        className="w-full p-2 bg-dark-3 border border-dark-4 rounded-xl text-cream text-xs focus:border-gold focus:outline-none"
+                      >
+                        <option value="">-- Seleccionar de Catálogo --</option>
+                        <option value="custom">✏️ Concepto / Partida Manual Libre</option>
+                        {insumos.map(i => (
+                          <option key={i.id} value={i.id}>
+                            {i.nombre} - ${i.precio_unitario.toLocaleString('es-MX')} ({i.unidad})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">
+                        Descripción / Concepto *
+                      </label>
+                      <input
+                        type="text"
+                        value={customDescripcion}
+                        onChange={(e) => setCustomDescripcion(e.target.value)}
+                        placeholder="Descripción del concepto o material..."
+                        className="w-full p-2 bg-dark-3 border border-dark-4 rounded-xl text-cream text-xs focus:border-gold focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-1">
+                      <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">
+                        Unidad
+                      </label>
+                      <input
+                        type="text"
+                        value={itemUnidad}
+                        onChange={(e) => setItemUnidad(e.target.value.toUpperCase())}
+                        className="w-full p-2 bg-dark-3 border border-dark-4 rounded-xl text-cream text-xs font-mono text-center focus:border-gold focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-1">
+                      <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">
+                        Cant.
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={itemCantidad}
+                        onChange={(e) => setItemCantidad(Math.max(1, Number(e.target.value)))}
+                        className="w-full p-2 bg-dark-3 border border-dark-4 rounded-xl text-cream text-xs font-mono text-center focus:border-gold focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] uppercase font-bold text-cream-dim mb-1">
+                        P. Unitario ($)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={itemPrecio}
+                        onChange={(e) => setItemPrecio(Math.max(0, Number(e.target.value)))}
+                        className="w-full p-2 bg-dark-3 border border-dark-4 rounded-xl text-cream text-xs font-mono focus:border-gold focus:outline-none"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-1">
+                      <button
+                        type="button"
+                        onClick={handleAddItem}
+                        className="w-full py-2 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs flex items-center justify-center gap-1 shadow-md transition-all cursor-pointer"
+                        title="Agregar Partida a la Tabla"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span className="sm:hidden">Agregar</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tabla interactiva de conceptos agregados */}
+                  {partidas.length === 0 ? (
+                    <div className="p-4 text-center border border-dashed border-dark-4 rounded-xl text-cream-muted text-xs bg-dark-2/40">
+                      No hay conceptos ni insumos agregados aún. Usa el formulario superior para añadir partidas.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-dark-4 bg-dark-2">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-dark-3/90 text-cream-dim uppercase font-bold text-[10px] tracking-wider">
+                          <tr>
+                            <th className="py-2.5 px-3 text-center w-10">#</th>
+                            <th className="py-2.5 px-3">Descripción / Concepto</th>
+                            <th className="py-2.5 px-3 text-center w-20">Unidad</th>
+                            <th className="py-2.5 px-3 text-center w-20">Cantidad</th>
+                            {mostrarPreciosEnPdf && (
+                              <>
+                                <th className="py-2.5 px-3 text-right w-28">P. Unitario</th>
+                                <th className="py-2.5 px-3 text-right w-32">Importe</th>
+                              </>
+                            )}
+                            <th className="py-2.5 px-3 text-center w-16">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-dark-4">
+                          {partidas.map((p, idx) => (
+                            <tr key={idx} className="hover:bg-dark-3/50 transition-colors">
+                              <td className="py-2 px-3 text-cream-dim text-center font-mono">{idx + 1}</td>
+                              <td className="py-2 px-3 font-semibold text-cream">{p.descripcion}</td>
+                              <td className="py-2 px-3 text-center font-mono text-cream-muted">{p.unidad}</td>
+                              <td className="py-2 px-3 text-center font-mono font-bold text-cream">{p.cantidad}</td>
+                              {mostrarPreciosEnPdf && (
+                                <>
+                                  <td className="py-2 px-3 text-right font-mono text-cream-muted">
+                                    ${p.precio_unitario.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-2 px-3 text-right font-mono font-bold text-emerald-400">
+                                    ${p.importe.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </>
+                              )}
+                              <td className="py-2 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItem(idx)}
+                                  className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                                  title="Eliminar partida"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        {mostrarPreciosEnPdf && (
+                          <tfoot>
+                            <tr className="bg-dark-3 font-bold border-t-2 border-dark-4">
+                              <td colSpan={4} className="py-2.5 px-3 text-right text-cream-dim uppercase text-[10.5px]">
+                                Total Estimado (MXN):
+                              </td>
+                              <td colSpan={2} className="py-2.5 px-3 text-right font-mono text-sm text-gold">
+                                ${partidas.reduce((acc, p) => acc + (p.importe || (p.cantidad * p.precio_unitario)), 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 3. Fundamentación Técnica y Legal (Opcional) */}
               <div>

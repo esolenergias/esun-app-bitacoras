@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ClienteReal, ProyectoReal, InsumoReal } from '../../types/adminTypes';
 import { adminDbService } from '../../services/adminDbService';
+import type { OficioData } from '../../../../components/legal/oficios/types';
+import OficioPreviewModal from '../../../../components/legal/oficios/OficioPreviewModal';
+import { generateOficioPdf } from '../../../../components/legal/oficios/oficioPdfGenerator';
 import { 
   Users, Briefcase, Boxes, BookOpen, FileText, Search, ExternalLink, Phone, Mail, MapPin, DollarSign, Calendar,
-  List, LayoutGrid, Tag, CheckCircle, Percent, Plus, Edit, Trash2, X, Save, AlertCircle, Loader2
+  List, LayoutGrid, Tag, CheckCircle, Percent, Plus, Edit, Trash2, X, Save, AlertCircle, Loader2, FileSignature, Printer, Eye
 } from 'lucide-react';
 
 /* =========================================================================
@@ -18,8 +21,30 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'filas' | 'fichas'>('filas');
   
+  // Oficios cargados
+  const [allOficios, setAllOficios] = useState<OficioData[]>([]);
+  const [loadingOficios, setLoadingOficios] = useState(false);
+  const [selectedPreviewOficio, setSelectedPreviewOficio] = useState<OficioData | null>(null);
+
+  // Cargar oficios al montar
+  useEffect(() => {
+    const loadOficios = async () => {
+      try {
+        setLoadingOficios(true);
+        const data = await adminDbService.getOficiosCompletos();
+        setAllOficios(data);
+      } catch (err) {
+        console.warn('Error al cargar oficios en CRM Clientes:', err);
+      } finally {
+        setLoadingOficios(false);
+      }
+    };
+    loadOficios();
+  }, []);
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState<'datos' | 'oficios'>('datos');
   const [selectedCliente, setSelectedCliente] = useState<ClienteReal | null>(null);
   const [nombre, setNombre] = useState('');
   const [rfc, setRfc] = useState('');
@@ -36,17 +61,45 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
     setTelefono('');
     setEmail('');
     setDireccion('');
+    setActiveModalTab('datos');
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (c: ClienteReal) => {
+  const handleOpenEdit = (c: ClienteReal, tab: 'datos' | 'oficios' = 'datos') => {
     setSelectedCliente(c);
     setNombre(c.nombre);
     setRfc(c.rfc || '');
     setTelefono(c.telefono || '');
     setEmail(c.email || '');
     setDireccion(c.direccion || '');
+    setActiveModalTab(tab);
     setIsModalOpen(true);
+  };
+
+  // Helper para filtrar oficios de un cliente
+  const getOficiosDelCliente = (cliente: ClienteReal) => {
+    const cName = cliente.nombre.toLowerCase().trim();
+    const cRfc = (cliente.rfc || '').toLowerCase().trim();
+    return allOficios.filter(o => {
+      const ofCliente = (o.clienteFinal || '').toLowerCase().trim();
+      const ofDestNombre = (o.destinatarioNombre || '').toLowerCase().trim();
+      const ofDestEmpresa = (o.destinatarioEmpresa || '').toLowerCase().trim();
+      const ofAsunto = (o.asunto || '').toLowerCase().trim();
+      const ofRef = (o.referencia || '').toLowerCase().trim();
+
+      const matchesName = (ofCliente && (ofCliente.includes(cName) || cName.includes(ofCliente))) ||
+                          (ofDestNombre && (ofDestNombre.includes(cName) || cName.includes(ofDestNombre))) ||
+                          (ofDestEmpresa && (ofDestEmpresa.includes(cName) || cName.includes(ofDestEmpresa))) ||
+                          (ofAsunto && ofAsunto.includes(cName)) ||
+                          (ofRef && ofRef.includes(cName));
+
+      const matchesRfc = cRfc && (
+        (o.empresaRFC && o.empresaRFC.toLowerCase().includes(cRfc)) ||
+        (ofRef && ofRef.includes(cRfc))
+      );
+
+      return matchesName || matchesRfc;
+    });
   };
 
   const handleGuardar = async () => {
@@ -183,62 +236,84 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
                   <th className="py-3.5 px-4">Teléfono</th>
                   <th className="py-3.5 px-4">Correo Electrónico</th>
                   <th className="py-3.5 px-4">Dirección / Ubicación</th>
+                  <th className="py-3.5 px-4 text-center">Oficios Emitidos</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-4/70 text-xs">
-                {filtered.map((c, index) => (
-                  <tr 
-                    key={c.id} 
-                    onClick={() => handleOpenEdit(c)}
-                    className="hover:bg-dark-3/60 transition-colors cursor-pointer group"
-                  >
-                    <td className="py-3 px-4 font-mono text-cream-dim text-[11px]">{index + 1}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-gold/10 text-gold border border-gold/25 flex items-center justify-center font-bold flex-shrink-0 group-hover:bg-gold group-hover:text-dark-1 transition-colors">
-                          <Users className="w-3.5 h-3.5" />
+                {filtered.map((c, index) => {
+                  const clientOficios = getOficiosDelCliente(c);
+                  return (
+                    <tr 
+                      key={c.id} 
+                      onClick={() => handleOpenEdit(c)}
+                      className="hover:bg-dark-3/60 transition-colors cursor-pointer group"
+                    >
+                      <td className="py-3 px-4 font-mono text-cream-dim text-[11px]">{index + 1}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-gold/10 text-gold border border-gold/25 flex items-center justify-center font-bold flex-shrink-0 group-hover:bg-gold group-hover:text-dark-1 transition-colors">
+                            <Users className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-cream text-sm group-hover:text-gold transition-colors">{c.nombre}</div>
+                            <div className="text-[10px] text-cream-dim font-mono">ID: {c.id.slice(0, 8)}...</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-bold text-cream text-sm group-hover:text-gold transition-colors">{c.nombre}</div>
-                          <div className="text-[10px] text-cream-dim font-mono">ID: {c.id.slice(0, 8)}...</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 font-mono font-bold text-gold">
-                      {c.rfc || '—'}
-                    </td>
-                    <td className="py-3 px-4 text-cream/90 font-mono">
-                      {c.telefono ? (
-                        <span className="flex items-center gap-1.5">
-                          <Phone className="w-3 h-3 text-cream-dim" />
-                          {c.telefono}
-                        </span>
-                      ) : (
-                        <span className="text-cream-dim">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-cream/90">
-                      {c.email ? (
-                        <span className="flex items-center gap-1.5">
-                          <Mail className="w-3 h-3 text-cream-dim" />
-                          {c.email}
-                        </span>
-                      ) : (
-                        <span className="text-cream-dim">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-cream-muted max-w-xs truncate">
-                      {c.direccion ? (
-                        <span className="flex items-center gap-1.5" title={c.direccion}>
-                          <MapPin className="w-3 h-3 text-cream-dim flex-shrink-0" />
-                          <span className="truncate">{c.direccion}</span>
-                        </span>
-                      ) : (
-                        <span className="text-cream-dim">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-gold">
+                        {c.rfc || '—'}
+                      </td>
+                      <td className="py-3 px-4 text-cream/90 font-mono">
+                        {c.telefono ? (
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 text-cream-dim" />
+                            {c.telefono}
+                          </span>
+                        ) : (
+                          <span className="text-cream-dim">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-cream/90">
+                        {c.email ? (
+                          <span className="flex items-center gap-1.5">
+                            <Mail className="w-3 h-3 text-cream-dim" />
+                            {c.email}
+                          </span>
+                        ) : (
+                          <span className="text-cream-dim">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-cream-muted max-w-xs truncate">
+                        {c.direccion ? (
+                          <span className="flex items-center gap-1.5" title={c.direccion}>
+                            <MapPin className="w-3 h-3 text-cream-dim flex-shrink-0" />
+                            <span className="truncate">{c.direccion}</span>
+                          </span>
+                        ) : (
+                          <span className="text-cream-dim">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {clientOficios.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEdit(c, 'oficios');
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gold/15 text-gold border border-gold/30 hover:bg-gold hover:text-dark-1 font-bold text-[11px] transition-all"
+                            title="Ver oficios vinculados"
+                          >
+                            <FileSignature className="w-3 h-3" />
+                            <span>{clientOficios.length} oficio{clientOficios.length === 1 ? '' : 's'}</span>
+                          </button>
+                        ) : (
+                          <span className="text-cream-dim/60 font-mono text-[11px]">0</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -246,131 +321,305 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
       ) : (
         /* VISTA EN FICHAS (CUADRÍCULA) */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(c => (
-            <div 
-              key={c.id} 
-              onClick={() => handleOpenEdit(c)}
-              className="bg-dark-2 p-4 rounded-2xl border border-dark-4 shadow-sm space-y-2 hover:border-gold/40 transition-colors cursor-pointer group"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-gold/10 text-gold border border-gold/25 flex items-center justify-center font-bold flex-shrink-0 group-hover:bg-gold group-hover:text-dark-1 transition-colors">
-                    <Users className="w-5 h-5" />
+          {filtered.map(c => {
+            const clientOficios = getOficiosDelCliente(c);
+            return (
+              <div 
+                key={c.id} 
+                onClick={() => handleOpenEdit(c)}
+                className="bg-dark-2 p-4 rounded-2xl border border-dark-4 shadow-sm space-y-2 hover:border-gold/40 transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-gold/10 text-gold border border-gold/25 flex items-center justify-center font-bold flex-shrink-0 group-hover:bg-gold group-hover:text-dark-1 transition-colors">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-bold text-cream text-sm truncate group-hover:text-gold transition-colors">{c.nombre}</h4>
+                      <div className="text-[11px] text-gold/80 font-mono">{c.rfc || 'Sin RFC'}</div>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-bold text-cream text-sm truncate group-hover:text-gold transition-colors">{c.nombre}</h4>
-                    <div className="text-[11px] text-gold/80 font-mono">{c.rfc || 'Sin RFC'}</div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEdit(c);
+                    }}
+                    className="p-1.5 text-cream-dim hover:text-gold hover:bg-gold/10 rounded-lg transition-colors"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="text-xs text-cream-muted space-y-1 pt-2 border-t border-dark-4/50">
+                  {c.telefono && <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-cream-dim" /> {c.telefono}</div>}
+                  {c.email && <div className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-cream-dim" /> {c.email}</div>}
+                  {c.direccion && <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-cream-dim" /> {c.direccion}</div>}
+                  <div className="pt-1.5 flex items-center justify-between">
+                    <span className="text-[11px] text-cream-dim">Oficios vinculados:</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEdit(c, 'oficios');
+                      }}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10.5px] transition-all ${
+                        clientOficios.length > 0
+                          ? 'bg-gold/15 text-gold border border-gold/30 hover:bg-gold hover:text-dark-1'
+                          : 'bg-dark-3 text-cream-dim border border-dark-4'
+                      }`}
+                    >
+                      <FileSignature className="w-3 h-3" />
+                      <span>{clientOficios.length}</span>
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenEdit(c);
-                  }}
-                  className="p-1.5 text-cream-dim hover:text-gold hover:bg-gold/10 rounded-lg transition-colors"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
               </div>
-              <div className="text-xs text-cream-muted space-y-1 pt-2 border-t border-dark-4/50">
-                {c.telefono && <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-cream-dim" /> {c.telefono}</div>}
-                {c.email && <div className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-cream-dim" /> {c.email}</div>}
-                {c.direccion && <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-cream-dim" /> {c.direccion}</div>}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Modal Editar / Crear Cliente */}
+      {/* Modal Editar / Crear Cliente y Ver Oficios Vinculados */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-dark-2 rounded-2xl max-w-lg w-full shadow-2xl border border-dark-4/50 overflow-hidden">
-            <div className="p-6 border-b border-dark-4/50 flex justify-between items-center bg-dark-3/50">
+          <div className="bg-dark-2 rounded-2xl max-w-3xl w-full shadow-2xl border border-dark-4/50 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-dark-4/50 flex justify-between items-center bg-dark-3/50 flex-shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-gold/15 text-gold flex items-center justify-center">
                   <Users className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-cream">
-                    {selectedCliente ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
+                    {selectedCliente ? selectedCliente.nombre : 'Registrar Nuevo Cliente'}
                   </h3>
-                  <p className="text-xs text-cream-muted">Actualización bilateral directa en Supabase `clientes`</p>
+                  <p className="text-xs text-cream-muted">
+                    {selectedCliente ? `ID: ${selectedCliente.id} • Actualización bilateral directa en Supabase` : 'Registro en base de datos CRM'}
+                  </p>
                 </div>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="text-cream-dim hover:text-cream-muted font-bold text-xl">✕</button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-cream/90 uppercase mb-1">
-                  Nombre o Razón Social *
-                </label>
-                <input
-                  type="text"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Ej: Manuel Alejandro Fregoso o Empresa S.A."
-                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-medium text-cream focus:border-gold focus:outline-none"
-                />
+            {/* Pestañas del Modal (Datos Generales vs Oficios Emitidos) */}
+            {selectedCliente && (
+              <div className="flex items-center border-b border-dark-4 bg-dark-3/30 px-6 pt-2 gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveModalTab('datos')}
+                  className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                    activeModalTab === 'datos'
+                      ? 'border-gold text-gold'
+                      : 'border-transparent text-cream-muted hover:text-cream'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Datos del Cliente</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveModalTab('oficios')}
+                  className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                    activeModalTab === 'oficios'
+                      ? 'border-gold text-gold'
+                      : 'border-transparent text-cream-muted hover:text-cream'
+                  }`}
+                >
+                  <FileSignature className="w-3.5 h-3.5" />
+                  <span>Oficios Emitidos ({getOficiosDelCliente(selectedCliente).length})</span>
+                </button>
               </div>
+            )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-cream/90 uppercase mb-1">
-                    RFC
-                  </label>
-                  <input
-                    type="text"
-                    value={rfc}
-                    onChange={(e) => setRfc(e.target.value.toUpperCase())}
-                    placeholder="FESM880101XX1"
-                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-mono text-cream focus:border-gold focus:outline-none"
-                  />
+            <div className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              {activeModalTab === 'datos' || !selectedCliente ? (
+                <>
+                  <div>
+                    <label className="block font-bold text-cream/90 uppercase mb-1">
+                      Nombre o Razón Social *
+                    </label>
+                    <input
+                      type="text"
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      placeholder="Ej: Manuel Alejandro Fregoso o Empresa S.A."
+                      className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-medium text-cream focus:border-gold focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-cream/90 uppercase mb-1">
+                        RFC
+                      </label>
+                      <input
+                        type="text"
+                        value={rfc}
+                        onChange={(e) => setRfc(e.target.value.toUpperCase())}
+                        placeholder="FESM880101XX1"
+                        className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-mono text-cream focus:border-gold focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-cream/90 uppercase mb-1">
+                        Teléfono
+                      </label>
+                      <input
+                        type="text"
+                        value={telefono}
+                        onChange={(e) => setTelefono(e.target.value)}
+                        placeholder="311 123 4567"
+                        className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-mono text-cream focus:border-gold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-cream/90 uppercase mb-1">
+                      Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="contacto@cliente.com"
+                      className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-cream/90 uppercase mb-1">
+                      Dirección / Ubicación
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={direccion}
+                      onChange={(e) => setDireccion(e.target.value)}
+                      placeholder="Av. Insurgentes 123, Col. Centro, Tepic, Nayarit"
+                      className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none"
+                    />
+                  </div>
+                </>
+              ) : (
+                /* TAB DE OFICIOS EMITIDOS DEL CLIENTE */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-dark-3/60 p-3 rounded-xl border border-dark-4">
+                    <div>
+                      <span className="font-bold text-cream block text-xs">
+                        Expediente de Oficios y Comunicados Oficiales
+                      </span>
+                      <p className="text-[11px] text-cream-muted">
+                        Oficios generados y enlazados a {selectedCliente.nombre}.
+                      </p>
+                    </div>
+                    <span className="font-mono text-gold font-bold text-xs bg-gold/10 px-2.5 py-1 rounded-lg border border-gold/30">
+                      {getOficiosDelCliente(selectedCliente).length} registrados
+                    </span>
+                  </div>
+
+                  {getOficiosDelCliente(selectedCliente).length === 0 ? (
+                    <div className="p-8 text-center border border-dashed border-dark-4 rounded-2xl bg-dark-3/30 space-y-2">
+                      <FileSignature className="w-8 h-8 text-cream-dim/40 mx-auto" />
+                      <p className="text-cream text-xs font-semibold">No hay oficios emitidos vinculados a este cliente aún.</p>
+                      <p className="text-[11px] text-cream-muted max-w-md mx-auto">
+                        Los oficios redactados desde el <strong>Centro de Oficios</strong> con este cliente seleccionado aparecerán automáticamente aquí.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-dark-4">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-dark-3 text-cream-muted uppercase font-bold text-[10.5px]">
+                          <tr>
+                            <th className="py-2.5 px-3">Folio</th>
+                            <th className="py-2.5 px-3">Fecha</th>
+                            <th className="py-2.5 px-3">Asunto / Obra</th>
+                            <th className="py-2.5 px-3">Destinatario</th>
+                            <th className="py-2.5 px-3 text-center">Estado</th>
+                            <th className="py-2.5 px-3 text-center">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-dark-4">
+                          {getOficiosDelCliente(selectedCliente).map((of, idx) => (
+                            <tr key={idx} className="hover:bg-dark-3/50 transition-colors">
+                              <td className="py-2.5 px-3 font-mono font-bold text-gold">
+                                {of.folio || 'S/F'}
+                              </td>
+                              <td className="py-2.5 px-3 text-cream-dim font-mono">
+                                {of.fecha || '—'}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="font-semibold text-cream max-w-xs truncate" title={of.asunto}>
+                                  {of.asunto || 'Oficio Oficial'}
+                                </div>
+                                {of.nombreObra && (
+                                  <div className="text-[10px] text-cream-muted truncate" title={of.nombreObra}>
+                                    Obra: {of.nombreObra}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-cream-dim">
+                                <div>{of.destinatarioNombre || '—'}</div>
+                                {of.destinatarioEmpresa && (
+                                  <div className="text-[10px] text-cream-muted">{of.destinatarioEmpresa}</div>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase font-mono ${
+                                  of.estado === 'emitido' || !of.estado
+                                    ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+                                    : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
+                                }`}>
+                                  {of.estado || 'emitido'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedPreviewOficio(of)}
+                                    className="p-1.5 text-cream-muted hover:text-gold hover:bg-gold/10 rounded-lg transition-colors cursor-pointer"
+                                    title="Previsualizar documento"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  {of.drive_url ? (
+                                    <a
+                                      href={of.drive_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                      title="Abrir PDF en Drive"
+                                    >
+                                      <Printer className="w-3.5 h-3.5" />
+                                    </a>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        try {
+                                          await generateOficioPdf(of);
+                                        } catch (err: any) {
+                                          alert('Error al generar PDF: ' + err?.message);
+                                        }
+                                      }}
+                                      className="p-1.5 text-cream-muted hover:text-gold hover:bg-gold/10 rounded-lg transition-colors cursor-pointer"
+                                      title="Descargar / Imprimir PDF"
+                                    >
+                                      <Printer className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block font-bold text-cream/90 uppercase mb-1">
-                    Teléfono
-                  </label>
-                  <input
-                    type="text"
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                    placeholder="311 123 4567"
-                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-mono text-cream focus:border-gold focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-cream/90 uppercase mb-1">
-                  Correo Electrónico
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="contacto@cliente.com"
-                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-cream/90 uppercase mb-1">
-                  Dirección / Ubicación
-                </label>
-                <textarea
-                  rows={2}
-                  value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
-                  placeholder="Av. Insurgentes 123, Col. Centro, Tepic, Nayarit"
-                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none"
-                />
-              </div>
+              )}
             </div>
 
-            <div className="p-6 border-t border-dark-4/50 flex justify-between items-center bg-dark-3/50">
-              {selectedCliente ? (
+            <div className="p-6 border-t border-dark-4/50 flex justify-between items-center bg-dark-3/50 flex-shrink-0">
+              {selectedCliente && activeModalTab === 'datos' ? (
                 <button
                   onClick={handleEliminar}
                   disabled={deleting || saving}
@@ -386,20 +635,31 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 text-xs font-semibold text-cream-muted hover:bg-dark-4 rounded-xl transition-colors"
                 >
-                  Cancelar
+                  Cerrar
                 </button>
-                <button
-                  onClick={handleGuardar}
-                  disabled={saving || deleting || !nombre.trim()}
-                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-dark-1 bg-gold hover:bg-gold-light disabled:opacity-50 rounded-xl shadow-md transition-all"
-                >
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  {saving ? 'Guardando en BD...' : 'Guardar Cliente'}
-                </button>
+                {(activeModalTab === 'datos' || !selectedCliente) && (
+                  <button
+                    onClick={handleGuardar}
+                    disabled={saving || deleting || !nombre.trim()}
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-dark-1 bg-gold hover:bg-gold-light disabled:opacity-50 rounded-xl shadow-md transition-all"
+                  >
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    {saving ? 'Guardando en BD...' : 'Guardar Cliente'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Previsualización Oficial de Oficio */}
+      {selectedPreviewOficio && (
+        <OficioPreviewModal
+          isOpen={Boolean(selectedPreviewOficio)}
+          onClose={() => setSelectedPreviewOficio(null)}
+          oficio={selectedPreviewOficio}
+        />
       )}
     </div>
   );

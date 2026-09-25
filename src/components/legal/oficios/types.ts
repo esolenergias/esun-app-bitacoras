@@ -50,6 +50,16 @@ export interface OficioData {
   firmaDigital?: string; // Data URL Base64 o URL de imagen de firma
   incluirFirmaDigital?: boolean; // Activar firma digital en documento
   
+  // Partidas e insumos para solicitudes, órdenes y actas
+  partidas?: {
+    descripcion: string;
+    unidad: string;
+    cantidad: number;
+    precio_unitario?: number;
+    importe?: number;
+  }[];
+  mostrarPreciosEnPdf?: boolean; // Si es falso o undefined cuando se oculte, no muestra columnas de precio/total
+
   // Control de estado y Drive
   estado?: 'borrador' | 'emitido' | 'entregado' | 'firmado';
   drive_url?: string;
