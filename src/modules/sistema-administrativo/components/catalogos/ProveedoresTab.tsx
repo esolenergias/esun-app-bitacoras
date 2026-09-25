@@ -27,8 +27,8 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
   const [direccion, setDireccion] = useState('');
-  const [diasCredito, setDiasCredito] = useState(30);
-  const [limiteCredito, setLimiteCredito] = useState(50000);
+  const [diasCredito, setDiasCredito] = useState<number | string>(0);
+  const [limiteCredito, setLimiteCredito] = useState<number | string>(0);
   const [categoria, setCategoria] = useState('Paneles Solares e Inversores');
 
   const handleOpenCreate = () => {
@@ -39,8 +39,8 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
     setTelefono('');
     setEmail('');
     setDireccion('');
-    setDiasCredito(30);
-    setLimiteCredito(50000);
+    setDiasCredito(0);
+    setLimiteCredito(0);
     setCategoria('Paneles Solares e Inversores');
     setIsModalOpen(true);
   };
@@ -72,8 +72,8 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
       telefono: telefono.trim(),
       email: email.trim(),
       direccion: direccion.trim(),
-      dias_credito: diasCredito,
-      limite_credito: limiteCredito,
+      dias_credito: typeof diasCredito === 'string' ? (parseInt(diasCredito) || 0) : (diasCredito || 0),
+      limite_credito: typeof limiteCredito === 'string' ? (parseFloat(limiteCredito) || 0) : (limiteCredito || 0),
       categoria_principal: categoria
     };
 
@@ -405,9 +405,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   </label>
                   <input
                     type="number"
+                    min="0"
                     value={diasCredito}
-                    onChange={(e) => setDiasCredito(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setDiasCredito(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                     className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-bold font-mono text-center text-cream focus:border-gold focus:outline-none"
+                    placeholder="0"
                   />
                 </div>
                 <div>
@@ -416,9 +418,12 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   </label>
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     value={limiteCredito}
-                    onChange={(e) => setLimiteCredito(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setLimiteCredito(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                     className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-bold font-mono text-center text-emerald-400 focus:border-gold focus:outline-none"
+                    placeholder="0.00"
                   />
                 </div>
               </div>

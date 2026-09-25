@@ -465,8 +465,8 @@ export class AdminDbService {
       telefono: prov.telefono || '',
       email: prov.email || '',
       direccion: prov.direccion || '',
-      dias_credito: prov.dias_credito || 30,
-      limite_credito: prov.limite_credito || 50000,
+      dias_credito: prov.dias_credito ?? 0,
+      limite_credito: prov.limite_credito ?? 0,
       categoria_principal: prov.categoria_principal || 'General',
       created_at: prov.created_at || new Date().toISOString()
     };
@@ -1144,6 +1144,13 @@ export class AdminDbService {
       if (!error && data && data.length > 0) {
         list = data.map((d: any) => {
           const jsonExtra = d.datos_json && typeof d.datos_json === 'object' ? d.datos_json : {};
+          // Si tiene drive_url, folio formal con destinatario y cuerpo, o json_extra marca emitido, es 'emitido'
+          const esEmitido = d.estado === 'emitido' || 
+            Boolean(d.drive_url) || 
+            jsonExtra.estado === 'emitido' || 
+            (d.folio && d.destinatario_nombre && (d.cuerpo || d.contenido) && d.estado !== 'borrador') ||
+            (Boolean(d.drive_url || jsonExtra.drive_url));
+
           return {
             id: d.id,
             folio: d.folio || '',
@@ -1179,8 +1186,8 @@ export class AdminDbService {
             empresaEmail: d.empresa_email || 'contacto@esolenergias.com',
             ccp: Array.isArray(d.ccp) ? d.ccp : [],
             anexos: Array.isArray(d.anexos) ? d.anexos : [],
-            estado: d.estado || 'emitido',
-            drive_url: d.drive_url || null,
+            estado: esEmitido ? 'emitido' : (d.estado || 'emitido'),
+            drive_url: d.drive_url || jsonExtra.drive_url || null,
             firmaDigital: d.firma_digital || undefined,
             incluirFirmaDigital: d.incluir_firma_digital ?? true,
             created_at: d.created_at,
@@ -1198,14 +1205,59 @@ export class AdminDbService {
         const parsed = JSON.parse(localStr);
         if (Array.isArray(parsed)) {
           parsed.forEach((item: any) => {
-            if (!list.some(o => o.folio === item.folio || (item.id && o.id === item.id))) {
-              list.push(item);
+            const existingIdx = list.findIndex(o => o.folio === item.folio || (item.id && o.id === item.id));
+            if (existingIdx === -1) {
+              // Normalizar item local
+              const localEmitido = item.estado === 'emitido' || Boolean(item.drive_url) || (item.folio && item.destinatarioNombre && item.cuerpo && item.estado !== 'borrador');
+              list.push({
+                ...item,
+                estado: localEmitido ? 'emitido' : (item.estado || 'emitido')
+              });
+            } else {
+              // Si en local tiene drive_url o datos más recientes, no degradar estado a borrador si el de list es emitido
+              if (list[existingIdx].estado === 'emitido') {
+                item.estado = 'emitido';
+              }
             }
           });
         }
       } catch (e) {}
     }
     return list;
+  }
+
+  async actualizarEstadoOficio(folioOrId: string, nuevoEstado: 'borrador' | 'emitido'): Promise<void> {
+    // 1. Actualizar localStorage
+    try {
+      const list = getLocal<OficioData[]>('esol_oficios_guardados_local', []);
+      const idx = list.findIndex(o => o.folio === folioOrId || o.id === folioOrId);
+      if (idx >= 0) {
+        list[idx] = {
+          ...list[idx],
+          estado: nuevoEstado,
+          updated_at: new Date().toISOString()
+        };
+        setLocal('esol_oficios_guardados_local', list);
+      }
+    } catch (e) {
+      console.warn('Error al actualizar estado en local:', e);
+    }
+
+    // 2. Actualizar Supabase
+    try {
+      const { error } = await supabase
+        .from('oficios_obra')
+        .update({
+          estado: nuevoEstado,
+          updated_at: new Date().toISOString()
+        })
+        .or(`folio.eq.${folioOrId},id.eq.${folioOrId}`);
+      if (error) {
+        console.warn('Error al actualizar estado en Supabase:', error);
+      }
+    } catch (e) {
+      console.warn('Error llamando supabase update oficio:', e);
+    }
   }
 
   async emitirOficioCentral(

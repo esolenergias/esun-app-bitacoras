@@ -15,7 +15,7 @@ import {
   Trash2, Building2, User, ShoppingCart, Truck, Package, Sparkles, Send, 
   ShieldCheck, AlertCircle, RefreshCw, ArrowRight, Layers, FileCheck2, 
   FolderCheck, X, ChevronRight, Edit3, ExternalLink, Calendar, MapPin,
-  Wand2, Scale, BookOpen, Loader2, HelpCircle, CheckCheck
+  Wand2, Scale, BookOpen, Loader2, HelpCircle, CheckCheck, Upload
 } from 'lucide-react';
 
 export type TipoTramitePeticion = 
@@ -128,8 +128,8 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   const [selectedInsumoId, setSelectedInsumoId] = useState('');
   const [customDescripcion, setCustomDescripcion] = useState('');
   const [itemUnidad, setItemUnidad] = useState('PZA');
-  const [itemCantidad, setItemCantidad] = useState(1);
-  const [itemPrecio, setItemPrecio] = useState(0);
+  const [itemCantidad, setItemCantidad] = useState<number | string>(1);
+  const [itemPrecio, setItemPrecio] = useState<number | string>(0);
 
   // AI Assistant States (Potenciado con IA Semiformal)
   const [aiNotes, setAiNotes] = useState('');
@@ -141,9 +141,47 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   // Registro de campos que se vacían automáticamente la primera vez que se hace click para editarlos
   const [clearedFields, setClearedFields] = useState<{ [key: string]: boolean }>({});
 
+  // Lista de textos predefinidos o de ejemplo que SÍ se deben borrar al dar click
+  const isDefaultTemplateText = (fieldName: string, val: string): boolean => {
+    if (!val || typeof val !== 'string') return false;
+    const trimmed = val.trim();
+
+    // NUNCA borrar si fue autocompletado por el sistema con cliente, proyecto o referencia real
+    if (trimmed.startsWith('Cliente:') || trimmed.startsWith('Obra:') || trimmed.startsWith('REF:')) {
+      return false;
+    }
+
+    // Coincidencias con plantillas predefinidas del sistema
+    const defaultTemplatesTexts = OFICIOS_TEMPLATES.flatMap(t => [
+      t.asuntoDefault,
+      t.vocativoDefault,
+      t.antecedentesDefault,
+      t.cuerpoDefault,
+      t.fundamentacionDefault,
+      t.peticionDefault,
+      t.despedidaDefault
+    ]).filter(Boolean);
+
+    // Textos genéricos adicionales
+    const placeholdersEjemplos = [
+      'REF: Proyecto / Contrato / Expediente...',
+      'ASUNTO: COMUNICADO OFICIAL...',
+      'COMUNICADO OFICIAL DE OBRA',
+      'Sin otro particular por el momento y agradeciendo su atención, quedamos a sus órdenes.',
+      'Con fundamento en la Norma Oficial Mexicana NOM-001-SEDE-2012 y las especificaciones técnicas...',
+      '1. Autorización de acceso en el horario establecido.\n2. Liberación del área de maniobras.'
+    ];
+
+    return defaultTemplatesTexts.includes(trimmed) || placeholdersEjemplos.includes(trimmed);
+  };
+
   const handleClearOnFocus = (fieldName: string, currentVal: any, clearFn: () => void) => {
-    if (!clearedFields[fieldName] && currentVal) {
-      setClearedFields(prev => ({ ...prev, [fieldName]: true }));
+    // Si ya fue interactuado, no hacer nada
+    if (clearedFields[fieldName]) return;
+    setClearedFields(prev => ({ ...prev, [fieldName]: true }));
+
+    // SOLO borrar si coincide con un texto de ejemplo/plantilla predefinida
+    if (currentVal && isDefaultTemplateText(fieldName, currentVal)) {
       clearFn();
     }
   };
@@ -158,19 +196,31 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   const [filterTipo, setFilterTipo] = useState<string>('todos');
   const [filterEstado, setFilterEstado] = useState<'todos' | 'emitido' | 'borrador'>('todos');
 
-  // Load oficios
+  // Load oficios y firma digital precargada
   const cargarHistorialOficios = async () => {
     try {
       setLoadingOficios(true);
       const data = await adminDbService.getOficiosCompletos();
       setOficiosList(data);
-      // Auto folio si es nuevo
-      if (!oficio.id) {
-        setOficio(prev => ({
-          ...prev,
-          folio: getNextFolio(data)
-        }));
+
+      // Obtener firma digital precargada de localStorage o de los oficios previos emitidos
+      let savedSig = typeof window !== 'undefined' ? localStorage.getItem('esol_firma_digital_precargada') : null;
+      if (!savedSig && Array.isArray(data)) {
+        const oficioConFirma = data.find(o => o.firmaDigital && o.firmaDigital.startsWith('data:image'));
+        if (oficioConFirma && oficioConFirma.firmaDigital) {
+          savedSig = oficioConFirma.firmaDigital;
+          try {
+            localStorage.setItem('esol_firma_digital_precargada', savedSig);
+          } catch (e) {}
+        }
       }
+
+      setOficio(prev => ({
+        ...prev,
+        folio: prev.id ? prev.folio : getNextFolio(data),
+        firmaDigital: prev.firmaDigital || savedSig || undefined,
+        incluirFirmaDigital: prev.incluirFirmaDigital ?? true
+      }));
     } catch (e) {
       console.error('Error cargando historial de oficios:', e);
     } finally {
@@ -255,6 +305,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
     const cliente = clientes.find(c => c.id === clienteId);
     if (cliente) {
+      setClearedFields(prev => ({ ...prev, referencia: true, destinatarioEmpresa: true, destinatarioNombre: true }));
       setOficio(prev => ({
         ...prev,
         clienteFinal: cliente.nombre,
@@ -279,6 +330,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
         setSelectedClienteId(clienteCorrespondiente.id);
       }
 
+      setClearedFields(prev => ({ ...prev, referencia: true }));
       setOficio(prev => ({
         ...prev,
         presupuestoId: proy.id,
@@ -307,18 +359,21 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
   // Agregar partida al constructor de insumos
   const handleAddItem = () => {
-    if (!customDescripcion.trim() || itemCantidad <= 0) {
+    const numCantidad = typeof itemCantidad === 'string' ? (parseFloat(itemCantidad) || 0) : itemCantidad;
+    const numPrecio = typeof itemPrecio === 'string' ? (parseFloat(itemPrecio) || 0) : itemPrecio;
+
+    if (!customDescripcion.trim() || numCantidad <= 0) {
       alert('Ingresa una descripción válida y una cantidad mayor a cero.');
       return;
     }
 
-    const importe = itemCantidad * itemPrecio;
+    const importe = numCantidad * numPrecio;
     const nuevaPartida: PartidaCompra = {
       insumo_id: selectedInsumoId !== 'custom' ? selectedInsumoId : undefined,
       descripcion: customDescripcion.trim(),
       unidad: itemUnidad,
-      cantidad: itemCantidad,
-      precio_unitario: itemPrecio,
+      cantidad: numCantidad,
+      precio_unitario: numPrecio,
       importe
     };
 
@@ -337,6 +392,19 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
   const handleRemoveItem = (index: number) => {
     const updated = partidas.filter((_, i) => i !== index);
+    setPartidas(updated);
+    actualizarCuerpoConPartidas(updated);
+  };
+
+  const handleUpdatePartida = (index: number, updatedFields: Partial<PartidaCompra>) => {
+    const updated = partidas.map((p, idx) => {
+      if (idx !== index) return p;
+      const merged = { ...p, ...updatedFields };
+      const cant = Number(merged.cantidad) || 0;
+      const prec = Number(merged.precio_unitario) || 0;
+      merged.importe = cant * prec;
+      return merged;
+    });
     setPartidas(updated);
     actualizarCuerpoConPartidas(updated);
   };
@@ -386,6 +454,19 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
         customAiPrompt,
         aiNotes
       );
+
+      // Proteger todos los campos modificados por la IA para que un clic no los borre jamás
+      setClearedFields(prev => ({
+        ...prev,
+        asunto: true,
+        vocativo: true,
+        antecedentes: true,
+        cuerpo: true,
+        fundamentacion: true,
+        peticion: true,
+        despedida: true,
+        referencia: true
+      }));
 
       setOficio(prev => ({
         ...prev,
@@ -513,6 +594,63 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
     setOficio({ ...item });
     setPartidas(item.partidas || []);
     setMostrarPreciosEnPdf(item.mostrarPreciosEnPdf ?? true);
+
+    // 1. Restaurar Tipo de Trámite / Petición
+    const tramitesValidos: TipoTramitePeticion[] = [
+      'oficio_legal',
+      'solicitud_compra',
+      'orden_compra',
+      'recepcion_mercancia',
+      'solicitud_material',
+      'vale_entrega'
+    ];
+    if (item.tipoOficio && tramitesValidos.includes(item.tipoOficio as TipoTramitePeticion)) {
+      setTipoTramite(item.tipoOficio as TipoTramitePeticion);
+    } else if (item.tipoOficio === 'requisicion_insumos' as any) {
+      setTipoTramite('solicitud_compra');
+    } else {
+      setTipoTramite('oficio_legal');
+    }
+
+    // 2. Restaurar Conexión de Expediente (CRM & Proyectos)
+    // A) Cliente
+    let matchingCliente = clientes.find(c => 
+      (item.clienteFinal && c.nombre.trim().toLowerCase() === item.clienteFinal.trim().toLowerCase()) ||
+      (item.referencia && item.referencia.toLowerCase().includes(c.nombre.trim().toLowerCase()))
+    );
+    if (matchingCliente) {
+      setSelectedClienteId(matchingCliente.id);
+    } else {
+      setSelectedClienteId('');
+    }
+
+    // B) Proyecto
+    let matchingProyecto = proyectos.find(p => 
+      (item.presupuestoId && (p.id === item.presupuestoId || p.presupuesto_id === item.presupuestoId)) ||
+      (item.nombreObra && p.titulo.trim().toLowerCase() === item.nombreObra.trim().toLowerCase()) ||
+      (item.referencia && item.referencia.toLowerCase().includes(p.titulo.trim().toLowerCase()))
+    );
+    if (matchingProyecto) {
+      setSelectedProyectoId(matchingProyecto.id);
+      // Si el proyecto tiene cliente y no teníamos cliente detectado, lo asignamos
+      if (!matchingCliente && matchingProyecto.cliente_id) {
+        setSelectedClienteId(matchingProyecto.cliente_id);
+      }
+    } else {
+      setSelectedProyectoId('');
+    }
+
+    // C) Proveedor
+    let matchingProveedor = proveedores.find(pr => 
+      (item.destinatarioEmpresa && pr.nombre.trim().toLowerCase() === item.destinatarioEmpresa.trim().toLowerCase()) ||
+      (item.destinatarioNombre && pr.nombre.trim().toLowerCase() === item.destinatarioNombre.trim().toLowerCase())
+    );
+    if (matchingProveedor) {
+      setSelectedProveedorId(matchingProveedor.id);
+    } else {
+      setSelectedProveedorId('');
+    }
+
     setClearedFields({});
     setAiNotes('');
     setCustomAiPrompt('');
@@ -1298,10 +1436,20 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                       </label>
                       <input
                         type="number"
-                        min="1"
+                        min="0"
+                        step="any"
                         value={itemCantidad}
-                        onChange={(e) => setItemCantidad(Math.max(1, Number(e.target.value)))}
+                        onFocus={() => {
+                          if (itemCantidad === 0 || itemCantidad === 1 || itemCantidad === '0' || itemCantidad === '1') {
+                            setItemCantidad('');
+                          }
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setItemCantidad(val === '' ? '' : parseFloat(val));
+                        }}
                         className="w-full p-2 bg-dark-3 border border-dark-4 rounded-xl text-cream text-xs font-mono text-center focus:border-gold focus:outline-none"
+                        placeholder="1"
                       />
                     </div>
 
@@ -1312,9 +1460,17 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="any"
                         value={itemPrecio}
-                        onChange={(e) => setItemPrecio(Math.max(0, Number(e.target.value)))}
+                        onFocus={() => {
+                          if (itemPrecio === 0 || itemPrecio === '0') {
+                            setItemPrecio('');
+                          }
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setItemPrecio(val === '' ? '' : parseFloat(val));
+                        }}
                         className="w-full p-2 bg-dark-3 border border-dark-4 rounded-xl text-cream text-xs font-mono focus:border-gold focus:outline-none"
                         placeholder="0.00"
                       />
@@ -1358,21 +1514,81 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                         </thead>
                         <tbody className="divide-y divide-dark-4">
                           {partidas.map((p, idx) => (
-                            <tr key={idx} className="hover:bg-dark-3/50 transition-colors">
+                            <tr key={idx} className="hover:bg-dark-3/60 transition-colors group">
                               <td className="py-2 px-3 text-cream-dim text-center font-mono">{idx + 1}</td>
-                              <td className="py-2 px-3 font-semibold text-cream">{p.descripcion}</td>
-                              <td className="py-2 px-3 text-center font-mono text-cream-muted">{p.unidad}</td>
-                              <td className="py-2 px-3 text-center font-mono font-bold text-cream">{p.cantidad}</td>
+                              
+                              {/* Descripción editable al click */}
+                              <td className="py-1 px-2 font-semibold text-cream">
+                                <input
+                                  type="text"
+                                  value={p.descripcion}
+                                  onChange={(e) => handleUpdatePartida(idx, { descripcion: e.target.value })}
+                                  className="w-full bg-transparent hover:bg-dark-3/80 focus:bg-dark-3 px-2 py-1 rounded-lg border border-transparent hover:border-dark-4 focus:border-gold focus:outline-none transition-all text-xs font-semibold text-cream cursor-text"
+                                  title="Haz clic para editar la descripción"
+                                />
+                              </td>
+
+                              {/* Unidad editable al click */}
+                              <td className="py-1 px-2 text-center">
+                                <input
+                                  type="text"
+                                  value={p.unidad}
+                                  onChange={(e) => handleUpdatePartida(idx, { unidad: e.target.value.toUpperCase() })}
+                                  className="w-16 bg-transparent hover:bg-dark-3/80 focus:bg-dark-3 px-1 py-1 rounded-lg border border-transparent hover:border-dark-4 focus:border-gold focus:outline-none transition-all text-center font-mono text-cream-muted text-xs cursor-text"
+                                  title="Haz clic para editar la unidad"
+                                />
+                              </td>
+
+                              {/* Cantidad editable al click */}
+                              <td className="py-1 px-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={p.cantidad}
+                                  onFocus={(e) => {
+                                    if (p.cantidad === 0) e.target.select();
+                                  }}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                    handleUpdatePartida(idx, { cantidad: isNaN(val) ? 0 : val });
+                                  }}
+                                  className="w-20 bg-transparent hover:bg-dark-3/80 focus:bg-dark-3 px-1 py-1 rounded-lg border border-transparent hover:border-dark-4 focus:border-gold focus:outline-none transition-all text-center font-mono font-bold text-cream text-xs cursor-text"
+                                  title="Haz clic para editar la cantidad"
+                                />
+                              </td>
+
                               {mostrarPreciosEnPdf && (
                                 <>
-                                  <td className="py-2 px-3 text-right font-mono text-cream-muted">
-                                    ${p.precio_unitario.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {/* Precio Unitario editable al click */}
+                                  <td className="py-1 px-2 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span className="text-cream-dim text-[11px]">$</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={p.precio_unitario}
+                                        onFocus={(e) => {
+                                          if (p.precio_unitario === 0) e.target.select();
+                                        }}
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                          handleUpdatePartida(idx, { precio_unitario: isNaN(val) ? 0 : val });
+                                        }}
+                                        className="w-24 bg-transparent hover:bg-dark-3/80 focus:bg-dark-3 px-1.5 py-1 rounded-lg border border-transparent hover:border-dark-4 focus:border-gold focus:outline-none transition-all text-right font-mono text-cream-muted text-xs cursor-text"
+                                        title="Haz clic para editar el precio unitario"
+                                      />
+                                    </div>
                                   </td>
+
+                                  {/* Importe Calculado */}
                                   <td className="py-2 px-3 text-right font-mono font-bold text-emerald-400">
-                                    ${p.importe.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    ${(p.importe ?? (p.cantidad * p.precio_unitario)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </>
                               )}
+
                               <td className="py-2 px-3 text-center">
                                 <button
                                   type="button"
@@ -1386,18 +1602,29 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                             </tr>
                           ))}
                         </tbody>
-                        {mostrarPreciosEnPdf && (
-                          <tfoot>
-                            <tr className="bg-dark-3 font-bold border-t-2 border-dark-4">
-                              <td colSpan={4} className="py-2.5 px-3 text-right text-cream-dim uppercase text-[10.5px]">
-                                Total Estimado (MXN):
-                              </td>
-                              <td colSpan={2} className="py-2.5 px-3 text-right font-mono text-sm text-gold">
-                                ${partidas.reduce((acc, p) => acc + (p.importe || (p.cantidad * p.precio_unitario)), 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        )}
+                        <tfoot>
+                          <tr className="bg-dark-3 font-bold border-t-2 border-dark-4">
+                            <td colSpan={3} className="py-2.5 px-3 text-right text-cream-dim uppercase text-[10.5px]">
+                              Total Cantidad:
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-xs font-black text-gold">
+                              {partidas.reduce((acc, p) => acc + (Number(p.cantidad) || 0), 0).toLocaleString('es-MX', { maximumFractionDigits: 2 })}
+                            </td>
+                            {mostrarPreciosEnPdf ? (
+                              <>
+                                <td className="py-2.5 px-3 text-right text-cream-dim uppercase text-[10.5px]">
+                                  Total Estimado (MXN):
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono text-sm font-black text-emerald-400">
+                                  ${partidas.reduce((acc, p) => acc + (p.importe || ((Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0))), 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td></td>
+                              </>
+                            ) : (
+                              <td></td>
+                            )}
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   )}
@@ -1464,7 +1691,47 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                {oficio.firmaDigital && (
+                  <div className="flex items-center gap-2 bg-dark-2 px-2.5 py-1 rounded-xl border border-dark-4">
+                    <img
+                      src={oficio.firmaDigital}
+                      alt="Firma"
+                      className="h-6 max-w-[80px] object-contain bg-white/90 rounded px-1"
+                    />
+                    <span className="text-[10px] text-emerald-400 font-mono font-bold">Firma Lista</span>
+                  </div>
+                )}
+
+                <label className="cursor-pointer px-2.5 py-1 bg-dark-3 hover:bg-dark-4 text-cream hover:text-gold border border-dark-4 hover:border-gold/40 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition-all">
+                  <Upload className="w-3.5 h-3.5 text-gold" />
+                  <span>{oficio.firmaDigital ? 'Cambiar Firma' : 'Cargar Firma'}</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const base64 = event.target?.result as string;
+                        if (base64) {
+                          setOficio(prev => ({
+                            ...prev,
+                            firmaDigital: base64,
+                            incluirFirmaDigital: true
+                          }));
+                          try {
+                            localStorage.setItem('esol_firma_digital_precargada', base64);
+                          } catch (err) {}
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+
                 <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-cream">
                   <input
                     type="checkbox"
@@ -1472,7 +1739,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                     onChange={(e) => setOficio({ ...oficio, incluirFirmaDigital: e.target.checked })}
                     className="rounded border-dark-4 text-gold focus:ring-gold"
                   />
-                  <span>Incluir Firma Digital Autorizada</span>
+                  <span>Incluir Firma en Documento</span>
                 </label>
               </div>
             </div>
@@ -1615,7 +1882,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                         </td>
                         <td className="py-3 px-4">
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-dark-3 border border-dark-4 text-gold">
-                            {item.tipoOficio.replace('_', ' ')}
+                            {(item.tipoOficio || 'libre').replace(/_/g, ' ')}
                           </span>
                         </td>
                         <td className="py-3 px-4 font-semibold text-cream">
@@ -1631,13 +1898,22 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                           {item.destinatarioNombre} {item.destinatarioEmpresa ? `(${item.destinatarioEmpresa})` : ''}
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                            item.estado === 'emitido'
-                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                              : 'bg-dark-3 text-cream-muted border-dark-4'
-                          }`}>
-                            {item.estado === 'emitido' ? 'Emitido Oficial' : 'Borrador'}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const nuevoEstado = item.estado === 'emitido' ? 'borrador' : 'emitido';
+                              await adminDbService.actualizarEstadoOficio(item.folio || item.id || '', nuevoEstado);
+                              setOficiosList(prev => prev.map(o => (o.folio === item.folio || o.id === item.id) ? { ...o, estado: nuevoEstado } : o));
+                            }}
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border cursor-pointer hover:scale-105 transition-all ${
+                              item.estado === 'emitido'
+                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                                : 'bg-dark-3 text-cream-muted border-dark-4 hover:border-gold hover:text-gold'
+                            }`}
+                            title="Haz clic para alternar entre Emitido y Borrador"
+                          >
+                            {item.estado === 'emitido' ? '✓ Emitido Oficial' : '✎ Borrador'}
+                          </button>
                         </td>
                         <td className="py-3 px-4 text-center">
                           {item.drive_url ? (

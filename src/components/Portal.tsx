@@ -2125,8 +2125,8 @@ export function Portal() {
               {activeTab === 'sistema_administrativo' && (
                 <div className="-m-6 lg:-m-8 animate-fade-in">
                   <SistemaAdministrativoApp
-                    userRole={currentUser.role}
-                    userName={currentUser.name}
+                    userRole={currentUser?.role || 'master'}
+                    userName={currentUser?.name || 'Administrador General'}
                     onBackToPortal={() => setActiveTab('dashboard')}
                     onNavigateToOficios={(folio) => {
                       localStorage.setItem('esol_legal_active_subtab', 'oficios');

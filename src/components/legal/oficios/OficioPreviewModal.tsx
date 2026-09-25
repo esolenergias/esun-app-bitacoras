@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Download, Printer, Loader2, Sparkles, Check, Cloud, ExternalLink, FileEdit } from 'lucide-react';
+import { X, Download, Printer, Loader2, Cloud, FileEdit } from 'lucide-react';
 import type { OficioData } from './types';
 import { buildOficioHtml, generateOficioPdf } from './oficioPdfGenerator';
 
@@ -145,7 +145,7 @@ export default function OficioPreviewModal({
               ) : (
                 <>
                   <Download className="w-3.5 h-3.5" />
-                  <span>Generar PDF</span>
+                  <span>Descargar PDF</span>
                 </>
               )}
             </button>
@@ -162,7 +162,7 @@ export default function OficioPreviewModal({
 
         {/* Paper Sheet Preview Area */}
         <div className="flex-1 bg-neutral-900 overflow-y-auto p-2 md:p-6 flex justify-center custom-scrollbar">
-          <div className="bg-white text-slate-900 shadow-2xl rounded-sm overflow-hidden w-full max-w-[216mm] min-h-[279mm] border border-neutral-300">
+          <div className="bg-white text-slate-900 shadow-2xl rounded-sm overflow-hidden w-full max-w-[216mm] min-h-[279mm] border border-neutral-300 my-auto">
             <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
           </div>
         </div>

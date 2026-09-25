@@ -562,13 +562,22 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
                                 )}
                               </td>
                               <td className="py-2.5 px-3 text-center">
-                                <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase font-mono ${
-                                  of.estado === 'emitido' || !of.estado
-                                    ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
-                                    : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
-                                }`}>
-                                  {of.estado || 'emitido'}
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const nuevoEstado = of.estado === 'emitido' ? 'borrador' : 'emitido';
+                                    await adminDbService.actualizarEstadoOficio(of.folio || of.id || '', nuevoEstado);
+                                    setAllOficios(prev => prev.map(o => (o.folio === of.folio || o.id === of.id) ? { ...o, estado: nuevoEstado } : o));
+                                  }}
+                                  className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase font-mono border cursor-pointer hover:scale-105 transition-all ${
+                                    of.estado === 'emitido' || !of.estado
+                                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                                      : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                                  }`}
+                                  title="Haz clic para alternar entre Emitido y Borrador"
+                                >
+                                  {of.estado === 'borrador' ? '✎ Borrador' : '✓ Emitido'}
+                                </button>
                               </td>
                               <td className="py-2.5 px-3 text-center">
                                 <div className="flex items-center justify-center gap-1.5">

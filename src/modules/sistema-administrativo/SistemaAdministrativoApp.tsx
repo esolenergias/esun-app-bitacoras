@@ -216,11 +216,11 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
 
             <div className="flex items-center gap-2 pl-2 border-l border-dark-4 text-xs">
               <div className="w-7 h-7 rounded-full bg-gold/20 text-gold border border-gold/30 flex items-center justify-center font-bold text-xs">
-                {userName.charAt(0)}
+                {(userName || 'A').charAt(0).toUpperCase()}
               </div>
               <div className="hidden sm:block text-left">
-                <div className="font-bold text-cream text-xs leading-none">{userName}</div>
-                <div className="text-[9px] text-gold uppercase font-mono mt-0.5">{userRole}</div>
+                <div className="font-bold text-cream text-xs leading-none">{userName || 'Administrador General'}</div>
+                <div className="text-[9px] text-gold uppercase font-mono mt-0.5">{userRole || 'master'}</div>
               </div>
             </div>
           </div>
