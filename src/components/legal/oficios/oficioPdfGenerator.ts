@@ -65,22 +65,31 @@ export function buildOficioHtml(oficio: OficioData): string {
 
   return `
     <style>
+      *, *:before, *:after {
+        box-sizing: border-box !important;
+      }
       .oficio-sheet {
-        width: 7.7in;
-        min-height: 10in;
-        box-sizing: border-box;
+        width: 7.5in !important;
+        max-width: 7.5in !important;
+        min-height: 9.8in;
+        box-sizing: border-box !important;
         background-color: #ffffff;
         color: #0f172a;
-        padding: 0;
-        margin: 0 auto;
+        padding: 0 6px !important;
+        margin: 0 auto !important;
         font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         position: relative;
         line-height: 1.4;
+        overflow-x: hidden !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
       }
       .oficio-firma-block {
         page-break-inside: avoid !important;
         break-inside: avoid-page !important;
-        margin-top: 30px;
+        margin-top: 24px;
+        width: 100% !important;
+        box-sizing: border-box !important;
       }
       tr {
         page-break-inside: avoid !important;
@@ -98,6 +107,7 @@ export function buildOficioHtml(oficio: OficioData): string {
         }
         .oficio-sheet {
           width: 100% !important;
+          max-width: 100% !important;
           min-height: auto !important;
           padding: 0 !important;
           margin: 0 !important;
@@ -106,30 +116,30 @@ export function buildOficioHtml(oficio: OficioData): string {
       }
     </style>
     <div class="oficio-sheet">
-      <div>
+      <div style="width: 100%; box-sizing: border-box;">
         <!-- Membrete Oficial -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d4af37; padding-bottom: 10px; margin-bottom: 14px;">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <img src="${logoUrl}" alt="ESOL Energias" style="max-height: 48px; width: auto; display: block;" onerror="this.style.display='none'" crossOrigin="anonymous" />
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d4af37; padding-bottom: 10px; margin-bottom: 14px; width: 100%; box-sizing: border-box;">
+          <div style="display: flex; align-items: center; gap: 10px; max-width: 60%; box-sizing: border-box;">
+            <img src="${logoUrl}" alt="ESOL Energias" style="max-height: 46px; width: auto; display: block;" onerror="this.style.display='none'" crossOrigin="anonymous" />
             <div>
-              <div style="font-family: 'Cinzel', 'Times New Roman', serif; font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: 1px;">ESOL ENERGIAS</div>
-              <div style="font-size: 9px; text-transform: uppercase; color: #d4af37; font-weight: 700; letter-spacing: 1.5px;">Ingeniería & Soluciones Fotovoltaicas</div>
+              <div style="font-family: 'Cinzel', 'Times New Roman', serif; font-size: 14.5px; font-weight: 700; color: #0f172a; letter-spacing: 0.8px;">ESOL ENERGIAS</div>
+              <div style="font-size: 8.5px; text-transform: uppercase; color: #d4af37; font-weight: 700; letter-spacing: 1.2px;">Ingeniería & Soluciones Fotovoltaicas</div>
             </div>
           </div>
-          <div style="text-align: right;">
-            <div style="display: inline-block; background: #0f172a; color: #d4af37; font-family: monospace; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 4px; border: 1px solid #d4af37; letter-spacing: 0.5px;">OFICIO No. ${oficio.folio || 'OF-ESOL-2026-001'}</div>
-            <div style="font-size: 10px; color: #475569; margin-top: 4px; font-weight: 500;">${fechaCompleta}</div>
+          <div style="text-align: right; max-width: 40%; box-sizing: border-box;">
+            <div style="display: inline-block; background: #0f172a; color: #d4af37; font-family: monospace; font-weight: 700; font-size: 10.5px; padding: 4px 8px; border-radius: 4px; border: 1px solid #d4af37; letter-spacing: 0.5px; white-space: nowrap;">OFICIO No. ${oficio.folio || 'OF-ESOL-2026-001'}</div>
+            <div style="font-size: 9.5px; color: #475569; margin-top: 4px; font-weight: 500;">${fechaCompleta}</div>
           </div>
         </div>
 
         <!-- 1. TÍTULO / ASUNTO Y REFERENCIA DE OBRA (PRIMERO) -->
         ${safeTrim(oficio.asunto) || safeTrim(oficio.referencia) || safeTrim(oficio.nombreObra) ? `
-          <div style="background: #f1f5f9; border-left: 3px solid #d4af37; padding: 8px 12px; margin-bottom: 14px;">
+          <div style="background: #f1f5f9; border-left: 3px solid #d4af37; padding: 8px 12px; margin-bottom: 14px; width: 100%; box-sizing: border-box; word-break: break-word; overflow-wrap: break-word;">
             ${safeTrim(oficio.asunto) ? `
-              <p style="font-size: 11.5px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin: 0;">${safeStr(oficio.asunto)}</p>
+              <p style="font-size: 11.5px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin: 0; line-height: 1.35;">${safeStr(oficio.asunto)}</p>
             ` : ''}
             ${safeTrim(oficio.referencia) || safeTrim(oficio.nombreObra) ? `
-              <p style="font-size: 9.5px; color: #64748b; margin: 3px 0 0 0; font-weight: 600;">
+              <p style="font-size: 9.5px; color: #64748b; margin: 4px 0 0 0; font-weight: 600; line-height: 1.35;">
                 ${safeTrim(oficio.referencia) ? safeStr(oficio.referencia) : `<strong>REF. OBRA:</strong> ${safeStr(oficio.nombreObra)} ${oficio.clienteFinal ? `| Cliente: ${safeStr(oficio.clienteFinal)}` : ''} ${oficio.ubicacionObra ? `| Ubicación: ${safeStr(oficio.ubicacionObra)}` : ''}`}
               </p>
             ` : ''}
@@ -137,7 +147,7 @@ export function buildOficioHtml(oficio: OficioData): string {
         ` : ''}
 
         <!-- 2 Espacios de separación antes de indicar a quién va dirigido -->
-        <div style="height: 24px;"></div>
+        <div style="height: 18px;"></div>
 
         <!-- 2. DESTINATARIO (DESPUÉS DEL TÍTULO) -->
         <div style="margin-bottom: 14px; background: #f8fafc; border-left: 3px solid #0f172a; padding: 8px 12px; border-radius: 0 6px 6px 0;">
@@ -170,17 +180,17 @@ export function buildOficioHtml(oficio: OficioData): string {
           const mostrarPrecios = oficio.mostrarPreciosEnPdf ?? true;
           const totalImporte = oficio.partidas.reduce((acc, p) => acc + (p.importe ?? ((p.cantidad || 0) * (p.precio_unitario || 0))), 0);
           return `
-            <div class="oficio-partidas-block" style="margin: 12px 0 16px 0; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 9.5px; text-align: left;">
+            <div class="oficio-partidas-block" style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 12px 0 16px 0; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden;">
+              <table style="width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 9px; text-align: left; box-sizing: border-box;">
                 <thead>
                   <tr style="background-color: #0f172a; color: #ffffff; page-break-inside: avoid; break-inside: avoid-page;">
-                    <th style="padding: 6px 8px; border: 1px solid #334155; width: 28px; text-align: center;">#</th>
-                    <th style="padding: 6px 8px; border: 1px solid #334155;">DESCRIPCIÓN / CONCEPTO</th>
-                    <th style="padding: 6px 8px; border: 1px solid #334155; width: 55px; text-align: center;">UNIDAD</th>
-                    <th style="padding: 6px 8px; border: 1px solid #334155; width: 50px; text-align: center;">CANT.</th>
+                    <th style="padding: 5px 4px; border: 1px solid #334155; width: 6%; text-align: center; box-sizing: border-box;">#</th>
+                    <th style="padding: 5px 6px; border: 1px solid #334155; width: ${mostrarPrecios ? '44%' : '64%'}; text-align: left; box-sizing: border-box; word-break: break-word; overflow-wrap: break-word;">DESCRIPCIÓN / CONCEPTO</th>
+                    <th style="padding: 5px 4px; border: 1px solid #334155; width: ${mostrarPrecios ? '12%' : '15%'}; text-align: center; box-sizing: border-box;">UNIDAD</th>
+                    <th style="padding: 5px 4px; border: 1px solid #334155; width: ${mostrarPrecios ? '10%' : '15%'}; text-align: center; box-sizing: border-box;">CANT.</th>
                     ${mostrarPrecios ? `
-                      <th style="padding: 6px 8px; border: 1px solid #334155; width: 80px; text-align: right;">P. UNITARIO</th>
-                      <th style="padding: 6px 8px; border: 1px solid #334155; width: 85px; text-align: right;">IMPORTE</th>
+                      <th style="padding: 5px 4px; border: 1px solid #334155; width: 13%; text-align: right; box-sizing: border-box;">P. UNITARIO</th>
+                      <th style="padding: 5px 6px; border: 1px solid #334155; width: 15%; text-align: right; box-sizing: border-box;">IMPORTE</th>
                     ` : ''}
                   </tr>
                 </thead>
@@ -191,23 +201,23 @@ export function buildOficioHtml(oficio: OficioData): string {
                     const imp = Number(item.importe ?? (item.cantidad * pu));
                     return `
                       <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e2e8f0; page-break-inside: avoid; break-inside: avoid-page;">
-                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: center; color: #64748b; font-weight: 600;">${idx + 1}</td>
-                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 600;">${safeStr(item.descripcion)}</td>
-                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: center; color: #475569; font-family: monospace;">${safeStr(item.unidad || 'PZA')}</td>
-                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: center; color: #0f172a; font-weight: 700; font-family: monospace;">${item.cantidad}</td>
+                        <td style="padding: 5px 4px; border: 1px solid #cbd5e1; text-align: center; color: #64748b; font-weight: 600; box-sizing: border-box;">${idx + 1}</td>
+                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 600; box-sizing: border-box; word-break: break-word; overflow-wrap: break-word; white-space: normal;">${safeStr(item.descripcion)}</td>
+                        <td style="padding: 5px 4px; border: 1px solid #cbd5e1; text-align: center; color: #475569; font-family: monospace; box-sizing: border-box;">${safeStr(item.unidad || 'PZA')}</td>
+                        <td style="padding: 5px 4px; border: 1px solid #cbd5e1; text-align: center; color: #0f172a; font-weight: 700; font-family: monospace; box-sizing: border-box;">${item.cantidad}</td>
                         ${mostrarPrecios ? `
-                          <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: right; color: #475569; font-family: monospace;">$${pu.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: right; color: #0f172a; font-weight: 700; font-family: monospace;">$${imp.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td style="padding: 5px 4px; border: 1px solid #cbd5e1; text-align: right; color: #475569; font-family: monospace; font-size: 8.5px; box-sizing: border-box; white-space: nowrap;">$${pu.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td style="padding: 5px 6px; border: 1px solid #cbd5e1; text-align: right; color: #0f172a; font-weight: 700; font-family: monospace; font-size: 8.5px; box-sizing: border-box; white-space: nowrap;">$${imp.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         ` : ''}
                       </tr>
                     `;
                   }).join('')}
                   <tr style="background-color: #f1f5f9; font-weight: 700; border-top: 2px solid #94a3b8; page-break-inside: avoid; break-inside: avoid-page;">
-                    <td colspan="3" style="padding: 6px 10px; border: 1px solid #cbd5e1; text-align: right; color: #0f172a; font-size: 9.5px;">TOTAL CANTIDAD:</td>
-                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; color: #0f172a; font-size: 10px; font-family: monospace; font-weight: 800;">${oficio.partidas.reduce((acc, p) => acc + (Number(p.cantidad) || 0), 0).toLocaleString('es-MX', { maximumFractionDigits: 2 })}</td>
+                    <td colspan="3" style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right; color: #0f172a; font-size: 9px; box-sizing: border-box;">TOTAL CANTIDAD:</td>
+                    <td style="padding: 6px 4px; border: 1px solid #cbd5e1; text-align: center; color: #0f172a; font-size: 9.5px; font-family: monospace; font-weight: 800; box-sizing: border-box;">${oficio.partidas.reduce((acc, p) => acc + (Number(p.cantidad) || 0), 0).toLocaleString('es-MX', { maximumFractionDigits: 2 })}</td>
                     ${mostrarPrecios ? `
-                      <td style="padding: 6px 10px; border: 1px solid #cbd5e1; text-align: right; color: #0f172a; font-size: 9.5px;">TOTAL (MXN):</td>
-                      <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right; color: #d4af37; font-size: 10.5px; font-family: monospace; font-weight: 800; background-color: #0f172a;">$${totalImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td style="padding: 6px 4px; border: 1px solid #cbd5e1; text-align: right; color: #0f172a; font-size: 9px; box-sizing: border-box;">TOTAL (MXN):</td>
+                      <td style="padding: 6px 6px; border: 1px solid #cbd5e1; text-align: right; color: #d4af37; font-size: 9.5px; font-family: monospace; font-weight: 800; background-color: #0f172a; box-sizing: border-box; white-space: nowrap;">$${totalImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     ` : ''}
                   </tr>
                 </tbody>
@@ -247,10 +257,10 @@ export function buildOficioHtml(oficio: OficioData): string {
       </div>
 
       <!-- Firmas y Acuse de Recibo (Sin anexos redundantes) -->
-      <div class="oficio-firma-block" style="page-break-inside: avoid; break-inside: avoid-page; margin-top: 20px; padding-top: 8px;">
-        <div style="display: flex; justify-content: space-between; page-break-inside: avoid; break-inside: avoid-page; align-items: flex-end;">
+      <div class="oficio-firma-block" style="page-break-inside: avoid; break-inside: avoid-page; margin-top: 20px; padding-top: 8px; width: 100%; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-between; page-break-inside: avoid; break-inside: avoid-page; align-items: flex-end; width: 100%; box-sizing: border-box; gap: 16px;">
           <!-- Columna Emisor ESOL -->
-          <div style="width: 45%; text-align: center; position: relative;">
+          <div style="width: 48%; text-align: center; position: relative; box-sizing: border-box;">
             <div style="font-size: 9.5px; font-weight: 700; color: #0f172a; letter-spacing: 0.5px; margin-bottom: 2px;">
               ATENTAMENTE
             </div>
@@ -263,7 +273,7 @@ export function buildOficioHtml(oficio: OficioData): string {
                 const firmaFinal = oficio.firmaDigital || storedSig;
                 const debeIncluir = oficio.incluirFirmaDigital ?? true;
                 if (debeIncluir && firmaFinal) {
-                  return `<img src="${firmaFinal}" alt="Firma Digital" style="max-height: 80px; max-width: 260px; width: auto; object-fit: contain; margin-bottom: -14px; position: relative; z-index: 10; display: block;" onerror="this.style.display='none'" crossOrigin="anonymous" />`;
+                  return `<img src="${firmaFinal}" alt="Firma Digital" style="max-height: 80px; max-width: 250px; width: auto; object-fit: contain; margin-bottom: -14px; position: relative; z-index: 10; display: block;" onerror="this.style.display='none'" crossOrigin="anonymous" />`;
                 }
                 return '';
               })()}
@@ -275,8 +285,8 @@ export function buildOficioHtml(oficio: OficioData): string {
           </div>
 
           <!-- Columna Acuse / Recepción Destinatario -->
-          <div style="width: 45%; text-align: center;">
-            <div style="border: 1px dashed #94a3b8; border-radius: 6px; padding: 8px 10px; background: #f8fafc; height: 110px; display: flex; flex-direction: column; justify-content: space-between; text-align: left; font-size: 8px; color: #64748b; box-sizing: border-box;">
+          <div style="width: 48%; text-align: center; box-sizing: border-box;">
+            <div style="border: 1px dashed #94a3b8; border-radius: 6px; padding: 8px 8px; background: #f8fafc; height: 110px; display: flex; flex-direction: column; justify-content: space-between; text-align: left; font-size: 8px; color: #64748b; box-sizing: border-box; width: 100%;">
               <div style="font-weight: 700; color: #0f172a; text-align: center; border-bottom: 1px dashed #cbd5e1; padding-bottom: 2px; font-size: 8.5px;">
                 ACUSE DE RECIBIDO
               </div>
@@ -293,12 +303,12 @@ export function buildOficioHtml(oficio: OficioData): string {
         </div>
 
         <!-- Footer Institucional (Sin RFC) -->
-        <div style="border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 18px; margin-bottom: 25px; display: flex; justify-content: space-between; font-size: 8px; color: #64748b; line-height: 1.35;">
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 18px; margin-bottom: 20px; display: flex; justify-content: space-between; font-size: 8px; color: #64748b; line-height: 1.35; width: 100%; box-sizing: border-box; gap: 12px;">
           <div>
             <strong>${oficio.empresaRazonSocial || 'ESOL ENERGIAS'}</strong><br/>
             ${oficio.empresaDomicilio || 'Tepic, Nayarit, México'}
           </div>
-          <div style="text-align: right;">
+          <div style="text-align: right; box-sizing: border-box;">
             Tel: ${oficio.empresaTelefono || '3112343034'} | Email: ${oficio.empresaEmail || 'contacto@esolenergias.com'}<br/>
             <span style="font-family: monospace; color: #d4af37;">SISTEMA OFICIAL DE CONTROL DE OBRA ESOL</span>
           </div>
@@ -376,7 +386,10 @@ export async function generateOficioPdfBlob(oficio: OficioData): Promise<Blob> {
   container.style.position = 'fixed';
   container.style.top = '-10000px';
   container.style.left = '-10000px';
-  container.style.width = '8.5in';
+  container.style.width = '7.5in';
+  container.style.boxSizing = 'border-box';
+  container.style.padding = '0';
+  container.style.margin = '0';
   container.style.zIndex = '-9999';
   container.style.opacity = '1';
   container.innerHTML = buildOficioHtml(oficio);
@@ -385,7 +398,7 @@ export async function generateOficioPdfBlob(oficio: OficioData): Promise<Blob> {
   const elementToRender = container.querySelector('.oficio-sheet') as HTMLElement || container;
 
   const opt = {
-    margin: [0.4, 0.45, 0.4, 0.45], // Margen estándar carta en pulgadas
+    margin: [0.4, 0.4, 0.4, 0.4], // Margen equilibrado estándar carta en pulgadas
     filename: filename,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { 
@@ -393,7 +406,9 @@ export async function generateOficioPdfBlob(oficio: OficioData): Promise<Blob> {
       useCORS: true, 
       allowTaint: true, 
       backgroundColor: '#FFFFFF',
-      logging: false
+      logging: false,
+      scrollX: 0,
+      scrollY: 0
     },
     jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
     pagebreak: { 
@@ -407,6 +422,22 @@ export async function generateOficioPdfBlob(oficio: OficioData): Promise<Blob> {
       html2pdf()
         .set(opt)
         .from(elementToRender)
+        .toPdf()
+        .get('pdf')
+        .then((pdf: any) => {
+          const totalPages = pdf.internal.getNumberOfPages();
+          for (let i = 1; i <= totalPages; i++) {
+            pdf.setPage(i);
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 116, 139);
+            // Numeración a la derecha en el margen inferior de la hoja carta
+            pdf.text(`Página ${i} de ${totalPages}`, 8.5 - 0.45, 11 - 0.22, { align: 'right' });
+            // Folio institucional al lado izquierdo
+            if (oficio.folio) {
+              pdf.text(`Folio: ${oficio.folio}`, 0.45, 11 - 0.22);
+            }
+          }
+        })
         .outputPdf('blob')
         .then((blob: Blob) => {
           resolve(blob);

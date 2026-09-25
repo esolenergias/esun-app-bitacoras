@@ -1970,7 +1970,11 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
         <OficioPreviewModal
           isOpen={isPreviewOpen}
           onClose={() => setIsPreviewOpen(false)}
-          oficio={oficio}
+          oficio={{
+            ...oficio,
+            partidas,
+            mostrarPreciosEnPdf
+          }}
         />
       )}
     </div>
