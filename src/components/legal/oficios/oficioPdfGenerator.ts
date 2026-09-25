@@ -68,14 +68,18 @@ export function buildOficioHtml(oficio: OficioData): string {
         </div>
 
         <!-- 1. TÍTULO / ASUNTO Y REFERENCIA DE OBRA (PRIMERO) -->
-        <div style="background: #f1f5f9; border-left: 3px solid #d4af37; padding: 8px 12px; margin-bottom: 14px;">
-          <p style="font-size: 11.5px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin: 0;">${oficio.asunto || 'ASUNTO: COMUNICADO OFICIAL DE OBRA'}</p>
-          ${oficio.referencia || oficio.nombreObra ? `
-            <p style="font-size: 9.5px; color: #64748b; margin: 3px 0 0 0; font-weight: 600;">
-              <strong>REF. OBRA:</strong> ${oficio.nombreObra || ''} ${oficio.clienteFinal ? `| Cliente: ${oficio.clienteFinal}` : ''} ${oficio.ubicacionObra ? `| Ubicación: ${oficio.ubicacionObra}` : ''}
-            </p>
-          ` : ''}
-        </div>
+        ${(oficio.asunto && oficio.asunto.trim()) || (oficio.referencia && oficio.referencia.trim()) || (oficio.nombreObra && oficio.nombreObra.trim()) ? `
+          <div style="background: #f1f5f9; border-left: 3px solid #d4af37; padding: 8px 12px; margin-bottom: 14px;">
+            ${oficio.asunto && oficio.asunto.trim() ? `
+              <p style="font-size: 11.5px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin: 0;">${oficio.asunto}</p>
+            ` : ''}
+            ${(oficio.referencia && oficio.referencia.trim()) || (oficio.nombreObra && oficio.nombreObra.trim()) ? `
+              <p style="font-size: 9.5px; color: #64748b; margin: 3px 0 0 0; font-weight: 600;">
+                ${oficio.referencia && oficio.referencia.trim() ? oficio.referencia : `<strong>REF. OBRA:</strong> ${oficio.nombreObra || ''} ${oficio.clienteFinal ? `| Cliente: ${oficio.clienteFinal}` : ''} ${oficio.ubicacionObra ? `| Ubicación: ${oficio.ubicacionObra}` : ''}`}
+              </p>
+            ` : ''}
+          </div>
+        ` : ''}
 
         <!-- 2 Espacios de separación antes de indicar a quién va dirigido -->
         <div style="height: 24px;"></div>
@@ -90,22 +94,24 @@ export function buildOficioHtml(oficio: OficioData): string {
         </div>
 
         <!-- Vocativo -->
-        ${oficio.vocativo ? `<div style="font-size: 11px; font-weight: 600; color: #1e293b; margin-bottom: 10px; font-style: italic;">${oficio.vocativo}</div>` : ''}
+        ${oficio.vocativo && oficio.vocativo.trim() ? `<div style="font-size: 11px; font-weight: 600; color: #1e293b; margin-bottom: 10px; font-style: italic;">${oficio.vocativo}</div>` : ''}
 
         <!-- Antecedentes si existen -->
-        ${oficio.antecedentes ? `
+        ${oficio.antecedentes && oficio.antecedentes.trim() ? `
           <div style="margin-bottom: 10px;">
             ${formatTextToParagraphs(oficio.antecedentes)}
           </div>
         ` : ''}
 
         <!-- Cuerpo Principal -->
-        <div style="margin-bottom: 12px;">
-          ${formatTextToParagraphs(oficio.cuerpo)}
-        </div>
+        ${oficio.cuerpo && oficio.cuerpo.trim() ? `
+          <div style="margin-bottom: 12px;">
+            ${formatTextToParagraphs(oficio.cuerpo)}
+          </div>
+        ` : ''}
 
         <!-- Fundamentación Técnica / Normativa si existe -->
-        ${oficio.fundamentacion ? `
+        ${oficio.fundamentacion && oficio.fundamentacion.trim() ? `
           <div style="background: #fdfbf7; border: 1px solid #fef3c7; border-left: 3px solid #d4af37; padding: 10px 14px; border-radius: 4px; margin: 12px 0;">
             <div style="margin-bottom: 6px;">
               <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #d4af37; background-color: #0f172a; padding: 4px 12px; border-radius: 4px; display: inline-block; line-height: 1.4; vertical-align: middle; box-sizing: border-box;">FUNDAMENTACIÓN TÉCNICA Y NORMATIVA</span>
@@ -117,7 +123,7 @@ export function buildOficioHtml(oficio: OficioData): string {
         ` : ''}
 
         <!-- Petición / Acuerdos si existen -->
-        ${oficio.peticion ? `
+        ${oficio.peticion && oficio.peticion.trim() ? `
           <div style="margin-top: 12px; margin-bottom: 10px;">
             <div style="margin-bottom: 6px;">
               <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #d4af37; background-color: #0f172a; padding: 4px 12px; border-radius: 4px; display: inline-block; line-height: 1.4; vertical-align: middle; box-sizing: border-box;">PETICIÓN Y REQUERIMIENTOS PUNTUALES</span>
@@ -127,9 +133,11 @@ export function buildOficioHtml(oficio: OficioData): string {
         ` : ''}
 
         <!-- Despedida -->
-        <div style="margin-top: 12px;">
-          ${formatTextToParagraphs(oficio.despedida || 'Sin otro particular por el momento, nos reiteramos a sus respetables órdenes para cualquier aclaración.')}
-        </div>
+        ${oficio.despedida && oficio.despedida.trim() ? `
+          <div style="margin-top: 12px;">
+            ${formatTextToParagraphs(oficio.despedida)}
+          </div>
+        ` : ''}
       </div>
 
       <!-- Firmas y Acuse de Recibo (Sin anexos redundantes) -->

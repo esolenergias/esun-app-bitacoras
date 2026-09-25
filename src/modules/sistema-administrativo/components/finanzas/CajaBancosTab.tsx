@@ -145,7 +145,7 @@ export const CajaBancosTab: React.FC<CajaBancosTabProps> = ({
                     </p>
                   )}
                 </div>
-                <div className={`p-2.5 rounded-xl ${isBanco ? 'bg-white/10 text-blue-300' : isCajaChica ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <div className={`p-2.5 rounded-xl border ${isBanco ? 'bg-gold/10 text-gold border-gold/30' : isCajaChica ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}>
                   {isBanco ? <Landmark className="w-5 h-5" /> : isCajaChica ? <Wallet className="w-5 h-5" /> : <DollarSign className="w-5 h-5" />}
                 </div>
               </div>

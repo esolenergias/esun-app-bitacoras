@@ -65,7 +65,7 @@ export const InventarioKardexTab: React.FC<InventarioKardexTabProps> = ({
           <button
             onClick={() => setSubTab('existencias')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              subTab === 'existencias' ? 'bg-white text-gold shadow-sm' : 'text-cream-muted hover:text-cream'
+              subTab === 'existencias' ? 'bg-dark-1 text-gold border border-gold/40 shadow-sm' : 'text-cream-muted hover:text-cream'
             }`}
           >
             <Package className="w-3.5 h-3.5" />
@@ -74,7 +74,7 @@ export const InventarioKardexTab: React.FC<InventarioKardexTabProps> = ({
           <button
             onClick={() => setSubTab('kardex')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              subTab === 'kardex' ? 'bg-white text-gold shadow-sm' : 'text-cream-muted hover:text-cream'
+              subTab === 'kardex' ? 'bg-dark-1 text-gold border border-gold/40 shadow-sm' : 'text-cream-muted hover:text-cream'
             }`}
           >
             <History className="w-3.5 h-3.5" />

@@ -4,6 +4,7 @@
 
 export type AdminTabType =
   | 'resumen'
+  | 'oficios_central'
   | 'solicitudes_compra'
   | 'ordenes_compra'
   | 'recepciones'
@@ -75,6 +76,8 @@ export interface SolicitudCompra {
   id: string;
   folio: string; // SC-ESOL-2026-001
   fecha: string;
+  cliente_id?: string;
+  cliente_nombre?: string;
   proyecto_id?: string;
   proyecto_nombre?: string;
   solicitante_nombre: string;
@@ -85,6 +88,8 @@ export interface SolicitudCompra {
   autorizado_por?: string;
   fecha_autorizacion?: string;
   orden_compra_id?: string;
+  folio_oficio?: string;
+  pdf_url?: string;
   created_at?: string;
 }
 
@@ -99,6 +104,8 @@ export interface OrdenCompra {
   folio_solicitud?: string;
   proveedor_id: string;
   proveedor_nombre: string;
+  cliente_id?: string;
+  cliente_nombre?: string;
   proyecto_id?: string;
   proyecto_nombre?: string;
   condicion_pago: 'contado' | 'credito';
@@ -111,6 +118,8 @@ export interface OrdenCompra {
   total: number;
   estatus: 'emitida' | 'aprobada' | 'recibida_parcial' | 'recibida_total' | 'cancelada';
   notas?: string;
+  folio_oficio?: string;
+  pdf_url?: string;
   created_at?: string;
 }
 
@@ -136,6 +145,10 @@ export interface RecepcionMercancia {
   folio_oc: string;
   proveedor_id?: string;
   proveedor_nombre: string;
+  cliente_id?: string;
+  cliente_nombre?: string;
+  proyecto_id?: string;
+  proyecto_nombre?: string;
   numero_factura?: string;
   numero_remision?: string;
   recibido_por: string;
@@ -143,6 +156,8 @@ export interface RecepcionMercancia {
   estatus: 'completa' | 'parcial' | 'rechazada';
   conforme: boolean;
   observaciones?: string;
+  folio_oficio?: string;
+  pdf_url?: string;
   created_at?: string;
 }
 
@@ -192,6 +207,8 @@ export interface SolicitudMaterial {
   id: string;
   folio: string; // SM-ESOL-2026-001
   fecha_solicitud: string;
+  cliente_id?: string;
+  cliente_nombre?: string;
   proyecto_id: string;
   proyecto_nombre: string;
   solicitante_nombre: string;
@@ -200,6 +217,8 @@ export interface SolicitudMaterial {
   estatus: 'pendiente' | 'aprobada' | 'rechazada' | 'entregada';
   autorizado_por?: string;
   fecha_autorizacion?: string;
+  folio_oficio?: string;
+  pdf_url?: string;
   created_at?: string;
 }
 
@@ -219,6 +238,8 @@ export interface ValeEntrega {
   id: string;
   folio: string; // VE-ESOL-2026-001
   fecha_entrega: string;
+  cliente_id?: string;
+  cliente_nombre?: string;
   solicitud_material_id: string;
   folio_solicitud: string;
   proyecto_id: string;
@@ -230,6 +251,8 @@ export interface ValeEntrega {
   estatus: 'entregado' | 'cancelado';
   notas?: string;
   firma_digital_recibido?: string;
+  folio_oficio?: string;
+  pdf_url?: string;
   created_at?: string;
 }
 

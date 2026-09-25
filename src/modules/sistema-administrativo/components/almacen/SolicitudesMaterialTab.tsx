@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { SolicitudMaterial, ProyectoReal, InsumoReal } from '../../types/adminTypes';
+import type { OficioData } from '../../../components/legal/oficios/types';
 import { adminDbService } from '../../services/adminDbService';
+import { OficioErpModal } from '../oficios/OficioErpModal';
 import { 
   ClipboardCheck, Plus, CheckCircle, XCircle, Clock, Search, FileText, 
   Send, AlertCircle, Eye, ArrowRight, UserCheck 
@@ -31,6 +33,8 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
   const [filterStatus, setFilterStatus] = useState<'todas' | 'pendiente' | 'aprobada' | 'rechazada' | 'entregada'>('todas');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSolicitud, setSelectedSolicitud] = useState<SolicitudMaterial | null>(null);
+  const [selectedOficio, setSelectedOficio] = useState<OficioData | null>(null);
+  const [isOficioOpen, setIsOficioOpen] = useState(false);
 
   // Form State
   const [selectedProyectoId, setSelectedProyectoId] = useState('');
@@ -274,10 +278,22 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => setSelectedSolicitud(sol)}
-                          className="p-1.5 text-cream-muted hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                          className="p-1.5 text-cream-muted hover:text-gold hover:bg-gold/10 rounded-lg transition-colors"
                           title="Ver Detalle"
                         >
                           <Eye className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const ofc = adminDbService.generarOficioSM(sol);
+                            setSelectedOficio(ofc);
+                            setIsOficioOpen(true);
+                          }}
+                          className="p-1.5 text-gold hover:text-gold-light hover:bg-gold/15 rounded-lg transition-colors border border-gold/30"
+                          title="Emitir / Ver Solicitud Formal a Obra"
+                        >
+                          <FileText className="w-4 h-4" />
                         </button>
 
                         {/* Autorizacion rapida para Master/Admin */}
@@ -573,6 +589,18 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
 
             <div className="p-4 border-t border-dark-4/50 flex justify-between bg-dark-3/50">
               <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const ofc = adminDbService.generarOficioSM(selectedSolicitud);
+                    setSelectedOficio(ofc);
+                    setIsOficioOpen(true);
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-gold bg-gold/15 hover:bg-gold/25 border border-gold/40 rounded-xl flex items-center gap-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Emitir / Ver Oficio</span>
+                </button>
+
                 {isMasterOrAdmin && selectedSolicitud.estatus === 'pendiente' && (
                   <>
                     <button
@@ -600,6 +628,15 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Embebido de Oficio Formal */}
+      <OficioErpModal
+        isOpen={isOficioOpen}
+        onClose={() => setIsOficioOpen(false)}
+        oficio={selectedOficio}
+        userRole={userRole}
+        onSaveOficio={(updated) => adminDbService.guardarOficioErp(updated)}
+      />
     </div>
   );
 };

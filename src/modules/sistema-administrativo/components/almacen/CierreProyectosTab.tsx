@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import type { ProyectoReal, ValeEntrega, SolicitudMaterial } from '../../types/adminTypes';
+import type { ProyectoReal, ValeEntrega, SolicitudMaterial, OficioData } from '../../types/adminTypes';
 import { adminDbService } from '../../services/adminDbService';
+import { OficioErpModal } from '../oficios/OficioErpModal';
 import { 
   FolderCheck, CheckCircle2, DollarSign, TrendingUp, TrendingDown, FileText, 
   Search, ShieldCheck, PieChart, ArrowUpRight, CheckCircle
@@ -25,6 +26,7 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProyecto, setSelectedProyecto] = useState<ProyectoReal | null>(null);
+  const [selectedOficio, setSelectedOficio] = useState<OficioData | null>(null);
   const [actaObservaciones, setActaObservaciones] = useState('');
 
   // Proyectos calculados
@@ -51,22 +53,13 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
     };
   });
 
-  const handleEmitirCierre = async (proyecto: typeof proyectosConAuditoria[0]) => {
-    if (onNavigateToOficios) {
-      const oficio = await adminDbService.crearOficioDesdeSolicitud({
-        tipo: 'entrega',
-        folio_referencia: `CIERRE-${proyecto.folio || proyecto.id.slice(0, 8)}`,
-        destinatario: proyecto.cliente_nombre,
-        asunto: `Acta de Entrega-Recepción y Cierre de Proyecto: ${proyecto.titulo}`,
-        cuerpo: `Por medio de la presente se formaliza la entrega a entera satisfacción del proyecto "${proyecto.titulo}" para el cliente ${proyecto.cliente_nombre}.\n\nSe declara concluida la instalación técnica de los componentes y sistemas solares, garantizando su correcta operación.\n\nObservaciones de cierre: ${actaObservaciones || 'Sin observaciones pendientes.'}`,
-        solicitante_nombre: userName
-      });
-      setSelectedProyecto(null);
-      onNavigateToOficios(oficio.folio);
-    } else {
-      alert(`Proyecto ${proyecto.titulo} auditado exitosamente.`);
-      setSelectedProyecto(null);
+  const handleEmitirCierre = (proyecto: ProyectoReal, observacionesExtra?: string) => {
+    const oficio = adminDbService.generarOficioCierre(proyecto);
+    if (observacionesExtra) {
+      oficio.cuerpo += `\n\nOBSERVACIONES ADICIONALES DE CIERRE:\n${observacionesExtra}`;
     }
+    setSelectedOficio(oficio);
+    setSelectedProyecto(null);
   };
 
   const filteredProyectos = proyectosConAuditoria.filter(p => {
@@ -134,7 +127,6 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
               </thead>
               <tbody className="divide-y divide-dark-4/70">
                 {filteredProyectos.map((p) => {
-                  const esFavorable = p.desviacionCosto <= 0;
                   return (
                     <tr key={p.id} className="hover:bg-dark-3/60 transition-colors">
                       <td className="py-3 px-4">
@@ -162,13 +154,24 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => setSelectedProyecto(p)}
-                          className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors shadow-sm"
-                        >
-                          <FolderCheck className="w-3.5 h-3.5" />
-                          Auditoría & Acta
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setSelectedProyecto(p)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-dark-3 hover:bg-dark-4 text-cream rounded-lg transition-colors border border-dark-4"
+                            title="Auditoría de Costos"
+                          >
+                            <FolderCheck className="w-3.5 h-3.5 text-blue-400" />
+                            Auditoría
+                          </button>
+                          <button
+                            onClick={() => handleEmitirCierre(p)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-gold/15 hover:bg-gold/25 text-gold rounded-lg transition-colors border border-gold/30"
+                            title="Emitir / Ver Acta de Finiquito y Cierre Oficial"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Acta Cierre
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -208,8 +211,8 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
                   <span className="font-mono font-bold text-gold-light text-sm">${(selectedProyecto as any).costoMaterialesReal.toLocaleString('es-MX')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-emerald-600 block">Utilidad Real</span>
-                  <span className="font-mono font-bold text-emerald-700 text-sm">${(selectedProyecto as any).utilidadEstimada.toLocaleString('es-MX')}</span>
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 block">Utilidad Real</span>
+                  <span className="font-mono font-bold text-emerald-400 text-sm">${(selectedProyecto as any).utilidadEstimada.toLocaleString('es-MX')}</span>
                 </div>
               </div>
 
@@ -222,7 +225,7 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
                   value={actaObservaciones}
                   onChange={(e) => setActaObservaciones(e.target.value)}
                   placeholder="Se entrega la instalación solar en óptimas condiciones, inversor sincronizado a la red y pruebas de voltaje aprobadas..."
-                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm"
+                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream"
                 />
               </div>
             </div>
@@ -236,15 +239,28 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
               </button>
 
               <button
-                onClick={() => handleEmitirCierre(selectedProyecto as any)}
-                className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-slate-900 hover:bg-black rounded-xl shadow-md transition-all"
+                onClick={() => handleEmitirCierre(selectedProyecto, actaObservaciones)}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-dark-1 bg-gold hover:bg-gold-light rounded-xl shadow-md transition-all"
               >
-                <FileText className="w-4 h-4 text-amber-400" />
-                Generar Acta de Entrega (Oficio Oficial)
+                <FileText className="w-4 h-4" />
+                Generar y Firmar Acta de Cierre (Oficio Oficial)
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Oficio ERP Integrado */}
+      {selectedOficio && (
+        <OficioErpModal
+          oficio={selectedOficio}
+          onClose={() => setSelectedOficio(null)}
+          onSave={async (updatedOficio) => {
+            await adminDbService.guardarOficioErp(updatedOficio);
+            setSelectedOficio(null);
+            onRefresh();
+          }}
+        />
       )}
     </div>
   );

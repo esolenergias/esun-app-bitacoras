@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
-import type { OrdenCompra, SolicitudCompra, Proveedor } from '../../types/adminTypes';
+import type { OrdenCompra, SolicitudCompra, Proveedor, ClienteReal, ProyectoReal } from '../../types/adminTypes';
+import type { OficioData } from '../../../../components/legal/oficios/types';
 import { adminDbService } from '../../services/adminDbService';
+import { OficioErpModal } from '../oficios/OficioErpModal';
+import { generateOficioPdf } from '../../../../components/legal/oficios/oficioPdfGenerator';
 import { 
   FileCheck, Plus, CheckCircle, Clock, Search, FileText, 
-  Send, Eye, ArrowRight, Truck, Building2, DollarSign
+  Send, Eye, ArrowRight, Truck, Building2, DollarSign, Download, Printer 
 } from 'lucide-react';
 
 interface OrdenesCompraTabProps {
   ordenes: OrdenCompra[];
   solicitudes: SolicitudCompra[];
   proveedores: Proveedor[];
+  clientes?: ClienteReal[];
+  proyectos?: ProyectoReal[];
   userRole?: string;
   userName?: string;
   onRefresh: () => void;
@@ -21,6 +26,8 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
   ordenes,
   solicitudes,
   proveedores,
+  clientes = [],
+  proyectos = [],
   userRole = 'master',
   userName = 'Administrador',
   onRefresh,
@@ -31,6 +38,8 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
   const [filterStatus, setFilterStatus] = useState<'todas' | 'aprobada' | 'recibida_parcial' | 'recibida_total' | 'cancelada'>('todas');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrden, setSelectedOrden] = useState<OrdenCompra | null>(null);
+  const [selectedOficio, setSelectedOficio] = useState<OficioData | null>(null);
+  const [isOficioOpen, setIsOficioOpen] = useState(false);
 
   // Form State
   const [selectedScId, setSelectedScId] = useState('');
@@ -200,13 +209,16 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
             <table className="w-full text-left text-sm">
               <thead className="bg-dark-3/90 border-b border-dark-4 text-xs font-bold uppercase text-cream-muted tracking-wider">
                 <tr>
-                  <th className="py-3 px-4">Folio OC</th>
+                  <th className="py-3 px-4">Folio OC / Oficio</th>
                   <th className="py-3 px-4">Fecha</th>
+                  <th className="py-3 px-4">Cliente Conectado</th>
+                  <th className="py-3 px-4">Proyecto / Obra</th>
                   <th className="py-3 px-4">Proveedor</th>
                   <th className="py-3 px-4">Condición</th>
                   <th className="py-3 px-4">Partidas</th>
                   <th className="py-3 px-4 text-right">Total (IVA inc.)</th>
                   <th className="py-3 px-4 text-center">Estado</th>
+                  <th className="py-3 px-4 text-center">PDF Emitido</th>
                   <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
@@ -214,10 +226,24 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
                 {filteredOrdenes.map((oc) => (
                   <tr key={oc.id} className="hover:bg-dark-3/60 transition-colors">
                     <td className="py-3 px-4 font-mono font-bold text-cream">
-                      {oc.folio}
+                      <div>{oc.folio}</div>
+                      {oc.folio_oficio && (
+                        <span className="text-[10px] font-mono text-gold block font-semibold mt-0.5">
+                          {oc.folio_oficio}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-cream-muted">
                       {new Date(oc.fecha).toLocaleDateString('es-MX')}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-cream">
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                        <span>{oc.cliente_nombre || 'eSol Energías'}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 font-semibold text-cream">
+                      {oc.proyecto_nombre || 'General'}
                     </td>
                     <td className="py-3 px-4 font-medium text-cream">
                       {oc.proveedor_nombre}
@@ -242,6 +268,36 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
+                      {oc.pdf_url ? (
+                        <a
+                          href={oc.pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all"
+                          title="Ver / Descargar PDF de la Orden"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </a>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            const ofc = adminDbService.generarOficioOC(oc);
+                            try {
+                              await generateOficioPdf(ofc);
+                            } catch (e: any) {
+                              alert('Error generando PDF: ' + e.message);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-gold border border-dark-4 text-xs font-semibold transition-all"
+                          title="Generar / Ver Documento Formal en PDF"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-gold" />
+                          <span>PDF</span>
+                        </button>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => setSelectedOrden(oc)}
@@ -249,6 +305,18 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
                           title="Ver Detalle"
                         >
                           <Eye className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const ofc = adminDbService.generarOficioOC(oc);
+                            setSelectedOficio(ofc);
+                            setIsOficioOpen(true);
+                          }}
+                          className="p-1.5 text-gold hover:text-gold-light hover:bg-gold/15 rounded-lg transition-colors border border-gold/30"
+                          title="Emitir / Ver Orden de Compra Formal"
+                        >
+                          <FileText className="w-4 h-4" />
                         </button>
 
                         {/* Recepcionar si está activa */}
@@ -503,7 +571,19 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
               </div>
             </div>
 
-            <div className="p-4 border-t border-dark-4/50 flex justify-end bg-dark-3/50">
+            <div className="p-4 border-t border-dark-4/50 flex justify-between bg-dark-3/50">
+              <button
+                onClick={() => {
+                  const ofc = adminDbService.generarOficioOC(selectedOrden);
+                  setSelectedOficio(ofc);
+                  setIsOficioOpen(true);
+                }}
+                className="px-4 py-2 text-xs font-bold text-gold bg-gold/15 hover:bg-gold/25 border border-gold/40 rounded-xl flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Emitir / Ver Orden Formal</span>
+              </button>
+
               <button
                 onClick={() => setSelectedOrden(null)}
                 className="px-4 py-2 text-sm font-semibold bg-dark-4 hover:bg-slate-300 text-cream/90 rounded-xl transition-colors"
@@ -514,6 +594,15 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Embebido de Oficio Formal */}
+      <OficioErpModal
+        isOpen={isOficioOpen}
+        onClose={() => setIsOficioOpen(false)}
+        oficio={selectedOficio}
+        userRole={userRole}
+        onSaveOficio={(updated) => adminDbService.guardarOficioErp(updated)}
+      />
     </div>
   );
 };

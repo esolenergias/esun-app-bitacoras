@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { ValeEntrega, SolicitudMaterial, ItemInventario } from '../../types/adminTypes';
+import type { OficioData } from '../../../components/legal/oficios/types';
 import { adminDbService } from '../../services/adminDbService';
+import { OficioErpModal } from '../oficios/OficioErpModal';
 import { 
   FileCheck2, Plus, Search, Eye, FileText, CheckCircle, PackageCheck, AlertCircle, Printer
 } from 'lucide-react';
@@ -9,6 +11,7 @@ interface ValesEntregaTabProps {
   vales: ValeEntrega[];
   solicitudesMaterial: SolicitudMaterial[];
   inventario: ItemInventario[];
+  userRole?: string;
   userName?: string;
   onRefresh: () => void;
   onNavigateToOficios?: (folioOficio?: string) => void;
@@ -18,6 +21,7 @@ export const ValesEntregaTab: React.FC<ValesEntregaTabProps> = ({
   vales,
   solicitudesMaterial,
   inventario,
+  userRole = 'master',
   userName = 'Almacenista',
   onRefresh,
   onNavigateToOficios
@@ -25,6 +29,8 @@ export const ValesEntregaTab: React.FC<ValesEntregaTabProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVale, setSelectedVale] = useState<ValeEntrega | null>(null);
+  const [selectedOficio, setSelectedOficio] = useState<OficioData | null>(null);
+  const [isOficioOpen, setIsOficioOpen] = useState(false);
 
   // Form State
   const [selectedSmId, setSelectedSmId] = useState('');
@@ -232,13 +238,27 @@ export const ValesEntregaTab: React.FC<ValesEntregaTabProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => setSelectedVale(vale)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        Ver Vale
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => setSelectedVale(vale)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-dark-3 hover:bg-dark-4 text-cream rounded-lg transition-colors border border-dark-4"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-gold" />
+                          <span>Ver</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const ofc = adminDbService.generarOficioVale(vale);
+                            setSelectedOficio(ofc);
+                            setIsOficioOpen(true);
+                          }}
+                          className="p-1.5 text-gold hover:text-gold-light hover:bg-gold/15 rounded-lg transition-colors border border-gold/30"
+                          title="Emitir / Ver Vale de Entrega Formal"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -324,7 +344,7 @@ export const ValesEntregaTab: React.FC<ValesEntregaTabProps> = ({
                         </thead>
                         <tbody className="divide-y divide-dark-4/70">
                           {itemsVale.map((it, idx) => (
-                            <tr key={idx} className="bg-white">
+                            <tr key={idx} className="bg-dark-3/40 hover:bg-dark-3/70 transition-colors">
                               <td className="p-2.5 font-medium text-cream">
                                 {it.descripcion}
                               </td>
@@ -457,7 +477,19 @@ export const ValesEntregaTab: React.FC<ValesEntregaTabProps> = ({
               )}
             </div>
 
-            <div className="p-4 border-t border-dark-4/50 flex justify-end bg-dark-3/50">
+            <div className="p-4 border-t border-dark-4/50 flex justify-between bg-dark-3/50">
+              <button
+                onClick={() => {
+                  const ofc = adminDbService.generarOficioVale(selectedVale);
+                  setSelectedOficio(ofc);
+                  setIsOficioOpen(true);
+                }}
+                className="px-4 py-2 text-xs font-bold text-gold bg-gold/15 hover:bg-gold/25 border border-gold/40 rounded-xl flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Emitir / Ver Vale Formal</span>
+              </button>
+
               <button
                 onClick={() => setSelectedVale(null)}
                 className="px-4 py-2 text-sm font-semibold bg-dark-4 hover:bg-slate-300 text-cream/90 rounded-xl transition-colors"
@@ -468,6 +500,15 @@ export const ValesEntregaTab: React.FC<ValesEntregaTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Embebido de Oficio Formal */}
+      <OficioErpModal
+        isOpen={isOficioOpen}
+        onClose={() => setIsOficioOpen(false)}
+        oficio={selectedOficio}
+        userRole={userRole}
+        onSaveOficio={(updated) => adminDbService.guardarOficioErp(updated)}
+      />
     </div>
   );
 };

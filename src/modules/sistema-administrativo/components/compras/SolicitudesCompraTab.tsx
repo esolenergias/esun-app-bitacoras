@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import type { SolicitudCompra, ProyectoReal, InsumoReal } from '../../types/adminTypes';
+import type { SolicitudCompra, ProyectoReal, InsumoReal, ClienteReal } from '../../types/adminTypes';
+import type { OficioData } from '../../../../components/legal/oficios/types';
 import { adminDbService } from '../../services/adminDbService';
+import { OficioErpModal } from '../oficios/OficioErpModal';
+import { generateOficioPdf } from '../../../../components/legal/oficios/oficioPdfGenerator';
 import { 
   ShoppingCart, Plus, CheckCircle, XCircle, Clock, Search, FileText, 
-  Send, AlertCircle, Eye, ArrowRight, UserCheck 
+  Send, AlertCircle, Eye, ArrowRight, UserCheck, Building2, Download, Printer 
 } from 'lucide-react';
 
 interface SolicitudesCompraTabProps {
   solicitudes: SolicitudCompra[];
   proyectos: ProyectoReal[];
   insumos: InsumoReal[];
+  clientes?: ClienteReal[];
   userRole?: string;
   userName?: string;
   onRefresh: () => void;
@@ -21,6 +25,7 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
   solicitudes,
   proyectos,
   insumos,
+  clientes = [],
   userRole = 'master',
   userName = 'Usuario Admin',
   onRefresh,
@@ -31,8 +36,11 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
   const [filterStatus, setFilterStatus] = useState<'todas' | 'pendiente' | 'aprobada' | 'rechazada' | 'ordenada'>('todas');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSolicitud, setSelectedSolicitud] = useState<SolicitudCompra | null>(null);
+  const [selectedOficio, setSelectedOficio] = useState<OficioData | null>(null);
+  const [isOficioOpen, setIsOficioOpen] = useState(false);
 
   // Form State
+  const [selectedClienteId, setSelectedClienteId] = useState('');
   const [selectedProyectoId, setSelectedProyectoId] = useState('');
   const [solicitanteNombre, setSolicitanteNombre] = useState(userName);
   const [justificacion, setJustificacion] = useState('');
@@ -106,7 +114,10 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
     }
 
     const proy = proyectos.find(p => p.id === selectedProyectoId);
+    const clie = clientes.find(c => c.id === selectedClienteId);
     const nuevaSol: Partial<SolicitudCompra> = {
+      cliente_id: selectedClienteId || undefined,
+      cliente_nombre: clie?.nombre || proy?.cliente_nombre || 'eSol Energías',
       proyecto_id: selectedProyectoId || undefined,
       proyecto_nombre: proy?.titulo || 'Requisición General',
       solicitante_nombre: solicitanteNombre,
@@ -136,6 +147,7 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
   };
 
   const resetForm = () => {
+    setSelectedClienteId('');
     setSelectedProyectoId('');
     setJustificacion('');
     setPartidas([]);
@@ -234,13 +246,15 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
             <table className="w-full text-left text-sm">
               <thead className="bg-dark-3/90 border-b border-dark-4 text-xs font-bold uppercase text-cream-muted tracking-wider">
                 <tr>
-                  <th className="py-3 px-4">Folio</th>
+                  <th className="py-3 px-4">Folio SC / Oficio</th>
                   <th className="py-3 px-4">Fecha</th>
+                  <th className="py-3 px-4">Cliente Conectado</th>
                   <th className="py-3 px-4">Proyecto / Obra</th>
                   <th className="py-3 px-4">Solicitante</th>
                   <th className="py-3 px-4">Partidas</th>
                   <th className="py-3 px-4 text-right">Total Est.</th>
                   <th className="py-3 px-4">Estado</th>
+                  <th className="py-3 px-4 text-center">PDF Emitido</th>
                   <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
@@ -248,10 +262,21 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
                 {filteredSolicitudes.map((sol) => (
                   <tr key={sol.id} className="hover:bg-dark-3/60 transition-colors">
                     <td className="py-3 px-4 font-mono font-bold text-cream">
-                      {sol.folio}
+                      <div>{sol.folio}</div>
+                      {sol.folio_oficio && (
+                        <span className="text-[10px] font-mono text-gold block font-semibold mt-0.5">
+                          {sol.folio_oficio}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-cream-muted">
                       {new Date(sol.fecha).toLocaleDateString('es-MX')}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-cream">
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                        <span>{sol.cliente_nombre || 'eSol Energías'}</span>
+                      </div>
                     </td>
                     <td className="py-3 px-4 font-semibold text-cream">
                       {sol.proyecto_nombre || 'General'}
@@ -279,6 +304,36 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
+                      {sol.pdf_url ? (
+                        <a
+                          href={sol.pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all"
+                          title="Ver / Descargar PDF Oficial"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </a>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            const ofc = adminDbService.generarOficioSC(sol);
+                            try {
+                              await generateOficioPdf(ofc);
+                            } catch (e: any) {
+                              alert('Error generando PDF: ' + e.message);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-gold border border-dark-4 text-xs font-semibold transition-all"
+                          title="Generar / Ver Documento Formal en PDF"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-gold" />
+                          <span>PDF</span>
+                        </button>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => setSelectedSolicitud(sol)}
@@ -286,6 +341,18 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
                           title="Ver Detalle"
                         >
                           <Eye className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const ofc = adminDbService.generarOficioSC(sol);
+                            setSelectedOficio(ofc);
+                            setIsOficioOpen(true);
+                          }}
+                          className="p-1.5 text-gold hover:text-gold-light hover:bg-gold/15 rounded-lg transition-colors border border-gold/30"
+                          title="Emitir / Ver Oficio Formal"
+                        >
+                          <FileText className="w-4 h-4" />
                         </button>
 
                         {/* Aprobación rápida para Master / Admin */}
@@ -342,14 +409,43 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-cream/90 uppercase mb-1 flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 text-gold" />
+                    <span>Cliente Conectado (CRM)</span>
+                  </label>
+                  <select
+                    value={selectedClienteId}
+                    onChange={(e) => setSelectedClienteId(e.target.value)}
+                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-medium focus:bg-dark-2"
+                  >
+                    <option value="">-- Cliente General / eSol --</option>
+                    {clientes.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} {c.rfc ? `(${c.rfc})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-cream/90 uppercase mb-1">
-                    Proyecto / Obra (Opcional)
+                    Proyecto / Obra (ERP)
                   </label>
                   <select
                     value={selectedProyectoId}
-                    onChange={(e) => setSelectedProyectoId(e.target.value)}
+                    onChange={(e) => {
+                      const proyId = e.target.value;
+                      setSelectedProyectoId(proyId);
+                      if (proyId) {
+                        const proy = proyectos.find(p => p.id === proyId);
+                        if (proy) {
+                          const clieMatch = clientes.find(c => c.id === proy.cliente_id || c.nombre.toLowerCase() === (proy.cliente_nombre || '').toLowerCase());
+                          if (clieMatch) setSelectedClienteId(clieMatch.id);
+                        }
+                      }
+                    }}
                     className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-medium focus:bg-dark-2"
                   >
                     <option value="">-- Compra General / Almacén --</option>
@@ -589,6 +685,18 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
 
             <div className="p-4 border-t border-dark-4/50 flex justify-between bg-dark-3/50">
               <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const ofc = adminDbService.generarOficioSC(selectedSolicitud);
+                    setSelectedOficio(ofc);
+                    setIsOficioOpen(true);
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-gold bg-gold/15 hover:bg-gold/25 border border-gold/40 rounded-xl flex items-center gap-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Emitir / Ver Oficio</span>
+                </button>
+
                 {isMasterOrAdmin && selectedSolicitud.estatus === 'pendiente' && (
                   <>
                     <button
@@ -616,6 +724,15 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Embebido de Oficio Formal */}
+      <OficioErpModal
+        isOpen={isOficioOpen}
+        onClose={() => setIsOficioOpen(false)}
+        oficio={selectedOficio}
+        userRole={userRole}
+        onSaveOficio={(updated) => adminDbService.guardarOficioErp(updated)}
+      />
     </div>
   );
 };

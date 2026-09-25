@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import type { DevolucionMerma, ProyectoReal, InsumoReal } from '../../types/adminTypes';
+import type { OficioData } from '../../../components/legal/oficios/types';
 import { adminDbService } from '../../services/adminDbService';
+import { OficioErpModal } from '../oficios/OficioErpModal';
 import { 
-  RotateCcw, AlertTriangle, Plus, Search, CheckCircle, PackageMinus, RefreshCw
+  RotateCcw, AlertTriangle, Plus, Search, CheckCircle, PackageMinus, RefreshCw, FileText
 } from 'lucide-react';
 
 interface DevolucionesMermasTabProps {
   devoluciones: DevolucionMerma[];
   proyectos: ProyectoReal[];
   insumos: InsumoReal[];
+  userRole?: string;
   userName?: string;
   onRefresh: () => void;
 }
@@ -17,12 +20,15 @@ export const DevolucionesMermasTab: React.FC<DevolucionesMermasTabProps> = ({
   devoluciones,
   proyectos,
   insumos,
+  userRole = 'master',
   userName = 'Almacenista',
   onRefresh
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<'todos' | 'devolucion' | 'merma'>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedOficio, setSelectedOficio] = useState<OficioData | null>(null);
+  const [isOficioOpen, setIsOficioOpen] = useState(false);
 
   // Form State
   const [tipo, setTipo] = useState<'devolucion' | 'merma'>('devolucion');
@@ -171,6 +177,7 @@ export const DevolucionesMermasTab: React.FC<DevolucionesMermasTabProps> = ({
                   <th className="py-3 px-4 text-center">Cantidad</th>
                   <th className="py-3 px-4 text-right">Costo Est.</th>
                   <th className="py-3 px-4">Motivo</th>
+                  <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-4/70">
@@ -206,6 +213,19 @@ export const DevolucionesMermasTab: React.FC<DevolucionesMermasTabProps> = ({
                     </td>
                     <td className="py-3 px-4 text-cream-muted text-xs max-w-xs truncate">
                       {reg.motivo}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => {
+                          const ofc = adminDbService.generarOficioDevolucion(reg);
+                          setSelectedOficio(ofc);
+                          setIsOficioOpen(true);
+                        }}
+                        className="p-1.5 text-gold hover:text-gold-light hover:bg-gold/15 rounded-lg transition-colors border border-gold/30"
+                        title="Emitir / Ver Acta de Movimiento Formal"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -361,6 +381,15 @@ export const DevolucionesMermasTab: React.FC<DevolucionesMermasTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Embebido de Oficio Formal */}
+      <OficioErpModal
+        isOpen={isOficioOpen}
+        onClose={() => setIsOficioOpen(false)}
+        oficio={selectedOficio}
+        userRole={userRole}
+        onSaveOficio={(updated) => adminDbService.guardarOficioErp(updated)}
+      />
     </div>
   );
 };

@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
-import type { RecepcionMercancia, OrdenCompra, InsumoReal } from '../../types/adminTypes';
+import type { RecepcionMercancia, OrdenCompra, InsumoReal, ClienteReal, ProyectoReal } from '../../types/adminTypes';
+import type { OficioData } from '../../../../components/legal/oficios/types';
 import { adminDbService } from '../../services/adminDbService';
+import { OficioErpModal } from '../oficios/OficioErpModal';
+import { generateOficioPdf } from '../../../../components/legal/oficios/oficioPdfGenerator';
 import { 
-  Truck, CheckCircle, Clock, Search, Plus, FileText, AlertTriangle, Eye, ArrowRight, ShieldCheck 
+  Truck, CheckCircle, Clock, Search, Plus, FileText, AlertTriangle, Eye, ArrowRight, ShieldCheck,
+  Building2, Download, Printer 
 } from 'lucide-react';
 
 interface RecepcionesTabProps {
   ordenesCompra: OrdenCompra[];
   recepciones: RecepcionMercancia[];
   insumos: InsumoReal[];
+  clientes?: ClienteReal[];
+  proyectos?: ProyectoReal[];
+  userRole?: string;
   onRefresh: () => void;
   onNavigateToOficios?: (folioOficio?: string) => void;
 }
@@ -17,6 +24,9 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
   ordenesCompra,
   recepciones,
   insumos,
+  clientes = [],
+  proyectos = [],
+  userRole = 'master',
   onRefresh,
   onNavigateToOficios
 }) => {
@@ -24,6 +34,8 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
   const [filterStatus, setFilterStatus] = useState<'todos' | 'completa' | 'parcial' | 'rechazada'>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecepcion, setSelectedRecepcion] = useState<RecepcionMercancia | null>(null);
+  const [selectedOficio, setSelectedOficio] = useState<OficioData | null>(null);
+  const [isOficioOpen, setIsOficioOpen] = useState(false);
 
   // Form state
   const [selectedOcId, setSelectedOcId] = useState('');
@@ -208,61 +220,128 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
                   <th className="py-3 px-4">Folio Recepción</th>
                   <th className="py-3 px-4">Fecha</th>
                   <th className="py-3 px-4">OC Origen</th>
+                  <th className="py-3 px-4">Cliente Conectado</th>
+                  <th className="py-3 px-4">Proyecto / Obra</th>
                   <th className="py-3 px-4">Proveedor</th>
                   <th className="py-3 px-4">Comprobante</th>
                   <th className="py-3 px-4">Partidas</th>
                   <th className="py-3 px-4">Estado</th>
+                  <th className="py-3 px-4 text-center">PDF Emitido</th>
                   <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-4/70">
-                {filteredRecepciones.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-dark-3/60 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-cream">
-                      {rec.folio}
-                    </td>
-                    <td className="py-3 px-4 text-cream-muted">
-                      {new Date(rec.fecha_recepcion).toLocaleDateString('es-MX')}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-gold font-semibold">
-                      {rec.folio_oc}
-                    </td>
-                    <td className="py-3 px-4 text-cream/90 font-medium">
-                      {rec.proveedor_nombre}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="text-xs text-cream-muted">
-                        {rec.numero_factura && <div><span className="font-semibold">Fact:</span> {rec.numero_factura}</div>}
-                        {rec.numero_remision && <div><span className="font-semibold">Rem:</span> {rec.numero_remision}</div>}
-                        {!rec.numero_factura && !rec.numero_remision && <span className="text-cream-dim">Sin comprobante</span>}
+                {filteredRecepciones.map((rec) => {
+                  const linkedOc = ordenesCompra.find(o => o.folio === rec.folio_oc || o.id === rec.orden_compra_id);
+                  const displayCliente = rec.cliente_nombre || linkedOc?.cliente_nombre || 'eSol Energías';
+                  const displayProyecto = rec.proyecto_nombre || linkedOc?.proyecto_nombre || 'Almacén Central';
+
+                  return (
+                    <tr key={rec.id} className="hover:bg-dark-3/60 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-cream">
+                        <div>{rec.folio}</div>
+                        {rec.folio_oficio && (
+                          <span className="text-[10px] font-mono text-gold block font-semibold mt-0.5">
+                            {rec.folio_oficio}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-cream-muted">
+                        {new Date(rec.fecha_recepcion).toLocaleDateString('es-MX')}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-gold font-semibold">
+                        {rec.folio_oc}
+                      </td>
+                      <td className="py-3 px-4 font-medium text-cream">
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                          <span>{displayCliente}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-cream-muted font-medium">
+                        {displayProyecto}
+                      </td>
+                      <td className="py-3 px-4 text-cream/90 font-medium">
+                        {rec.proveedor_nombre}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-xs text-cream-muted">
+                          {rec.numero_factura && <div><span className="font-semibold">Fact:</span> {rec.numero_factura}</div>}
+                          {rec.numero_remision && <div><span className="font-semibold">Rem:</span> {rec.numero_remision}</div>}
+                          {!rec.numero_factura && !rec.numero_remision && <span className="text-cream-dim">Sin comprobante</span>}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-cream-muted font-medium">
+                        {rec.partidas.length} ítems
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-bold ${
+                          rec.estatus === 'completa' ? 'bg-emerald-100 text-emerald-700' :
+                          rec.estatus === 'parcial' ? 'bg-amber-100 text-amber-700' :
+                          'bg-rose-100 text-rose-700'
+                        }`}>
+                          {rec.estatus === 'completa' && <CheckCircle className="w-3 h-3" />}
+                          {rec.estatus === 'parcial' && <Clock className="w-3 h-3" />}
+                          {rec.estatus === 'rechazada' && <AlertTriangle className="w-3 h-3" />}
+                          {rec.estatus.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {rec.pdf_url ? (
+                          <a
+                            href={rec.pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all"
+                            title="Ver / Descargar Acta de Recepción"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>PDF</span>
+                          </a>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              const ofc = adminDbService.generarOficioRecepcion(rec);
+                              try {
+                                await generateOficioPdf(ofc);
+                              } catch (e: any) {
+                                alert('Error generando PDF: ' + e.message);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-gold border border-dark-4 text-xs font-semibold transition-all"
+                            title="Generar Acta de Recepción en PDF"
+                          >
+                            <Printer className="w-3.5 h-3.5 text-gold" />
+                            <span>PDF</span>
+                          </button>
+                        )}
+                      </td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => setSelectedRecepcion(rec)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-dark-3 hover:bg-dark-4 text-cream rounded-lg transition-colors border border-dark-4"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-gold" />
+                          <span>Ver</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const ofc = adminDbService.generarOficioRecepcion(rec);
+                            setSelectedOficio(ofc);
+                            setIsOficioOpen(true);
+                          }}
+                          className="p-1.5 text-gold hover:text-gold-light hover:bg-gold/15 rounded-lg transition-colors border border-gold/30"
+                          title="Emitir / Ver Acta de Recepción Formal"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-cream-muted font-medium">
-                      {rec.partidas.length} ítems
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-bold ${
-                        rec.estatus === 'completa' ? 'bg-emerald-100 text-emerald-700' :
-                        rec.estatus === 'parcial' ? 'bg-amber-100 text-amber-700' :
-                        'bg-rose-100 text-rose-700'
-                      }`}>
-                        {rec.estatus === 'completa' && <CheckCircle className="w-3 h-3" />}
-                        {rec.estatus === 'parcial' && <Clock className="w-3 h-3" />}
-                        {rec.estatus === 'rechazada' && <AlertTriangle className="w-3 h-3" />}
-                        {rec.estatus.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => setSelectedRecepcion(rec)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-gold/10 text-gold-light hover:bg-blue-100 rounded-lg transition-colors"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        Ver Detalle
-                      </button>
-                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -347,7 +426,7 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
                         </thead>
                         <tbody className="divide-y divide-dark-4/70">
                           {itemsRecibidos.map((it, idx) => (
-                            <tr key={idx} className="bg-white">
+                            <tr key={idx} className="bg-dark-3/40 hover:bg-dark-3/70 transition-colors">
                               <td className="p-2.5 font-medium text-cream">
                                 {it.descripcion} <span className="text-cream-dim">({it.unidad})</span>
                               </td>
@@ -481,7 +560,19 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
               )}
             </div>
 
-            <div className="p-4 border-t border-dark-4/50 flex justify-end bg-dark-3/50">
+            <div className="p-4 border-t border-dark-4/50 flex justify-between bg-dark-3/50">
+              <button
+                onClick={() => {
+                  const ofc = adminDbService.generarOficioRecepcion(selectedRecepcion);
+                  setSelectedOficio(ofc);
+                  setIsOficioOpen(true);
+                }}
+                className="px-4 py-2 text-xs font-bold text-gold bg-gold/15 hover:bg-gold/25 border border-gold/40 rounded-xl flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Emitir / Ver Acta de Recepción</span>
+              </button>
+
               <button
                 onClick={() => setSelectedRecepcion(null)}
                 className="px-4 py-2 text-sm font-semibold bg-dark-4 hover:bg-slate-300 text-cream/90 rounded-xl transition-colors"
@@ -492,6 +583,15 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Embebido de Oficio Formal */}
+      <OficioErpModal
+        isOpen={isOficioOpen}
+        onClose={() => setIsOficioOpen(false)}
+        oficio={selectedOficio}
+        userRole={userRole}
+        onSaveOficio={(updated) => adminDbService.guardarOficioErp(updated)}
+      />
     </div>
   );
 };
