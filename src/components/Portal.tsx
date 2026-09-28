@@ -607,17 +607,6 @@ export function Portal() {
                           <Wrench className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Mantenimientos (App)</span>}
                         </button>
-                        <button
-                          onClick={() => window.open('/?sistema_administrativo=1', '_blank')}
-                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20 shadow-sm ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
-                          title="Sistema Administrativo (ERP)"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Building2 className="w-4 h-4 stroke-[2] flex-shrink-0 text-gold" />
-                            {!sidebarCollapsed && <span>Sistema Administrativo</span>}
-                          </div>
-                          {!sidebarCollapsed && <ExternalLink className="w-3.5 h-3.5 opacity-70" />}
-                        </button>
                       </div>
 
                       <div className="mt-8 pt-4 border-t border-dark-4/50 space-y-1">
@@ -783,11 +772,13 @@ export function Portal() {
                 {/* ACCESO DIRECTO: SISTEMA ADMINISTRATIVO (ERP) */}
                 {currentUser.role !== 'user' && (
                   <button
-                    onClick={() => window.open('/?sistema_administrativo=1', '_blank')}
+                    onClick={() => {
+                      window.location.href = '/?sistema_administrativo=1';
+                    }}
                     className={`w-full group flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer border bg-gradient-to-r from-gold/20 via-gold/10 to-transparent border-gold/50 hover:border-gold hover:from-gold/30 hover:shadow-lg hover:shadow-gold/10 text-cream ${
                       sidebarCollapsed ? 'justify-center p-2' : ''
                     }`}
-                    title="Abrir Sistema Administrativo (ERP) en ventana independiente"
+                    title="Acceder al Sistema Administrativo (ERP)"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-7 h-7 rounded-lg bg-gold/20 border border-gold/60 flex items-center justify-center text-gold group-hover:bg-gold group-hover:text-dark-1 transition-all flex-shrink-0 shadow-sm">

@@ -808,15 +808,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const handleHashChange = () => {
       const hash = window.location.hash;
       if (hash === '#portal') {
-        const storedUser = currentUser || (localStorage.getItem('esol_current_user') ? JSON.parse(localStorage.getItem('esol_current_user')!) : null);
-        if (storedUser) {
-          setCurrentView('portal');
-          setIsPortalOpen(true);
-        } else {
-          // Logged out: stay on landing and open login modal
-          setCurrentView('landing');
-          setIsPortalOpen(true);
-        }
+        setCurrentView('portal');
+        setIsPortalOpen(true);
       } else {
         setCurrentView('landing');
         setIsPortalOpen(false);
@@ -825,7 +818,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.addEventListener('hashchange', handleHashChange);
     handleHashChange(); // Run on mount
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [currentUser]);
+  }, []);
 
   // Effect to automatically route to/from portal on login/logout
   useEffect(() => {
