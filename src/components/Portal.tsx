@@ -596,16 +596,16 @@ export function Portal() {
                           {!sidebarCollapsed && <span>Bitácoras (App)</span>}
                         </button>
                         <button
-                          onClick={() => setActiveTab('mantenimientos')}
+                          onClick={() => setActiveTab('sistema_administrativo')}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                            activeTab === 'mantenimientos'
+                            activeTab === 'sistema_administrativo'
                               ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                               : 'text-cream-muted hover:text-cream hover:bg-dark-3'
                           } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
-                          title="Mantenimientos (App)"
+                          title="Sistema Administrativo (ERP)"
                         >
-                          <Wrench className="w-4 h-4 stroke-[2] flex-shrink-0" />
-                          {!sidebarCollapsed && <span>Mantenimientos (App)</span>}
+                          <Building2 className="w-4 h-4 stroke-[2] flex-shrink-0 text-gold" />
+                          {!sidebarCollapsed && <span>Sistema Administrativo</span>}
                         </button>
                       </div>
 
@@ -772,11 +772,11 @@ export function Portal() {
                 {/* ACCESO DIRECTO: SISTEMA ADMINISTRATIVO (ERP) */}
                 {currentUser.role !== 'user' && (
                   <button
-                    onClick={() => window.open('/?sistema_administrativo=1', '_blank')}
+                    onClick={() => setActiveTab('sistema_administrativo')}
                     className={`w-full group flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer border bg-gradient-to-r from-gold/20 via-gold/10 to-transparent border-gold/50 hover:border-gold hover:from-gold/30 hover:shadow-lg hover:shadow-gold/10 text-cream ${
                       sidebarCollapsed ? 'justify-center p-2' : ''
                     }`}
-                    title="Abrir Sistema Administrativo (ERP) en ventana independiente"
+                    title="Abrir Sistema Administrativo (ERP)"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-7 h-7 rounded-lg bg-gold/20 border border-gold/60 flex items-center justify-center text-gold group-hover:bg-gold group-hover:text-dark-1 transition-all flex-shrink-0 shadow-sm">
@@ -798,7 +798,7 @@ export function Portal() {
                         <span className="text-[8px] font-mono font-black bg-gold/20 text-gold px-1.5 py-0.5 rounded border border-gold/30">
                           ERP
                         </span>
-                        <ExternalLink className="w-3.5 h-3.5 text-gold/70 group-hover:text-gold group-hover:translate-x-0.5 transition-all" />
+                        <ChevronRight className="w-3.5 h-3.5 text-gold/70 group-hover:text-gold group-hover:translate-x-0.5 transition-all" />
                       </div>
                     )}
                   </button>
