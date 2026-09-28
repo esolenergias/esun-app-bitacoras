@@ -83,12 +83,12 @@ function StandaloneAdminWrapper() {
       userEmail={currentUser?.email}
       adminSystemRole={currentUser?.adminSystemRole}
       onBackToPortal={() => {
-        window.location.href = '/';
+        window.location.href = '/#portal';
       }}
       onNavigateToOficios={(folio) => {
         localStorage.setItem('esol_legal_active_subtab', 'oficios');
         if (folio) localStorage.setItem('esol_oficio_editing_target', folio);
-        window.location.href = '/?tab=legal';
+        window.location.href = '/#portal';
       }}
     />
   );
