@@ -83,12 +83,12 @@ function StandaloneAdminWrapper() {
       userEmail={currentUser?.email}
       adminSystemRole={currentUser?.adminSystemRole}
       onBackToPortal={() => {
-        window.location.href = '/#portal';
+        window.location.href = window.location.origin + '/#portal';
       }}
       onNavigateToOficios={(folio) => {
         localStorage.setItem('esol_legal_active_subtab', 'oficios');
         if (folio) localStorage.setItem('esol_oficio_editing_target', folio);
-        window.location.href = '/#portal';
+        window.location.href = window.location.origin + '/#portal';
       }}
     />
   );
@@ -99,10 +99,11 @@ function App() {
   const esunPropuesta = searchParams.get('esun_propuesta');
   const presupuestoId = searchParams.get('presupuestoId');
   const isStandaloneAdmin = 
-    searchParams.get('sistema_administrativo') !== null ||
+    (searchParams.get('sistema_administrativo') !== null ||
     searchParams.get('admin_erp') !== null ||
     searchParams.get('tab') === 'sistema_administrativo' ||
-    window.location.pathname === '/sistema-administrativo';
+    window.location.pathname === '/sistema-administrativo') &&
+    window.location.hash !== '#portal';
 
   if (esunPropuesta) {
     const [projectId, proposalId] = esunPropuesta.split('_');

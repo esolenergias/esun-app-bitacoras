@@ -654,31 +654,35 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                 )}
               </div>
 
+              {/* ----------------------------------------------------- */}
+              {/* MÓDULO 5: RECURSOS HUMANOS (PERSONAL & NÓMINA) */}
+              {/* ----------------------------------------------------- */}
+              <div className="space-y-1 pt-2 border-t border-dark-4/50">
+                <button
+                  onClick={() => setActiveTab('personal')}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    activeTab === 'personal'
+                      ? 'bg-gold/20 text-gold border-l-2 border-gold shadow-inner shadow-gold/10'
+                      : 'text-cream-muted hover:text-cream hover:bg-dark-3 bg-dark-1/40 border border-dark-4/60'
+                  } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                  title="5. Personal & Nómina (RH)"
+                >
+                  <div className="flex items-center gap-3">
+                    <UserCheck className="w-4 h-4 stroke-[2] text-gold flex-shrink-0" />
+                    {!sidebarCollapsed && <span>5. Personal & Nómina</span>}
+                  </div>
+                  {!sidebarCollapsed && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
+                      RH
+                    </span>
+                  )}
+                </button>
+              </div>
+
             </div>
           </div>
 
           <div className="p-2 border-t border-dark-4 bg-dark-1/60 space-y-2">
-            {/* Módulo: Personal & Nómina */}
-            <button
-              onClick={() => setActiveTab('personal')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                activeTab === 'personal'
-                  ? 'bg-gold/20 text-gold border-l-2 border-gold shadow-inner shadow-gold/10'
-                  : 'text-cream-muted hover:text-cream hover:bg-dark-3 bg-dark-2/60 border border-dark-4/60'
-              } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
-              title="Personal & Nómina"
-            >
-              <div className="flex items-center gap-3">
-                <UserCheck className="w-4 h-4 stroke-[2] text-gold flex-shrink-0" />
-                {!sidebarCollapsed && <span>Personal & Nómina</span>}
-              </div>
-              {!sidebarCollapsed && (
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
-                  RH
-                </span>
-              )}
-            </button>
-
             {/* Collapse button */}
             <button 
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -931,6 +935,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               userRole={effectiveRole}
               canEdit={canEdit}
               onRefresh={cargarDatos}
+            />
+          )}
+
+          {activeTab === 'personal' && (
+            <PersonalTab
+              canEdit={canEdit}
+              userRole={effectiveRole}
             />
           )}
         </main>
