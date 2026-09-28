@@ -3,18 +3,23 @@ import type { Proveedor } from '../../types/adminTypes';
 import { adminDbService } from '../../services/adminDbService';
 import { 
   Building2, Phone, Mail, MapPin, Plus, Search, CreditCard, CheckCircle, Edit, Trash2,
-  List, LayoutGrid
+  List, LayoutGrid, Eye
 } from 'lucide-react';
 
 interface ProveedoresTabProps {
   proveedores: Proveedor[];
+  canEdit?: boolean;
+  userRole?: string;
   onRefresh: () => void;
 }
 
 export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
   proveedores,
+  canEdit = true,
+  userRole = 'master',
   onRefresh
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'filas' | 'fichas'>('filas');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,6 +37,10 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
   const [categoria, setCategoria] = useState('Paneles Solares e Inversores');
 
   const handleOpenCreate = () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     setEditingProveedor(null);
     setNombre('');
     setRfc('');
@@ -60,6 +69,10 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
   };
 
   const handleGuardar = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!nombre.trim()) {
       alert('El nombre del proveedor es obligatorio.');
       return;
@@ -111,13 +124,20 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-sm shadow-md shadow-gold/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Registrar Proveedor
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={handleOpenCreate}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-sm shadow-md shadow-gold/20 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Registrar Proveedor
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold">
+            <Eye className="w-4 h-4" />
+            Modo Visor (Solo Lectura)
+          </div>
+        )}
       </div>
 
       {/* Filter & View Mode Bar */}
@@ -322,9 +342,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-cream">
-                    {editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+                    {!isAllowedToEdit ? 'Detalles del Proveedor' : (editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor')}
                   </h3>
-                  <p className="text-xs text-cream-muted">Configura datos fiscales y plazos comerciales.</p>
+                  <p className="text-xs text-cream-muted">
+                    {!isAllowedToEdit ? 'Vista de solo lectura del catálogo.' : 'Configura datos fiscales y plazos comerciales.'}
+                  </p>
                 </div>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="text-cream-dim hover:text-cream-muted font-bold text-xl">✕</button>
@@ -337,10 +359,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                 </label>
                 <input
                   type="text"
+                  disabled={!isAllowedToEdit}
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Ej: Distribuidora Solar de México S.A. de C.V."
-                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-medium text-cream focus:border-gold focus:outline-none"
+                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-medium text-cream focus:border-gold focus:outline-none disabled:opacity-60"
                 />
               </div>
 
@@ -351,10 +374,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   </label>
                   <input
                     type="text"
+                    disabled={!isAllowedToEdit}
                     value={rfc}
                     onChange={(e) => setRfc(e.target.value.toUpperCase())}
                     placeholder="DSM180901XX1"
-                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-mono text-cream focus:border-gold focus:outline-none"
+                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-mono text-cream focus:border-gold focus:outline-none disabled:opacity-60"
                   />
                 </div>
                 <div>
@@ -363,10 +387,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   </label>
                   <input
                     type="text"
+                    disabled={!isAllowedToEdit}
                     value={categoria}
                     onChange={(e) => setCategoria(e.target.value)}
                     placeholder="Ej: Inversores, Estructuras..."
-                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none"
+                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -378,10 +403,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   </label>
                   <input
                     type="text"
+                    disabled={!isAllowedToEdit}
                     value={contacto}
                     onChange={(e) => setContacto(e.target.value)}
                     placeholder="Ej: Ing. Carlos Morales"
-                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none"
+                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none disabled:opacity-60"
                   />
                 </div>
                 <div>
@@ -390,10 +416,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   </label>
                   <input
                     type="text"
+                    disabled={!isAllowedToEdit}
                     value={telefono}
                     onChange={(e) => setTelefono(e.target.value)}
                     placeholder="Ej: 55 1234 5678"
-                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-mono text-cream focus:border-gold focus:outline-none"
+                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-mono text-cream focus:border-gold focus:outline-none disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -405,10 +432,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   </label>
                   <input
                     type="number"
+                    disabled={!isAllowedToEdit}
                     min="0"
                     value={diasCredito}
                     onChange={(e) => setDiasCredito(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
-                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-bold font-mono text-center text-cream focus:border-gold focus:outline-none"
+                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-bold font-mono text-center text-cream focus:border-gold focus:outline-none disabled:opacity-60"
                     placeholder="0"
                   />
                 </div>
@@ -418,11 +446,12 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   </label>
                   <input
                     type="number"
+                    disabled={!isAllowedToEdit}
                     min="0"
                     step="0.01"
                     value={limiteCredito}
                     onChange={(e) => setLimiteCredito(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
-                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-bold font-mono text-center text-emerald-400 focus:border-gold focus:outline-none"
+                    className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm font-bold font-mono text-center text-emerald-400 focus:border-gold focus:outline-none disabled:opacity-60"
                     placeholder="0.00"
                   />
                 </div>
@@ -434,10 +463,11 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                 </label>
                 <input
                   type="email"
+                  disabled={!isAllowedToEdit}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="ventas@proveedor.com"
-                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none"
+                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none disabled:opacity-60"
                 />
               </div>
 
@@ -447,16 +477,17 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                 </label>
                 <textarea
                   rows={2}
+                  disabled={!isAllowedToEdit}
                   value={direccion}
                   onChange={(e) => setDireccion(e.target.value)}
                   placeholder="Calle, Número, Colonia, Ciudad..."
-                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none"
+                  className="w-full p-2.5 bg-dark-3 border border-dark-4 rounded-xl text-sm text-cream focus:border-gold focus:outline-none disabled:opacity-60"
                 />
               </div>
             </div>
 
             <div className="p-6 border-t border-dark-4/50 flex justify-between items-center bg-dark-3/50">
-              {editingProveedor ? (
+              {isAllowedToEdit && editingProveedor ? (
                 <button
                   onClick={async () => {
                     if (window.confirm(`¿Eliminar al proveedor "${editingProveedor.nombre}"?`)) {
@@ -477,15 +508,17 @@ export const ProveedoresTab: React.FC<ProveedoresTabProps> = ({
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 text-xs font-semibold text-cream-muted hover:bg-dark-4 rounded-xl transition-colors"
                 >
-                  Cancelar
+                  {isAllowedToEdit ? 'Cancelar' : 'Cerrar'}
                 </button>
-                <button
-                  onClick={handleGuardar}
-                  disabled={!nombre.trim()}
-                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-dark-1 bg-gold hover:bg-gold-light disabled:opacity-50 rounded-xl shadow-md transition-all"
-                >
-                  Guardar Proveedor
-                </button>
+                {isAllowedToEdit && (
+                  <button
+                    onClick={handleGuardar}
+                    disabled={!nombre.trim()}
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-dark-1 bg-gold hover:bg-gold-light disabled:opacity-50 rounded-xl shadow-md transition-all"
+                  >
+                    Guardar Proveedor
+                  </button>
+                )}
               </div>
             </div>
           </div>

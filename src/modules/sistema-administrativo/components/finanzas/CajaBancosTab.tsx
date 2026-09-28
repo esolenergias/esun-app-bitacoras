@@ -9,16 +9,21 @@ import {
 interface CajaBancosTabProps {
   cuentas: CuentaFinanciera[];
   movimientos: MovimientoFinanciero[];
+  userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
 }
 
 export const CajaBancosTab: React.FC<CajaBancosTabProps> = ({
   cuentas,
   movimientos,
+  userRole = 'master',
   userName = 'Tesorero',
+  canEdit = true,
   onRefresh
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [activeSubTab, setActiveSubTab] = useState<'todas' | 'caja_chica' | 'caja_grande' | 'banco'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,6 +38,10 @@ export const CajaBancosTab: React.FC<CajaBancosTabProps> = ({
   const saldoTotalGlobal = cuentas.reduce((acc, c) => acc + c.saldo_actual, 0);
 
   const handleGuardarMovimiento = async () => {
+    if (!isAllowedToEdit) {
+      alert('Operación no permitida: Tu usuario está en Modo Visor (solo lectura).');
+      return;
+    }
     if (!cuentaId || monto <= 0 || !concepto.trim()) {
       alert('Complete los campos requeridos y asegúrese de que el monto sea mayor a 0.');
       return;
@@ -99,16 +108,23 @@ export const CajaBancosTab: React.FC<CajaBancosTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-500/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Registrar Movimiento en Cuenta
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Registrar Movimiento en Cuenta
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-dark-3 border border-dark-4 text-cream-muted rounded-xl text-xs font-bold select-none">
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <span>Modo Visor (Solo Lectura)</span>
+          </div>
+        )}
       </div>
 
       {/* Tarjetas de Cuentas */}

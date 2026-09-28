@@ -10,7 +10,9 @@ interface IngresosTabProps {
   clientes: ClienteReal[];
   proyectos: ProyectoReal[];
   cuentas: CuentaFinanciera[];
+  userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
 }
 
@@ -19,9 +21,12 @@ export const IngresosTab: React.FC<IngresosTabProps> = ({
   clientes,
   proyectos,
   cuentas,
+  userRole = 'master',
   userName = 'Administrador',
+  canEdit = true,
   onRefresh
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'cobrado' | 'pendiente' | 'parcial'>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,6 +56,10 @@ export const IngresosTab: React.FC<IngresosTabProps> = ({
   };
 
   const handleGuardarIngreso = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!concepto.trim() || montoTotal <= 0) {
       alert('Por favor complete los campos requeridos con un monto válido.');
       return;
@@ -118,16 +127,23 @@ export const IngresosTab: React.FC<IngresosTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-500/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Registrar Ingreso / Factura
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-500/20 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Registrar Ingreso / Factura
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold">
+            <Eye className="w-4 h-4" />
+            Modo Visor (Solo Lectura)
+          </div>
+        )}
       </div>
 
       {/* KPI Cards */}

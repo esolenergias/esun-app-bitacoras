@@ -80,6 +80,8 @@ function StandaloneAdminWrapper() {
       standalone={true}
       userRole={currentUser?.role || 'master'}
       userName={currentUser?.name || 'Administrador Esol'}
+      userEmail={currentUser?.email}
+      adminSystemRole={currentUser?.adminSystemRole}
       onBackToPortal={() => {
         window.location.href = '/';
       }}

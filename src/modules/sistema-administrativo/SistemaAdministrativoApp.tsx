@@ -27,12 +27,14 @@ import {
   ArrowLeft, LayoutDashboard, ShoppingCart, Truck, Package, ClipboardList, 
   FileCheck2, RotateCcw, FolderCheck, DollarSign, Building2, Database, Users, 
   Layers, RefreshCw, ShieldAlert, Sparkles, FileText, ChevronRight, ChevronDown, 
-  ExternalLink, Menu, X, Landmark, Wallet, CheckCircle2, ShieldCheck, Box
+  ExternalLink, Menu, X, Landmark, Wallet, CheckCircle2, ShieldCheck, Box, Eye
 } from 'lucide-react';
 
 interface SistemaAdministrativoAppProps {
   userRole?: string;
   userName?: string;
+  userEmail?: string;
+  adminSystemRole?: 'editor' | 'visor';
   standalone?: boolean;
   onBackToPortal?: () => void;
   onNavigateToOficios?: (folioOficio?: string) => void;
@@ -41,10 +43,23 @@ interface SistemaAdministrativoAppProps {
 export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> = ({
   userRole = 'master',
   userName = 'Administrador General',
+  userEmail,
+  adminSystemRole,
   standalone = false,
   onBackToPortal,
   onNavigateToOficios
 }) => {
+  const isViewer = 
+    userRole === 'visor' || 
+    adminSystemRole === 'visor' || 
+    userEmail?.toLowerCase().trim() === 'corona.gustavoc@gmail.com';
+  const effectiveRole = isViewer ? 'visor' : userRole;
+  const canEdit = !isViewer;
+
+  useEffect(() => {
+    adminDbService.setReadOnly(isViewer);
+  }, [isViewer]);
+
   const [activeTab, setActiveTab] = useState<AdminTabType>('resumen');
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -215,17 +230,37 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
             </a>
 
             <div className="flex items-center gap-2 pl-2 border-l border-dark-4 text-xs">
-              <div className="w-7 h-7 rounded-full bg-gold/20 text-gold border border-gold/30 flex items-center justify-center font-bold text-xs">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs border ${
+                isViewer ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-gold/20 text-gold border border-gold/30'
+              }`}>
                 {(userName || 'A').charAt(0).toUpperCase()}
               </div>
               <div className="hidden sm:block text-left">
                 <div className="font-bold text-cream text-xs leading-none">{userName || 'Administrador General'}</div>
-                <div className="text-[9px] text-gold uppercase font-mono mt-0.5">{userRole || 'master'}</div>
+                <div className={`text-[9px] uppercase font-mono mt-0.5 font-bold ${isViewer ? 'text-amber-400' : 'text-gold'}`}>
+                  {isViewer ? 'MODO VISOR (SOLO LECTURA)' : (userRole || 'master')}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Banner de Modo Visor Restringido */}
+      {isViewer && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-xs text-amber-300 flex-shrink-0 animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span className="font-bold">Modo Visor Activado:</span>
+            <span className="text-amber-200/90 text-[11px] hidden sm:inline">
+              Acceso en solo lectura. Las acciones de creación, edición, borrado y autorización están deshabilitadas.
+            </span>
+          </div>
+          <span className="text-[10px] uppercase font-mono font-bold bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40">
+            🔒 Solo Consulta
+          </span>
+        </div>
+      )}
 
       {/* Main Body: Left Sidebar Navigation + Content Workspace */}
       <div className="flex-1 flex overflow-hidden">
@@ -590,8 +625,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               solicitudesCompra={solicitudesCompra}
               ordenesCompra={ordenesCompra}
               recepciones={recepciones}
-              userRole={userRole}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
               onNavigateTab={setActiveTab}
             />
@@ -603,8 +639,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               proyectos={proyectos}
               insumos={insumos}
               clientes={clientes}
-              userRole={userRole}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
               onNavigateToOficios={handleOpenOficiosModule}
               onGenerarOc={(sc) => {
@@ -620,8 +657,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               proveedores={proveedores}
               clientes={clientes}
               proyectos={proyectos}
-              userRole={userRole}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
               onNavigateToOficios={handleOpenOficiosModule}
               onRecepcionar={(oc) => {
@@ -637,7 +675,8 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               insumos={insumos}
               clientes={clientes}
               proyectos={proyectos}
-              userRole={userRole}
+              userRole={effectiveRole}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
               onNavigateToOficios={handleOpenOficiosModule}
             />
@@ -656,8 +695,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               solicitudes={solicitudesMaterial}
               proyectos={proyectos}
               insumos={insumos}
-              userRole={userRole}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
               onNavigateToOficios={handleOpenOficiosModule}
               onGenerarVale={(sm) => {
@@ -671,7 +711,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               vales={valesEntrega}
               solicitudesMaterial={solicitudesMaterial}
               inventario={inventario}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
               onNavigateToOficios={handleOpenOficiosModule}
             />
@@ -682,7 +724,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               devoluciones={devoluciones}
               proyectos={proyectos}
               insumos={insumos}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
             />
           )}
@@ -692,7 +736,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               proyectos={proyectos}
               vales={valesEntrega}
               solicitudesMaterial={solicitudesMaterial}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
               onNavigateToOficios={handleOpenOficiosModule}
             />
@@ -702,7 +748,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
             <CajaBancosTab
               cuentas={cuentas}
               movimientos={movimientos}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
             />
           )}
@@ -713,7 +761,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               clientes={clientes}
               proyectos={proyectos}
               cuentas={cuentas}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
             />
           )}
@@ -724,7 +774,9 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               proveedores={proveedores}
               cuentas={cuentas}
               ordenesCompra={ordenesCompra}
+              userRole={effectiveRole}
               userName={userName}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
             />
           )}
@@ -732,20 +784,37 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
           {activeTab === 'catalogo_proveedores' && (
             <ProveedoresTab
               proveedores={proveedores}
+              userRole={effectiveRole}
+              canEdit={canEdit}
               onRefresh={cargarDatos}
             />
           )}
 
           {activeTab === 'db_clientes' && (
-            <ClientesAdminView clientes={clientes} onRefresh={cargarDatos} />
+            <ClientesAdminView
+              clientes={clientes}
+              userRole={effectiveRole}
+              canEdit={canEdit}
+              onRefresh={cargarDatos}
+            />
           )}
 
           {activeTab === 'db_proyectos' && (
-            <ProyectosAdminView proyectos={proyectos} onRefresh={cargarDatos} />
+            <ProyectosAdminView
+              proyectos={proyectos}
+              userRole={effectiveRole}
+              canEdit={canEdit}
+              onRefresh={cargarDatos}
+            />
           )}
 
           {activeTab === 'db_materiales' && (
-            <MaterialesAdminView insumos={insumos} onRefresh={cargarDatos} />
+            <MaterialesAdminView
+              insumos={insumos}
+              userRole={effectiveRole}
+              canEdit={canEdit}
+              onRefresh={cargarDatos}
+            />
           )}
         </main>
       </div>

@@ -9,6 +9,7 @@ interface OficioErpModalProps {
   onClose: () => void;
   oficio: OficioData | null;
   userRole?: string;
+  canEdit?: boolean;
   onSave?: (updated: OficioData) => void;
   onSaveOficio?: (updated: OficioData) => void;
 }
@@ -18,9 +19,11 @@ export const OficioErpModal: React.FC<OficioErpModalProps> = ({
   onClose,
   oficio,
   userRole = 'master',
+  canEdit = true,
   onSave,
   onSaveOficio
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [currentOficio, setCurrentOficio] = useState<OficioData | null>(oficio);
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -34,6 +37,10 @@ export const OficioErpModal: React.FC<OficioErpModalProps> = ({
   const isMaster = userRole === 'master';
 
   const handleToggleEstado = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     const nuevoEstado: 'borrador' | 'emitido' = currentOficio.estado === 'emitido' ? 'borrador' : 'emitido';
     const updated: OficioData = {
       ...currentOficio,
@@ -149,18 +156,20 @@ export const OficioErpModal: React.FC<OficioErpModalProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={handleToggleEstado}
-              disabled={saving}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 text-xs ${
-                currentOficio.estado === 'emitido'
-                  ? 'bg-dark-3 hover:bg-dark-4 text-cream border border-dark-4'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{currentOficio.estado === 'emitido' ? 'Cambiar a Borrador' : 'Marcar como Emitido'}</span>
-            </button>
+            {isAllowedToEdit && (
+              <button
+                onClick={handleToggleEstado}
+                disabled={saving}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 text-xs ${
+                  currentOficio.estado === 'emitido'
+                    ? 'bg-dark-3 hover:bg-dark-4 text-cream border border-dark-4'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{currentOficio.estado === 'emitido' ? 'Cambiar a Borrador' : 'Marcar como Emitido'}</span>
+              </button>
+            )}
           </div>
 
           {/* Action Buttons */}

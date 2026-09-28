@@ -14,10 +14,13 @@ import {
    ========================================================================= */
 interface ClientesViewProps {
   clientes: ClienteReal[];
+  canEdit?: boolean;
+  userRole?: string;
   onRefresh?: () => void;
 }
 
-export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRefresh }) => {
+export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, canEdit = true, userRole = 'master', onRefresh }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'filas' | 'fichas'>('filas');
   
@@ -55,6 +58,10 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
   const [deleting, setDeleting] = useState(false);
 
   const handleOpenCreate = () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     setSelectedCliente(null);
     setNombre('');
     setRfc('');
@@ -103,6 +110,10 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
   };
 
   const handleGuardar = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!nombre.trim()) {
       alert('El nombre o razón social del cliente es obligatorio.');
       return;
@@ -128,6 +139,10 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
   };
 
   const handleEliminar = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!selectedCliente) return;
     if (!window.confirm(`¿Estás seguro de eliminar a "${selectedCliente.nombre}" de la base de datos?`)) return;
 
@@ -166,13 +181,20 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
 
         {/* Action button, view mode toggle & search */}
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-3.5 py-2 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs shadow-md shadow-gold/20 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Registrar Cliente
-          </button>
+          {isAllowedToEdit ? (
+            <button
+              onClick={handleOpenCreate}
+              className="flex items-center gap-2 px-3.5 py-2 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs shadow-md shadow-gold/20 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Registrar Cliente
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold">
+              <Eye className="w-3.5 h-3.5" />
+              Modo Visor
+            </div>
+          )}
 
           {/* Toggle View Mode */}
           <div className="flex items-center bg-dark-3 p-1 rounded-xl border border-dark-4">
@@ -564,17 +586,19 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
                               <td className="py-2.5 px-3 text-center">
                                 <button
                                   type="button"
+                                  disabled={!isAllowedToEdit}
                                   onClick={async () => {
+                                    if (!isAllowedToEdit) return;
                                     const nuevoEstado = of.estado === 'emitido' ? 'borrador' : 'emitido';
                                     await adminDbService.actualizarEstadoOficio(of.folio || of.id || '', nuevoEstado);
                                     setAllOficios(prev => prev.map(o => (o.folio === of.folio || o.id === of.id) ? { ...o, estado: nuevoEstado } : o));
                                   }}
-                                  className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase font-mono border cursor-pointer hover:scale-105 transition-all ${
+                                  className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase font-mono border ${isAllowedToEdit ? 'cursor-pointer hover:scale-105' : 'cursor-default opacity-80'} transition-all ${
                                     of.estado === 'emitido' || !of.estado
                                       ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
                                       : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
                                   }`}
-                                  title="Haz clic para alternar entre Emitido y Borrador"
+                                  title={isAllowedToEdit ? "Haz clic para alternar entre Emitido y Borrador" : "Estado del oficio"}
                                 >
                                   {of.estado === 'borrador' ? '✎ Borrador' : '✓ Emitido'}
                                 </button>
@@ -628,7 +652,7 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
             </div>
 
             <div className="p-6 border-t border-dark-4/50 flex justify-between items-center bg-dark-3/50 flex-shrink-0">
-              {selectedCliente && activeModalTab === 'datos' ? (
+              {isAllowedToEdit && selectedCliente && activeModalTab === 'datos' ? (
                 <button
                   onClick={handleEliminar}
                   disabled={deleting || saving}
@@ -646,7 +670,7 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
                 >
                   Cerrar
                 </button>
-                {(activeModalTab === 'datos' || !selectedCliente) && (
+                {isAllowedToEdit && (activeModalTab === 'datos' || !selectedCliente) && (
                   <button
                     onClick={handleGuardar}
                     disabled={saving || deleting || !nombre.trim()}
@@ -679,10 +703,13 @@ export const ClientesAdminView: React.FC<ClientesViewProps> = ({ clientes, onRef
    ========================================================================= */
 interface ProyectosViewProps {
   proyectos: ProyectoReal[];
+  canEdit?: boolean;
+  userRole?: string;
   onRefresh?: () => void;
 }
 
-export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, onRefresh }) => {
+export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, canEdit = true, userRole = 'master', onRefresh }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'filas' | 'fichas'>('filas');
 
@@ -715,6 +742,10 @@ export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, on
   };
 
   const handleOpenCreate = () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     setSelectedProyecto(null);
     setTitulo('');
     setClienteNombre('');
@@ -735,6 +766,10 @@ export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, on
   };
 
   const handleGuardar = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!titulo.trim()) {
       alert('El nombre del proyecto / presupuesto es obligatorio.');
       return;
@@ -760,6 +795,10 @@ export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, on
   };
 
   const handleEliminar = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!selectedProyecto) return;
     if (!window.confirm(`¿Estás seguro de eliminar el proyecto "${selectedProyecto.titulo}"?`)) return;
 
@@ -797,13 +836,20 @@ export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, on
 
         {/* View mode toggle & search */}
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-3.5 py-2 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs shadow-md shadow-gold/20 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo Proyecto
-          </button>
+          {isAllowedToEdit ? (
+            <button
+              onClick={handleOpenCreate}
+              className="flex items-center gap-2 px-3.5 py-2 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs shadow-md shadow-gold/20 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo Proyecto
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold">
+              <Eye className="w-3.5 h-3.5" />
+              Modo Visor
+            </div>
+          )}
 
           {/* Toggle View Mode */}
           <div className="flex items-center bg-dark-3 p-1 rounded-xl border border-dark-4">
@@ -1050,7 +1096,7 @@ export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, on
             </div>
 
             <div className="p-6 border-t border-dark-4/50 flex justify-between items-center bg-dark-3/50">
-              {selectedProyecto ? (
+              {isAllowedToEdit && selectedProyecto ? (
                 <button
                   onClick={handleEliminar}
                   disabled={deleting || saving}
@@ -1066,16 +1112,18 @@ export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, on
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 text-xs font-semibold text-cream-muted hover:bg-dark-4 rounded-xl transition-colors"
                 >
-                  Cancelar
+                  {isAllowedToEdit ? 'Cancelar' : 'Cerrar'}
                 </button>
-                <button
-                  onClick={handleGuardar}
-                  disabled={saving || deleting || !titulo.trim()}
-                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-dark-1 bg-gold hover:bg-gold-light disabled:opacity-50 rounded-xl shadow-md transition-all"
-                >
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  {saving ? 'Guardando en BD...' : 'Guardar Proyecto'}
-                </button>
+                {isAllowedToEdit && (
+                  <button
+                    onClick={handleGuardar}
+                    disabled={saving || deleting || !titulo.trim()}
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-dark-1 bg-gold hover:bg-gold-light disabled:opacity-50 rounded-xl shadow-md transition-all"
+                  >
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    {saving ? 'Guardando en BD...' : 'Guardar Proyecto'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1090,10 +1138,13 @@ export const ProyectosAdminView: React.FC<ProyectosViewProps> = ({ proyectos, on
    ========================================================================= */
 interface InsumosViewProps {
   insumos: InsumoReal[];
+  canEdit?: boolean;
+  userRole?: string;
   onRefresh?: () => void;
 }
 
-export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, onRefresh }) => {
+export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, canEdit = true, userRole = 'master', onRefresh }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'filas' | 'fichas'>('filas');
 
@@ -1110,6 +1161,10 @@ export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, onRef
   const [deleting, setDeleting] = useState(false);
 
   const handleOpenCreate = () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     setSelectedInsumo(null);
     setCodigo('');
     setNombre('');
@@ -1132,6 +1187,10 @@ export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, onRef
   };
 
   const handleGuardar = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!codigo.trim() || !nombre.trim()) {
       alert('El código y la descripción del insumo son obligatorios.');
       return;
@@ -1158,6 +1217,10 @@ export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, onRef
   };
 
   const handleEliminar = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!selectedInsumo) return;
     if (!window.confirm(`¿Estás seguro de eliminar el insumo "${selectedInsumo.nombre}" del catálogo maestro?`)) return;
 
@@ -1195,13 +1258,20 @@ export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, onRef
 
         {/* View mode toggle & search */}
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-3.5 py-2 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs shadow-md shadow-gold/20 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Registrar Insumo
-          </button>
+          {isAllowedToEdit ? (
+            <button
+              onClick={handleOpenCreate}
+              className="flex items-center gap-2 px-3.5 py-2 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-xs shadow-md shadow-gold/20 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Registrar Insumo
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold">
+              <Eye className="w-3.5 h-3.5" />
+              Modo Visor
+            </div>
+          )}
 
           {/* Toggle View Mode */}
           <div className="flex items-center bg-dark-3 p-1 rounded-xl border border-dark-4">
@@ -1450,7 +1520,7 @@ export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, onRef
             </div>
 
             <div className="p-6 border-t border-dark-4/50 flex justify-between items-center bg-dark-3/50">
-              {selectedInsumo ? (
+              {isAllowedToEdit && selectedInsumo ? (
                 <button
                   onClick={handleEliminar}
                   disabled={deleting || saving}
@@ -1466,16 +1536,18 @@ export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, onRef
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 text-xs font-semibold text-cream-muted hover:bg-dark-4 rounded-xl transition-colors"
                 >
-                  Cancelar
+                  {isAllowedToEdit ? 'Cancelar' : 'Cerrar'}
                 </button>
-                <button
-                  onClick={handleGuardar}
-                  disabled={saving || deleting || !codigo.trim() || !nombre.trim()}
-                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-dark-1 bg-gold hover:bg-gold-light disabled:opacity-50 rounded-xl shadow-md transition-all"
-                >
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  {saving ? 'Guardando en BD...' : 'Guardar Insumo'}
-                </button>
+                {isAllowedToEdit && (
+                  <button
+                    onClick={handleGuardar}
+                    disabled={saving || deleting || !codigo.trim() || !nombre.trim()}
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-dark-1 bg-gold hover:bg-gold-light disabled:opacity-50 rounded-xl shadow-md transition-all"
+                  >
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    {saving ? 'Guardando en BD...' : 'Guardar Insumo'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -54,6 +54,7 @@ export function Portal() {
     closePortal,
     users,
     updateUserRole,
+    updateUserAdminSystemRole,
     updateCurrentUser,
     logout,
     products,
@@ -83,8 +84,8 @@ export function Portal() {
           setActiveTab('dashboard');
         }
       } else if (currentUser.role === 'admin') {
-        // Admins cannot access master-only views (dashboard, pro, cms, agents, seo, roles)
-        if (activeTab === 'cms' || activeTab === 'agents' || activeTab === 'seo' || activeTab === 'roles') {
+        // Admins cannot access master-only CMS/Agents/SEO views
+        if (activeTab === 'cms' || activeTab === 'agents' || activeTab === 'seo') {
             setActiveTab('dashboard');
           }
       }
@@ -684,7 +685,7 @@ export function Portal() {
                         )}
                       </div>
   {/* CONFIGURACION ACCORDION */}
-                      {currentUser.role === 'master' && (
+                      {(currentUser.role === 'master' || currentUser.role === 'admin') && (
                       <div className="pt-2">
                         {!sidebarCollapsed && (
                           <button 
@@ -700,19 +701,20 @@ export function Portal() {
                         )}
                         {(configExpanded || sidebarCollapsed) && (
                           <div className={sidebarCollapsed ? "space-y-0" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
-                            <button
-                              onClick={() => setActiveTab('agents')}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                activeTab === 'agents'
-                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                            >
-                              <Bot className="w-4 h-4 stroke-[2]" />
-                              {!sidebarCollapsed && <span>Motores Chat IA</span>}
-                            </button>
                             {currentUser.role === 'master' && (
-<button
+                              <button
+                                onClick={() => setActiveTab('agents')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                  activeTab === 'agents'
+                                    ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                    : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                                } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                              >
+                                <Bot className="w-4 h-4 stroke-[2]" />
+                                {!sidebarCollapsed && <span>Motores Chat IA</span>}
+                              </button>
+                            )}
+                            <button
                               onClick={() => setActiveTab('roles')}
                               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
                                 activeTab === 'roles'
@@ -723,7 +725,6 @@ export function Portal() {
                               <Sliders className="w-4 h-4 stroke-[2]" />
                               {!sidebarCollapsed && <span>Roles y Permisos</span>}
                             </button>
-)}
                             <button
                               onClick={() => setActiveTab('cfeconfig')}
                               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
@@ -1968,6 +1969,7 @@ export function Portal() {
                                 <th className="py-3">Usuario</th>
                                 <th className="py-3">Email</th>
                                 <th className="py-3">Rol Actual</th>
+                                <th className="py-3 text-center">Sistema Administrativo</th>
                                 <th className="py-3 text-right">Modificar Privilegios</th>
                               </tr>
                             </thead>
@@ -1992,9 +1994,63 @@ export function Portal() {
                                       {u.role === 'user' ? 'Cliente' : u.role.toUpperCase()}
                                     </span>
                                   </td>
+                                  <td className="py-3.5 text-center select-none">
+                                    {(() => {
+                                      const isCorona = u.email?.toLowerCase().trim() === 'corona.gustavoc@gmail.com';
+                                      const isMaster = currentUser.role === 'master';
+                                      const admRole = isCorona ? 'visor' : (u.adminSystemRole || 'editor');
+                                      const canToggle = isMaster && !isCorona;
+
+                                      return (
+                                        <div className="inline-flex flex-col items-center gap-1">
+                                          <label 
+                                            className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-xl border transition-all ${
+                                              canToggle 
+                                                ? 'cursor-pointer hover:border-gold/50 bg-dark-3/60' 
+                                                : 'cursor-not-allowed opacity-80 bg-dark-3/30 border-dark-4'
+                                            }`}
+                                            title={
+                                              isCorona 
+                                                ? 'Restricción de seguridad: Gustavo Corona solo puede tener acceso de Visor.' 
+                                                : !isMaster 
+                                                ? 'Solo el rol Master puede editar los permisos del Sistema Administrativo.' 
+                                                : 'Marcar para otorgar poder de editar, desmarcar para modo visor.'
+                                            }
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={admRole === 'editor'}
+                                              disabled={!canToggle}
+                                              onChange={(e) => {
+                                                if (!canToggle) return;
+                                                const nextRole = e.target.checked ? 'editor' : 'visor';
+                                                updateUserAdminSystemRole(u.id, nextRole);
+                                              }}
+                                              className="w-4 h-4 rounded border-dark-4 text-gold focus:ring-gold bg-dark-2 disabled:cursor-not-allowed cursor-pointer"
+                                            />
+                                            <span className={`text-[10px] font-mono font-bold uppercase ${
+                                              admRole === 'editor' ? 'text-emerald-400' : 'text-amber-400'
+                                            }`}>
+                                              {admRole === 'editor' ? 'Poder de Editar' : 'Visor (Solo Lectura)'}
+                                            </span>
+                                          </label>
+                                          {isCorona && (
+                                            <span className="text-[9px] text-amber-400 font-mono font-semibold flex items-center gap-1">
+                                              🔒 Restricción activa
+                                            </span>
+                                          )}
+                                          {!isMaster && !isCorona && (
+                                            <span className="text-[8.5px] text-cream-dim/60 font-mono">
+                                              (Solo Master)
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
                                   <td className="py-3.5 text-right select-none">
                                     <select
-                                      disabled={currentUser.email === u.email}
+                                      disabled={currentUser.role !== 'master' || currentUser.email === u.email}
                                       value={u.role}
                                       onChange={(e) => {
                                         const newRole = e.target.value as UserRole;
@@ -2127,6 +2183,8 @@ export function Portal() {
                   <SistemaAdministrativoApp
                     userRole={currentUser?.role || 'master'}
                     userName={currentUser?.name || 'Administrador General'}
+                    userEmail={currentUser?.email}
+                    adminSystemRole={currentUser?.adminSystemRole}
                     onBackToPortal={() => setActiveTab('dashboard')}
                     onNavigateToOficios={(folio) => {
                       localStorage.setItem('esol_legal_active_subtab', 'oficios');

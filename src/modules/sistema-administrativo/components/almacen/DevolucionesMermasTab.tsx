@@ -4,7 +4,7 @@ import type { OficioData } from '../../../components/legal/oficios/types';
 import { adminDbService } from '../../services/adminDbService';
 import { OficioErpModal } from '../oficios/OficioErpModal';
 import { 
-  RotateCcw, AlertTriangle, Plus, Search, CheckCircle, PackageMinus, RefreshCw, FileText
+  RotateCcw, AlertTriangle, Plus, Search, CheckCircle, PackageMinus, RefreshCw, FileText, Eye
 } from 'lucide-react';
 
 interface DevolucionesMermasTabProps {
@@ -13,6 +13,7 @@ interface DevolucionesMermasTabProps {
   insumos: InsumoReal[];
   userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
 }
 
@@ -22,8 +23,10 @@ export const DevolucionesMermasTab: React.FC<DevolucionesMermasTabProps> = ({
   insumos,
   userRole = 'master',
   userName = 'Almacenista',
+  canEdit = true,
   onRefresh
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<'todos' | 'devolucion' | 'merma'>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,6 +54,10 @@ export const DevolucionesMermasTab: React.FC<DevolucionesMermasTabProps> = ({
   };
 
   const handleGuardarRegistro = async () => {
+    if (!isAllowedToEdit) {
+      alert('Operación no permitida: Tu usuario está en Modo Visor (solo lectura).');
+      return;
+    }
     if (!descripcionInsumo.trim() || cantidad <= 0) {
       alert('Por favor ingrese un material y una cantidad válida.');
       return;
@@ -112,16 +119,23 @@ export const DevolucionesMermasTab: React.FC<DevolucionesMermasTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm shadow-md shadow-amber-500/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Registrar Devolución / Merma
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Registrar Devolución / Merma
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-dark-3 border border-dark-4 text-cream-muted rounded-xl text-xs font-bold select-none">
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <span>Modo Visor (Solo Lectura)</span>
+          </div>
+        )}
       </div>
 
       {/* Filter and Search */}

@@ -17,6 +17,7 @@ interface OrdenesCompraTabProps {
   proyectos?: ProyectoReal[];
   userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
   onNavigateToOficios?: (folioOficio?: string) => void;
   onRecepcionar?: (orden: OrdenCompra) => void;
@@ -30,10 +31,12 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
   proyectos = [],
   userRole = 'master',
   userName = 'Administrador',
+  canEdit = true,
   onRefresh,
   onNavigateToOficios,
   onRecepcionar
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todas' | 'aprobada' | 'recibida_parcial' | 'recibida_total' | 'cancelada'>('todas');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,6 +75,10 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
   };
 
   const handleCrearOc = async (conOficio = false) => {
+    if (!isAllowedToEdit) {
+      alert('Operación no permitida: Tu usuario está en Modo Visor (solo lectura).');
+      return;
+    }
     if (!selectedProveedorId) {
       alert('Por favor seleccione un proveedor.');
       return;
@@ -152,16 +159,23 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Orden de Compra
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-sm shadow-md transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva Orden de Compra
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-dark-3 border border-dark-4 text-cream-muted rounded-xl text-xs font-bold select-none">
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <span>Modo Visor (Solo Lectura)</span>
+          </div>
+        )}
       </div>
 
       {/* Filter and Search */}
@@ -319,8 +333,8 @@ export const OrdenesCompraTab: React.FC<OrdenesCompraTabProps> = ({
                           <FileText className="w-4 h-4" />
                         </button>
 
-                        {/* Recepcionar si está activa */}
-                        {(oc.estatus === 'aprobada' || oc.estatus === 'recibida_parcial') && onRecepcionar && (
+                        {/* Recepcionar si está activa y tiene permisos */}
+                        {(oc.estatus === 'aprobada' || oc.estatus === 'recibida_parcial') && onRecepcionar && isAllowedToEdit && (
                           <button
                             onClick={() => onRecepcionar(oc)}
                             className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors"

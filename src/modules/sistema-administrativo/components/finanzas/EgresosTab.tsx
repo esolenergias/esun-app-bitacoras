@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { EgresoRegistro, Proveedor, CuentaFinanciera, OrdenCompra } from '../../types/adminTypes';
 import { adminDbService } from '../../services/adminDbService';
 import { 
-  CreditCard, DollarSign, Plus, Search, CheckCircle, Clock, ArrowUpRight, AlertTriangle
+  CreditCard, DollarSign, Plus, Search, CheckCircle, Clock, ArrowUpRight, AlertTriangle, Eye
 } from 'lucide-react';
 
 interface EgresosTabProps {
@@ -10,7 +10,9 @@ interface EgresosTabProps {
   proveedores: Proveedor[];
   cuentas: CuentaFinanciera[];
   ordenesCompra: OrdenCompra[];
+  userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
 }
 
@@ -19,9 +21,12 @@ export const EgresosTab: React.FC<EgresosTabProps> = ({
   proveedores,
   cuentas,
   ordenesCompra,
+  userRole = 'master',
   userName = 'Administrador',
+  canEdit = true,
   onRefresh
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'pagado' | 'pendiente' | 'parcial'>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,6 +57,10 @@ export const EgresosTab: React.FC<EgresosTabProps> = ({
   };
 
   const handleGuardarEgreso = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!concepto.trim() || montoTotal <= 0) {
       alert('Por favor complete los campos requeridos con un monto válido.');
       return;
@@ -119,16 +128,23 @@ export const EgresosTab: React.FC<EgresosTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-sm shadow-md shadow-rose-500/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Registrar Egreso / CxP
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-sm shadow-md shadow-rose-500/20 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Registrar Egreso / CxP
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold">
+            <Eye className="w-4 h-4" />
+            Modo Visor (Solo Lectura)
+          </div>
+        )}
       </div>
 
       {/* KPI Cards */}

@@ -16,6 +16,7 @@ interface SolicitudesCompraTabProps {
   clientes?: ClienteReal[];
   userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
   onNavigateToOficios?: (folioOficio?: string) => void;
   onGenerarOc?: (solicitud: SolicitudCompra) => void;
@@ -28,6 +29,7 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
   clientes = [],
   userRole = 'master',
   userName = 'Usuario Admin',
+  canEdit = true,
   onRefresh,
   onNavigateToOficios,
   onGenerarOc
@@ -60,7 +62,8 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
   const [itemCantidad, setItemCantidad] = useState(1);
   const [itemPrecio, setItemPrecio] = useState(0);
 
-  const isMasterOrAdmin = userRole === 'master' || userRole === 'admin';
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
+  const isMasterOrAdmin = isAllowedToEdit && (userRole === 'master' || userRole === 'admin');
 
   const handleSelectInsumo = (insumoId: string) => {
     setSelectedInsumoId(insumoId);
@@ -108,6 +111,10 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
   };
 
   const handleGuardarSolicitud = async (conOficio = false) => {
+    if (!isAllowedToEdit) {
+      alert('Operación no permitida: Tu usuario está en Modo Visor (solo lectura).');
+      return;
+    }
     if (partidas.length === 0) {
       alert('Agregue al menos un insumo/material a la solicitud.');
       return;
@@ -157,6 +164,10 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
   };
 
   const handleAutorizar = async (id: string, accion: 'aprobada' | 'rechazada') => {
+    if (!isAllowedToEdit) {
+      alert('Operación no permitida: Tu usuario está en Modo Visor (solo lectura).');
+      return;
+    }
     await adminDbService.autorizarSolicitudCompra(id, accion, userName);
     onRefresh();
     if (selectedSolicitud && selectedSolicitud.id === id) {
@@ -189,16 +200,23 @@ export const SolicitudesCompraTab: React.FC<SolicitudesCompraTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Solicitud de Compra
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 font-bold rounded-xl text-sm shadow-md transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva Solicitud de Compra
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-dark-3 border border-dark-4 text-cream-muted rounded-xl text-xs font-bold select-none">
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <span>Modo Visor (Solo Lectura)</span>
+          </div>
+        )}
       </div>
 
       {/* Filter and Search */}

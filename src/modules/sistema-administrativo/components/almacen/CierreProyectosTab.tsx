@@ -11,7 +11,9 @@ interface CierreProyectosTabProps {
   proyectos: ProyectoReal[];
   vales: ValeEntrega[];
   solicitudesMaterial: SolicitudMaterial[];
+  userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
   onNavigateToOficios?: (folioOficio?: string) => void;
 }
@@ -20,10 +22,13 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
   proyectos,
   vales,
   solicitudesMaterial,
+  userRole = 'master',
   userName = 'Administrador',
+  canEdit = true,
   onRefresh,
   onNavigateToOficios
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProyecto, setSelectedProyecto] = useState<ProyectoReal | null>(null);
   const [selectedOficio, setSelectedOficio] = useState<OficioData | null>(null);
@@ -238,13 +243,19 @@ export const CierreProyectosTab: React.FC<CierreProyectosTabProps> = ({
                 Cancelar
               </button>
 
-              <button
-                onClick={() => handleEmitirCierre(selectedProyecto, actaObservaciones)}
-                className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-dark-1 bg-gold hover:bg-gold-light rounded-xl shadow-md transition-all"
-              >
-                <FileText className="w-4 h-4" />
-                Generar y Firmar Acta de Cierre (Oficio Oficial)
-              </button>
+              {isAllowedToEdit ? (
+                <button
+                  onClick={() => handleEmitirCierre(selectedProyecto, actaObservaciones)}
+                  className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-dark-1 bg-gold hover:bg-gold-light rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  <FileText className="w-4 h-4" />
+                  Generar y Firmar Acta de Cierre (Oficio Oficial)
+                </button>
+              ) : (
+                <span className="text-xs text-amber-400 font-bold bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20">
+                  Modo Visor: Solo lectura de auditoría (no se puede emitir acta)
+                </span>
+              )}
             </div>
           </div>
         </div>

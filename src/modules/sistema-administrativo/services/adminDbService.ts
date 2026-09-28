@@ -117,6 +117,22 @@ export function generateAdminFolio(prefix: string, existingList: { folio?: strin
 }
 
 export class AdminDbService {
+  private isReadOnly: boolean = false;
+
+  setReadOnly(readOnly: boolean) {
+    this.isReadOnly = readOnly;
+  }
+
+  getReadOnly(): boolean {
+    return this.isReadOnly;
+  }
+
+  assertCanMutate(actionName: string = 'realizar modificaciones') {
+    if (this.isReadOnly) {
+      throw new Error(`Acción bloqueada: El usuario actual tiene asignado Modo Visor (solo lectura) y no tiene permisos para ${actionName}.`);
+    }
+  }
+
   constructor() {
     this.purgarDatosInventadosLegacy();
   }
@@ -456,6 +472,7 @@ export class AdminDbService {
   }
 
   async guardarProveedor(prov: Partial<Proveedor>): Promise<Proveedor> {
+    this.assertCanMutate('guardar o modificar proveedores');
     const list = this.getProveedores();
     const updated: Proveedor = {
       id: prov.id || `prov-${Date.now()}`,
@@ -478,6 +495,7 @@ export class AdminDbService {
   }
 
   async eliminarProveedor(id: string): Promise<void> {
+    this.assertCanMutate('eliminar proveedores');
     const list = this.getProveedores().filter(p => p.id !== id);
     setLocal(KEYS.PROVEEDORES, list);
   }
@@ -490,6 +508,7 @@ export class AdminDbService {
   }
 
   async crearSolicitudCompra(data: Partial<SolicitudCompra>): Promise<SolicitudCompra> {
+    this.assertCanMutate('crear solicitudes de compra');
     const list = this.getSolicitudesCompra();
     const folio = data.folio || generateAdminFolio('SC', list);
     const total = (data.partidas || []).reduce((acc, it) => acc + (it.importe || (it.cantidad * it.precio_unitario)), 0);
@@ -526,6 +545,7 @@ export class AdminDbService {
   }
 
   async autorizarSolicitudCompra(id: string, accion: 'aprobada' | 'rechazada', autorizador: string): Promise<void> {
+    this.assertCanMutate('autorizar o rechazar solicitudes de compra');
     const list = this.getSolicitudesCompra();
     const sc = list.find(s => s.id === id);
     if (sc) {
@@ -544,6 +564,7 @@ export class AdminDbService {
   }
 
   async crearOrdenCompra(data: Partial<OrdenCompra>): Promise<OrdenCompra> {
+    this.assertCanMutate('crear órdenes de compra');
     const list = this.getOrdenesCompra();
     const folio = data.folio || generateAdminFolio('OC', list);
     const subtotal = (data.partidas || []).reduce((acc, it) => acc + (it.importe || (it.cantidad * it.precio_unitario)), 0);
@@ -607,6 +628,7 @@ export class AdminDbService {
   }
 
   async crearRecepcion(data: Partial<RecepcionMercancia>, insumos: InsumoReal[] = []): Promise<RecepcionMercancia> {
+    this.assertCanMutate('registrar recepciones de mercancía');
     const list = this.getRecepciones();
     const folio = data.folio || generateAdminFolio('REC', list);
 
@@ -727,6 +749,7 @@ export class AdminDbService {
   }
 
   async crearSolicitudMaterial(data: Partial<SolicitudMaterial>): Promise<SolicitudMaterial> {
+    this.assertCanMutate('crear solicitudes de material');
     const list = this.getSolicitudesMaterial();
     const folio = data.folio || generateAdminFolio('SM', list);
 
@@ -758,6 +781,7 @@ export class AdminDbService {
   }
 
   async autorizarSolicitudMaterial(id: string, accion: 'aprobada' | 'rechazada', autorizador: string): Promise<void> {
+    this.assertCanMutate('autorizar o rechazar solicitudes de material');
     const list = this.getSolicitudesMaterial();
     const sm = list.find(s => s.id === id);
     if (sm) {
@@ -776,6 +800,7 @@ export class AdminDbService {
   }
 
   async crearValeEntrega(data: Partial<ValeEntrega>): Promise<ValeEntrega> {
+    this.assertCanMutate('crear vales de entrega');
     const list = this.getValesEntrega();
     const folio = data.folio || generateAdminFolio('VE', list);
 
@@ -860,6 +885,7 @@ export class AdminDbService {
   }
 
   async crearDevolucionMerma(data: Partial<DevolucionMerma>): Promise<DevolucionMerma> {
+    this.assertCanMutate('registrar devoluciones o mermas');
     const list = this.getDevoluciones();
     const prefix = data.tipo === 'devolucion' ? 'DEV' : 'MER';
     const folio = generateAdminFolio(prefix, list);
@@ -930,6 +956,7 @@ export class AdminDbService {
   }
 
   async crearMovimientoFinanciero(data: Partial<MovimientoFinanciero>): Promise<MovimientoFinanciero> {
+    this.assertCanMutate('registrar movimientos de tesorería');
     const movimientos = this.getMovimientos();
     const cuentas = this.getCuentas();
 
@@ -967,6 +994,7 @@ export class AdminDbService {
   }
 
   async crearIngreso(data: Partial<IngresoRegistro>): Promise<IngresoRegistro> {
+    this.assertCanMutate('registrar ingresos');
     const list = this.getIngresos();
     const folio = generateAdminFolio('ING', list);
 
@@ -1013,6 +1041,7 @@ export class AdminDbService {
   }
 
   async crearEgreso(data: Partial<EgresoRegistro>): Promise<EgresoRegistro> {
+    this.assertCanMutate('registrar egresos');
     const list = this.getEgresos();
     const folio = generateAdminFolio('EGR', list);
 
@@ -1059,6 +1088,7 @@ export class AdminDbService {
   // ----------------------------------------------------------
   
   async guardarOficioErp(oficio: OficioData): Promise<OficioData> {
+    this.assertCanMutate('guardar o modificar oficios oficiales');
     const today = new Date().toISOString().split('T')[0];
     const updatedRecord: OficioData = {
       ...oficio,

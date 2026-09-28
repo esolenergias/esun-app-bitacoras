@@ -2,6 +2,8 @@
 // TIPOS DEL SISTEMA ADMINISTRATIVO (ERP ESOL ENERGÍAS)
 // ==========================================================
 
+export type AdminAccessMode = 'editor' | 'visor';
+
 export type AdminTabType =
   | 'resumen'
   | 'oficios_central'

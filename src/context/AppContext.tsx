@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 
 // Define Types
 export type UserRole = 'user' | 'admin' | 'master';
+export type AdminSystemRole = 'editor' | 'visor';
 
 export interface VolumeTier {
   minQty: number;
@@ -36,6 +37,7 @@ export interface User {
   role: UserRole;
   avatar?: string;
   verified: boolean;
+  adminSystemRole?: AdminSystemRole;
 }
 
 export interface LandingPageContent {
@@ -140,6 +142,8 @@ interface AppContextType {
   // Users management (Master)
   users: User[];
   updateUserRole: (userId: string, newRole: UserRole) => void;
+  adminSystemPermissions: Record<string, AdminSystemRole>;
+  updateUserAdminSystemRole: (userId: string, newAdminRole: AdminSystemRole) => Promise<boolean>;
 
   // Theme
   theme: 'dark' | 'light';
@@ -258,10 +262,11 @@ Monto: <monto total aproximado en MXN, ej. $4,800 o vacío>`,
 
 
 const initialUsers: User[] = [
-  { id: 'usr-1', name: 'Manuel Fregoso', email: 'menyfre@gmail.com', role: 'master', verified: true, avatar: '👑' },
-  { id: 'usr-2', name: 'Ana Martínez (Ventas)', email: 'admin.esol@gmail.com', role: 'admin', verified: true, avatar: '💼' },
-  { id: 'usr-3', name: 'Carlos Delgado (Cliente B2B)', email: 'cliente.esol@gmail.com', role: 'user', verified: true, avatar: '☀️' },
-  { id: 'usr-4', name: 'Alfonso Gómez (Lead)', email: 'alfonso@gmail.com', role: 'user', verified: true, avatar: '☀️' }
+  { id: 'usr-1', name: 'Manuel Fregoso', email: 'menyfre@gmail.com', role: 'master', verified: true, avatar: '👑', adminSystemRole: 'editor' },
+  { id: 'usr-2', name: 'Ana Martínez (Ventas)', email: 'admin.esol@gmail.com', role: 'admin', verified: true, avatar: '💼', adminSystemRole: 'editor' },
+  { id: 'usr-gustavo', name: 'Gustavo Corona', email: 'corona.gustavoc@gmail.com', role: 'admin', verified: true, avatar: '💼', adminSystemRole: 'visor' },
+  { id: 'usr-3', name: 'Carlos Delgado (Cliente B2B)', email: 'cliente.esol@gmail.com', role: 'user', verified: true, avatar: '☀️', adminSystemRole: 'visor' },
+  { id: 'usr-4', name: 'Alfonso Gómez (Lead)', email: 'alfonso@gmail.com', role: 'user', verified: true, avatar: '☀️', adminSystemRole: 'visor' }
 ];
 
 const initialSEO: SEOData = {
@@ -719,13 +724,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .single();
 
           if (profile && !error) {
+            const userEmail = profile.email || session.user.email || '';
+            const isCorona = userEmail === 'corona.gustavoc@gmail.com';
+            let storedPerms: Record<string, AdminSystemRole> = {};
+            try {
+              storedPerms = JSON.parse(localStorage.getItem('esol_admin_permissions') || '{}');
+            } catch {
+              storedPerms = {};
+            }
+            const adminSystemRole: AdminSystemRole = isCorona ? 'visor' : (storedPerms[userEmail] || (profile.role === 'master' ? 'editor' : 'editor'));
+
             const user: User = {
               id: profile.id,
               name: (session.user.email === 'menyfre@gmail.com') ? 'Manuel Fregoso' : (profile.name || session.user.email?.split('@')[0] || 'Cliente'),
-              email: profile.email || session.user.email || '',
+              email: userEmail,
               role: profile.role as UserRole,
               avatar: profile.avatar || '☀️',
-              verified: true
+              verified: true,
+              adminSystemRole
             };
             setCurrentUser(user);
             localStorage.setItem('esol_current_user', JSON.stringify(user));
@@ -738,13 +754,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             } else if (email.includes('admin')) {
               role = 'admin';
             }
+            const isCorona = email === 'corona.gustavoc@gmail.com';
+            let storedPerms: Record<string, AdminSystemRole> = {};
+            try {
+              storedPerms = JSON.parse(localStorage.getItem('esol_admin_permissions') || '{}');
+            } catch {
+              storedPerms = {};
+            }
+            const adminSystemRole: AdminSystemRole = isCorona ? 'visor' : (storedPerms[email] || (role === 'master' ? 'editor' : 'editor'));
+
             const fallbackUser: User = {
               id: session.user.id,
               name: email === 'menyfre@gmail.com' ? 'Manuel Fregoso' : email.split('@')[0],
               email,
               role,
               avatar: role === 'master' ? '👑' : role === 'admin' ? '💼' : '☀️',
-              verified: true
+              verified: true,
+              adminSystemRole
             };
             setCurrentUser(fallbackUser);
             localStorage.setItem('esol_current_user', JSON.stringify(fallbackUser));
@@ -814,10 +840,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.location.hash = '';
   };
 
+  // Permisos específicos para el Sistema Administrativo (ERP)
+  const [adminSystemPermissions, setAdminSystemPermissions] = useState<Record<string, AdminSystemRole>>(() => {
+    try {
+      const stored = localStorage.getItem('esol_admin_permissions');
+      const parsed = stored ? JSON.parse(stored) : {};
+      return {
+        ...parsed,
+        'corona.gustavoc@gmail.com': 'visor'
+      };
+    } catch {
+      return { 'corona.gustavoc@gmail.com': 'visor' };
+    }
+  });
+
   // Users state for Master dashboard role management
   const [users, setUsers] = useState<User[]>(() => {
     const stored = localStorage.getItem('esol_platform_users');
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      try {
+        const parsed: User[] = JSON.parse(stored);
+        return parsed.map(u => ({
+          ...u,
+          adminSystemRole: u.email === 'corona.gustavoc@gmail.com' ? 'visor' : (u.adminSystemRole || 'editor')
+        }));
+      } catch {
+        return initialUsers;
+      }
+    }
     return initialUsers;
   });
 
@@ -828,7 +878,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
       try {
-        console.log("Fetching profiles from Supabase for admin/master dashboard...");
+        console.log("Fetching profiles and admin permissions from Supabase for admin/master dashboard...");
+        
+        // 1. Fetch permissions mapping from cms_content
+        let permsMap: Record<string, AdminSystemRole> = {
+          ...adminSystemPermissions,
+          'corona.gustavoc@gmail.com': 'visor'
+        };
+
+        const { data: permData } = await supabase
+          .from('cms_content')
+          .select('value')
+          .eq('key', 'admin_system_permissions')
+          .maybeSingle();
+
+        if (permData && permData.value) {
+          permsMap = {
+            ...permData.value,
+            'corona.gustavoc@gmail.com': 'visor'
+          };
+          setAdminSystemPermissions(permsMap);
+          localStorage.setItem('esol_admin_permissions', JSON.stringify(permsMap));
+        }
+
+        // 2. Fetch profiles
         const { data, error } = await supabase
           .from('profiles')
           .select('*');
@@ -839,17 +912,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         
         if (data) {
-          const mappedUsers: User[] = data.map(p => ({
-            id: p.id,
-            name: p.name || p.email.split('@')[0],
-            email: p.email,
-            role: p.role as UserRole,
-            avatar: p.avatar || (p.role === 'master' ? '👑' : p.role === 'admin' ? '💼' : '☀️'),
-            verified: true
-          }));
+          const mappedUsers: User[] = data.map(p => {
+            const isCorona = p.email === 'corona.gustavoc@gmail.com';
+            const admRole: AdminSystemRole = isCorona 
+              ? 'visor' 
+              : (permsMap[p.email] || (p.role === 'master' ? 'editor' : 'editor'));
+
+            return {
+              id: p.id,
+              name: p.name || p.email.split('@')[0],
+              email: p.email,
+              role: p.role as UserRole,
+              avatar: p.avatar || (p.role === 'master' ? '👑' : p.role === 'admin' ? '💼' : '☀️'),
+              verified: true,
+              adminSystemRole: admRole
+            };
+          });
           setUsers(mappedUsers);
           localStorage.setItem('esol_platform_users', JSON.stringify(mappedUsers));
-          console.log("Successfully loaded profiles from Supabase:", mappedUsers.length);
+          console.log("Successfully loaded profiles from Supabase with ERP permissions:", mappedUsers.length);
         }
       } catch (err) {
         console.error("Error fetching profiles from Supabase:", err);
@@ -891,6 +972,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.error("Error updating user role in Supabase:", err);
     }
+  };
+
+  const updateUserAdminSystemRole = async (userId: string, newAdminRole: AdminSystemRole): Promise<boolean> => {
+    // Seguridad: Solo el rol master tiene el poder de conceder permisos de edición en el Sistema Administrativo
+    if (currentUser?.role !== 'master') {
+      alert('Acceso no autorizado: Solo el rol Master puede editar el poder de edición/visor en el Sistema Administrativo.');
+      return false;
+    }
+
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return false;
+
+    // REGLA OBLIGATORIA: corona.gustavoc@gmail.com solo puede ser visor
+    if (targetUser.email === 'corona.gustavoc@gmail.com' && newAdminRole === 'editor') {
+      alert('Restricción del Sistema: El correo corona.gustavoc@gmail.com tiene asignada una restrictiva de seguridad y solo puede ser Visor del Sistema Administrativo (no puede modificar ni editar).');
+      return false;
+    }
+
+    const finalRole: AdminSystemRole = targetUser.email === 'corona.gustavoc@gmail.com' ? 'visor' : newAdminRole;
+
+    const updatedPermissions = {
+      ...adminSystemPermissions,
+      [targetUser.email]: finalRole,
+      'corona.gustavoc@gmail.com': 'visor'
+    };
+
+    setAdminSystemPermissions(updatedPermissions);
+    localStorage.setItem('esol_admin_permissions', JSON.stringify(updatedPermissions));
+
+    setUsers(prev => {
+      const updated = prev.map(u => {
+        if (u.id === userId) {
+          return { ...u, adminSystemRole: finalRole };
+        }
+        return u;
+      });
+      localStorage.setItem('esol_platform_users', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (currentUser && (currentUser.id === userId || currentUser.email === targetUser.email)) {
+      const updatedCurrent = { ...currentUser, adminSystemRole: finalRole };
+      setCurrentUser(updatedCurrent);
+      localStorage.setItem('esol_current_user', JSON.stringify(updatedCurrent));
+    }
+
+    // Persistir en cms_content de Supabase
+    try {
+      await saveCmsContentToDb('admin_system_permissions', updatedPermissions);
+      console.log(`Permiso ERP guardado para ${targetUser.email}: ${finalRole}`);
+    } catch (err) {
+      console.error('Error guardando admin_system_permissions en Supabase:', err);
+    }
+
+    return true;
   };
 
   // Gemini API Key State
@@ -1063,6 +1199,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const keyVal = String(geminiRow.value || '');
             setGlobalGeminiApiKey(keyVal);
             localStorage.setItem('cfe_gemini_api_key', keyVal);
+          }
+
+          const adminPermsRow = cmsData.find(r => r.key === 'admin_system_permissions');
+          if (adminPermsRow && adminPermsRow.value) {
+            console.log("Loaded admin_system_permissions from Supabase");
+            const mergedPerms: Record<string, AdminSystemRole> = {
+              ...adminPermsRow.value,
+              'corona.gustavoc@gmail.com': 'visor'
+            };
+            setAdminSystemPermissions(mergedPerms);
+            localStorage.setItem('esol_admin_permissions', JSON.stringify(mergedPerms));
           }
         } else if (cmsError) {
           console.warn("Could not load cms_content from Supabase:", cmsError.message);
@@ -1502,6 +1649,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentView,
         users,
         updateUserRole,
+        adminSystemPermissions,
+        updateUserAdminSystemRole,
         products,
         addProduct,
         deleteProduct,

@@ -14,6 +14,7 @@ interface SolicitudesMaterialTabProps {
   insumos: InsumoReal[];
   userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
   onNavigateToOficios?: (folioOficio?: string) => void;
   onGenerarVale?: (solicitud: SolicitudMaterial) => void;
@@ -25,10 +26,12 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
   insumos,
   userRole = 'master',
   userName = 'Usuario Admin',
+  canEdit = true,
   onRefresh,
   onNavigateToOficios,
   onGenerarVale
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todas' | 'pendiente' | 'aprobada' | 'rechazada' | 'entregada'>('todas');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -54,7 +57,7 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
   const [itemUnidad, setItemUnidad] = useState('PZA');
   const [itemCantidad, setItemCantidad] = useState(1);
 
-  const isMasterOrAdmin = userRole === 'master' || userRole === 'admin';
+  const isMasterOrAdmin = isAllowedToEdit && (userRole === 'master' || userRole === 'admin');
 
   const handleSelectInsumo = (insumoId: string) => {
     setSelectedInsumoId(insumoId);
@@ -97,6 +100,10 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
   };
 
   const handleGuardarSolicitud = async (conOficio = false) => {
+    if (!isAllowedToEdit) {
+      alert('Operación no permitida: Tu usuario está en Modo Visor (solo lectura).');
+      return;
+    }
     if (!selectedProyectoId) {
       alert('Seleccione un Proyecto / Presupuesto de obra.');
       return;
@@ -145,6 +152,10 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
   };
 
   const handleAutorizar = async (id: string, accion: 'aprobada' | 'rechazada') => {
+    if (!isAllowedToEdit) {
+      alert('Operación no permitida: Tu usuario está en Modo Visor (solo lectura).');
+      return;
+    }
     await adminDbService.autorizarSolicitudMaterial(id, accion, userName);
     onRefresh();
     if (selectedSolicitud && selectedSolicitud.id === id) {
@@ -177,16 +188,23 @@ export const SolicitudesMaterialTab: React.FC<SolicitudesMaterialTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm shadow-md shadow-violet-500/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Solicitud de Material
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm shadow-md shadow-violet-500/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva Solicitud de Material
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-dark-3 border border-dark-4 text-cream-muted rounded-xl text-xs font-bold select-none">
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <span>Modo Visor (Solo Lectura)</span>
+          </div>
+        )}
       </div>
 
       {/* Filter and Search */}

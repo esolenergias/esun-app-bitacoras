@@ -36,6 +36,7 @@ interface CentroOficiosTabProps {
   recepciones: RecepcionMercancia[];
   userRole?: string;
   userName?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
   onNavigateTab?: (tab: any) => void;
 }
@@ -108,9 +109,11 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   recepciones,
   userRole = 'master',
   userName = 'Administrador General',
+  canEdit = true,
   onRefresh,
   onNavigateTab
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [viewMode, setViewMode] = useState<'redactar' | 'historial'>('redactar');
   const [tipoTramite, setTipoTramite] = useState<TipoTramitePeticion>('oficio_legal');
   const [oficiosList, setOficiosList] = useState<OficioData[]>([]);
@@ -495,6 +498,10 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
   // EMISIÓN FORMAL (DUAL SAVE: OFICIOS_OBRA + ENTIDAD ERP)
   const handleEmitirFormalmente = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición ni emisión en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     if (!oficio.folio || !oficio.destinatarioNombre || !oficio.cuerpo) {
       alert('Para emitir formalmente, asegúrate de tener Folio, Destinatario y Cuerpo del Documento.');
       return;
@@ -572,6 +579,10 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   };
 
   const handleGuardarBorrador = async () => {
+    if (!isAllowedToEdit) {
+      alert('No tienes permisos de edición ni emisión en el Sistema Administrativo (Modo Visor).');
+      return;
+    }
     try {
       const borrador: OficioData = {
         ...oficio,
@@ -1755,31 +1766,40 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                   <span>Previsualizar Documento</span>
                 </button>
 
-                <button
-                  onClick={handleGuardarBorrador}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-cream font-bold text-xs flex items-center justify-center gap-2 border border-dark-4 transition-all"
-                >
-                  <span>Guardar Borrador</span>
-                </button>
+                {isAllowedToEdit && (
+                  <button
+                    onClick={handleGuardarBorrador}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-cream font-bold text-xs flex items-center justify-center gap-2 border border-dark-4 transition-all"
+                  >
+                    <span>Guardar Borrador</span>
+                  </button>
+                )}
               </div>
 
-              <button
-                onClick={handleEmitirFormalmente}
-                disabled={isEmitting}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-gold to-gold-light hover:brightness-110 text-dark-1 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-gold/20 transition-all uppercase tracking-wider"
-              >
-                {isEmitting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-dark-1" />
-                    <span>Emitiendo y Guardando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 text-dark-1" />
-                    <span>Emitir Formalmente (Dual Save)</span>
-                  </>
-                )}
-              </button>
+              {isAllowedToEdit ? (
+                <button
+                  onClick={handleEmitirFormalmente}
+                  disabled={isEmitting}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-gold to-gold-light hover:brightness-110 text-dark-1 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-gold/20 transition-all uppercase tracking-wider"
+                >
+                  {isEmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-dark-1" />
+                      <span>Emitiendo y Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 text-dark-1" />
+                      <span>Emitir Formalmente (Dual Save)</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold">
+                  <Eye className="w-4 h-4" />
+                  Modo Visor (Solo Lectura)
+                </div>
+              )}
             </div>
           </div>
         </div>

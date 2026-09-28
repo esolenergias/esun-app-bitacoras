@@ -16,6 +16,7 @@ interface RecepcionesTabProps {
   clientes?: ClienteReal[];
   proyectos?: ProyectoReal[];
   userRole?: string;
+  canEdit?: boolean;
   onRefresh: () => void;
   onNavigateToOficios?: (folioOficio?: string) => void;
 }
@@ -27,9 +28,11 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
   clientes = [],
   proyectos = [],
   userRole = 'master',
+  canEdit = true,
   onRefresh,
   onNavigateToOficios
 }) => {
+  const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'completa' | 'parcial' | 'rechazada'>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,6 +82,10 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
   };
 
   const handleCrearRecepcion = async () => {
+    if (!isAllowedToEdit) {
+      alert('Operación no permitida: Tu usuario está en Modo Visor (solo lectura).');
+      return;
+    }
     if (!selectedOcId) {
       alert('Seleccione una Orden de Compra.');
       return;
@@ -153,21 +160,28 @@ export const RecepcionesTab: React.FC<RecepcionesTabProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          disabled={ocsDisponibles.length === 0}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all ${
-            ocsDisponibles.length === 0
-              ? 'bg-dark-4 text-cream-dim cursor-not-allowed'
-              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
-          }`}
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Recepción {ocsDisponibles.length > 0 && `(${ocsDisponibles.length} OC pendientes)`}
-        </button>
+        {isAllowedToEdit ? (
+          <button
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
+            disabled={ocsDisponibles.length === 0}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all ${
+              ocsDisponibles.length === 0
+                ? 'bg-dark-4 text-cream-dim cursor-not-allowed'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 cursor-pointer'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            Nueva Recepción {ocsDisponibles.length > 0 && `(${ocsDisponibles.length} OC pendientes)`}
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-dark-3 border border-dark-4 text-cream-muted rounded-xl text-xs font-bold select-none">
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <span>Modo Visor (Solo Lectura)</span>
+          </div>
+        )}
       </div>
 
       {/* Filter Bar */}
