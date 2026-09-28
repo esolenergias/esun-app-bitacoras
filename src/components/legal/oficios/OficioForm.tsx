@@ -215,11 +215,14 @@ export default function OficioForm({
 
   // Signature management
   const [signatureSavedNotice, setSignatureSavedNotice] = useState(false);
+  const userSigKey = currentUser?.email 
+    ? `esol_firma_digital_${currentUser.email}` 
+    : (currentUser?.id ? `esol_firma_digital_${currentUser.id}` : 'esol_firma_digital_precargada');
 
   useEffect(() => {
-    // If no signature on this oficio, auto-load pre-saved signature only for master
-    if (isMaster && !oficio.firmaDigital) {
-      const savedSig = localStorage.getItem('esol_firma_digital_precargada');
+    // If no signature on this oficio, auto-load pre-saved signature of the active user
+    if (!oficio.firmaDigital) {
+      const savedSig = localStorage.getItem(userSigKey) || localStorage.getItem('esol_firma_digital_precargada');
       if (savedSig) {
         setOficio(prev => ({
           ...prev,
@@ -228,7 +231,26 @@ export default function OficioForm({
         }));
       }
     }
-  }, [isMaster]);
+
+    // Also auto-populate sender name if currently default/empty
+    if (currentUser?.name && (!oficio.remitenteNombre || oficio.remitenteNombre === 'Manuel de Jesus Fregoso Samaniega')) {
+      let cargo = 'REPRESENTANTE LEGAL';
+      if (currentUser.role === 'master') {
+        cargo = 'DIRECCIÓN GENERAL / REPRESENTANTE LEGAL';
+      } else if (currentUser.role === 'admin') {
+        cargo = 'ADMINISTRACIÓN Y CONTROL DE OPERACIONES';
+      } else if (currentUser.role) {
+        cargo = 'SUPERVISOR DE OBRA Y PROYECTOS';
+      }
+
+      setOficio(prev => ({
+        ...prev,
+        remitenteNombre: prev.remitenteNombre && prev.remitenteNombre !== 'Manuel de Jesus Fregoso Samaniega' ? prev.remitenteNombre : currentUser.name,
+        remitenteCargo: prev.remitenteCargo && prev.remitenteCargo !== 'REPRESENTANTE LEGAL' ? prev.remitenteCargo : cargo,
+        empresaEmail: prev.empresaEmail || currentUser.email || 'contacto@esolenergias.com'
+      }));
+    }
+  }, [currentUser, userSigKey]);
 
   const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -278,6 +300,7 @@ export default function OficioForm({
             }));
 
             try {
+              localStorage.setItem(userSigKey, optimizedBase64);
               localStorage.setItem('esol_firma_digital_precargada', optimizedBase64);
             } catch (lsErr) {
               console.warn('LocalStorage limit exceeded:', lsErr);
@@ -298,6 +321,7 @@ export default function OficioForm({
           incluirFirmaDigital: true
         }));
         try {
+          localStorage.setItem(userSigKey, rawBase64);
           localStorage.setItem('esol_firma_digital_precargada', rawBase64);
         } catch (e) {}
       };
@@ -1205,7 +1229,7 @@ export default function OficioForm({
             </div>
           </div>
 
-          {/* Firma Digital Precargada del Representante (Exclusivo Rol Master) */}
+          {/* Firma Digital Precargada del Emisor / Creador */}
           <div className="bg-dark-2 border border-dark-4 rounded-2xl p-5 shadow-xl space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-dark-4 pb-3">
               <div className="flex items-center gap-3">
@@ -1214,105 +1238,91 @@ export default function OficioForm({
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-cream flex items-center gap-2">
-                    Firma Digital del Representante Legal
+                    Firma Digital del Emisor / Creador
                     <span className="text-[10px] font-mono bg-dark-1 text-gold px-2 py-0.5 rounded border border-gold/30">
-                      Exclusivo Master
+                      {currentUser?.name || 'Firmante Oficial'}
                     </span>
                   </h4>
                   <p className="text-[11px] text-cream-muted">
-                    Estampado y certificación digital de firma oficial en oficios y documentos PDF.
+                    Estampado y certificación digital de tu firma oficial en oficios y documentos PDF.
                   </p>
                 </div>
               </div>
 
-              {isMaster && (
-                <label className="flex items-center gap-2 cursor-pointer bg-dark-1 px-3 py-1.5 rounded-xl border border-dark-4 hover:border-gold/50 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(oficio.incluirFirmaDigital)}
-                    onChange={(e) => setOficio({ ...oficio, incluirFirmaDigital: e.target.checked })}
-                    className="rounded text-gold focus:ring-gold bg-dark-3 border-dark-4 w-4 h-4"
-                  />
-                  <span className="text-xs font-medium text-cream">
-                    {oficio.incluirFirmaDigital ? 'Firma Activa en Oficio' : 'Firma Desactivada'}
-                  </span>
-                </label>
-              )}
+              <label className="flex items-center gap-2 cursor-pointer bg-dark-1 px-3 py-1.5 rounded-xl border border-dark-4 hover:border-gold/50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={Boolean(oficio.incluirFirmaDigital)}
+                  onChange={(e) => setOficio({ ...oficio, incluirFirmaDigital: e.target.checked })}
+                  className="rounded text-gold focus:ring-gold bg-dark-3 border-dark-4 w-4 h-4"
+                />
+                <span className="text-xs font-medium text-cream">
+                  {oficio.incluirFirmaDigital ? 'Firma Activa en Oficio' : 'Firma Desactivada'}
+                </span>
+              </label>
             </div>
 
-            {isMaster ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                {/* Preview Box */}
-                <div className="bg-white rounded-xl p-4 border border-neutral-300 flex flex-col items-center justify-center min-h-[120px] relative">
-                  {oficio.firmaDigital ? (
-                    <>
-                      <img
-                        src={oficio.firmaDigital}
-                        alt="Firma Digital Precargada"
-                        className="max-h-24 max-w-[240px] object-contain"
-                      />
-                      <span className="text-[9px] text-slate-500 mt-2 font-mono uppercase tracking-wider">
-                        Firma Digital Oficial Cargada
-                      </span>
-                    </>
-                  ) : (
-                    <div className="text-center text-slate-400">
-                      <FileEdit className="w-8 h-8 mx-auto mb-1 opacity-40" />
-                      <p className="text-xs font-medium text-slate-600">Sin firma cargada</p>
-                      <p className="text-[10px] text-slate-400">Sube una imagen de tu firma oficial</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Upload Controls */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <label className="flex-1 cursor-pointer bg-dark-3 hover:bg-dark-4 text-cream hover:text-gold border border-dark-4 hover:border-gold/50 rounded-xl px-4 py-2.5 text-xs font-medium flex items-center justify-center gap-2 transition-colors">
-                      <Upload className="w-4 h-4 text-gold" />
-                      <span>{oficio.firmaDigital ? 'Cambiar Imagen de Firma' : 'Subir Imagen de Firma'}</span>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={handleSignatureUpload}
-                        className="hidden"
-                      />
-                    </label>
-
-                    {oficio.firmaDigital && (
-                      <button
-                        type="button"
-                        onClick={handleRemoveSignature}
-                        className="p-2.5 bg-dark-3 hover:bg-red-500/20 text-cream-muted hover:text-red-400 border border-dark-4 hover:border-red-500/30 rounded-xl transition-colors"
-                        title="Quitar firma de este oficio"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+              {/* Preview Box */}
+              <div className="bg-white rounded-xl p-4 border border-neutral-300 flex flex-col items-center justify-center min-h-[120px] relative">
+                {oficio.firmaDigital ? (
+                  <>
+                    <img
+                      src={oficio.firmaDigital}
+                      alt="Firma Digital Precargada"
+                      className="max-h-24 max-w-[240px] object-contain"
+                    />
+                    <span className="text-[9px] text-slate-500 mt-2 font-mono uppercase tracking-wider">
+                      Firma Digital Oficial de {oficio.remitenteNombre || currentUser?.name || 'Usuario'}
+                    </span>
+                  </>
+                ) : (
+                  <div className="text-center text-slate-400">
+                    <FileEdit className="w-8 h-8 mx-auto mb-1 opacity-40" />
+                    <p className="text-xs font-medium text-slate-600">Sin firma cargada</p>
+                    <p className="text-[10px] text-slate-400">Sube una imagen de tu firma oficial</p>
                   </div>
+                )}
+              </div>
 
-                  {signatureSavedNotice && (
-                    <div className="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5 flex items-center gap-1.5 animate-fade-in">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Firma guardada como predeterminada para todos tus oficios.</span>
-                    </div>
+              {/* Upload Controls */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <label className="flex-1 cursor-pointer bg-dark-3 hover:bg-dark-4 text-cream hover:text-gold border border-dark-4 hover:border-gold/50 rounded-xl px-4 py-2.5 text-xs font-medium flex items-center justify-center gap-2 transition-colors">
+                    <Upload className="w-4 h-4 text-gold" />
+                    <span>{oficio.firmaDigital ? 'Cambiar Imagen de Firma' : 'Subir Imagen de Firma'}</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleSignatureUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {oficio.firmaDigital && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveSignature}
+                      className="p-2.5 bg-dark-3 hover:bg-red-500/20 text-cream-muted hover:text-red-400 border border-dark-4 hover:border-red-500/30 rounded-xl transition-colors"
+                      title="Quitar firma de este oficio"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   )}
+                </div>
 
-                  <p className="text-[10px] text-cream-muted leading-relaxed">
-                    💡 <strong>Precarga Automática:</strong> Al subir tu firma se recuerda automáticamente en tu equipo para todos los oficios emitidos.
-                  </p>
-                </div>
+                {signatureSavedNotice && (
+                  <div className="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5 flex items-center gap-1.5 animate-fade-in">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Firma guardada como predeterminada para tu usuario.</span>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-cream-muted leading-relaxed">
+                  💡 <strong>Tu Firma Personal:</strong> Se recordará automáticamente en tu cuenta para todos los oficios que emitas desde tu usuario.
+                </p>
               </div>
-            ) : (
-              <div className="bg-dark-1/70 border border-dark-4 rounded-xl p-4 flex items-start gap-3.5">
-                <Shield className="w-5 h-5 text-gold shrink-0 mt-0.5" />
-                <div className="text-xs text-cream-muted space-y-1">
-                  <p className="text-cream font-medium">Estampado de Firma Digital Exclusivo para Dirección Master</p>
-                  <p className="text-[11px] leading-relaxed">
-                    La carga y estampado digital de la firma del Representante Legal está reservada exclusivamente para el usuario <strong>Master</strong> (Dirección General). Puedes redactar y emitir oficios con todos los datos institucionales para su correspondiente firma autógrafa.
-                  </p>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* C.c.p. (Con copia para) y Anexos */}

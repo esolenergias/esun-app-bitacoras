@@ -411,7 +411,7 @@ export function Portal() {
           <div className="flex-1 flex flex-col md:flex-row min-h-0 w-full">
             
             {/* 3. SIDEBAR NAVIGATION */}
-            <div className={`w-full md:w-64 bg-dark-2 border-b md:border-b-0 md:border-r border-dark-4 p-4 flex flex-col justify-between select-none transition-all duration-300 ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'}`}>
+            <div className={`w-full ${sidebarCollapsed ? 'md:w-20 p-2 md:p-2.5' : 'md:w-64 p-4'} flex-shrink-0 bg-dark-2 border-b md:border-b-0 md:border-r border-dark-4 flex flex-col justify-between select-none transition-all duration-300`}>
               <div className="space-y-4">
                 {/* Profile Card */}
                 <div 
@@ -420,7 +420,7 @@ export function Portal() {
                     setEditProfileAvatar(currentUser.avatar);
                     setIsProfileModalOpen(true);
                   }}
-                  className={`p-3 bg-dark-1/80 border border-dark-4 rounded-2xl flex items-center gap-3 overflow-hidden cursor-pointer hover:bg-dark-3 hover:border-gold/50 transition-colors ${sidebarCollapsed ? 'justify-center p-2' : ''}`}
+                  className={`p-2.5 bg-dark-1/80 border border-dark-4 rounded-2xl flex items-center gap-3 overflow-hidden cursor-pointer hover:bg-dark-3 hover:border-gold/50 transition-colors ${sidebarCollapsed ? 'justify-center p-2' : ''}`}
                   title="Editar Perfil"
                 >
                   <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/35 text-gold flex items-center justify-center font-display text-lg flex-shrink-0">
@@ -446,7 +446,7 @@ export function Portal() {
                     {sidebarCollapsed ? '•' : 'Navegación'}
                   </span>
 
-                                    {/* ------------------------- */}
+                  {/* ------------------------- */}
                   {/* CLIENT ROLE SIDEBAR TABS  */}
                   {/* ------------------------- */}
                   {currentUser.role === 'user' && (
@@ -457,9 +457,10 @@ export function Portal() {
                           activeTab === 'dashboard'
                             ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                             : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                        title="Monitoreo"
                       >
-                        <Zap className="w-4 h-4 stroke-[2]" />
+                        <Zap className="w-4 h-4 stroke-[2] flex-shrink-0" />
                         {!sidebarCollapsed && <span>Monitoreo</span>}
                       </button>
                       <button
@@ -468,9 +469,10 @@ export function Portal() {
                           activeTab === 'projects'
                             ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                             : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                        title="Mis Proyectos 3D"
                       >
-                        <Layers className="w-4 h-4 stroke-[2]" />
+                        <Layers className="w-4 h-4 stroke-[2] flex-shrink-0" />
                         {!sidebarCollapsed && <span>Mis Proyectos 3D</span>}
                       </button>
                       <button
@@ -479,9 +481,10 @@ export function Portal() {
                           activeTab === 'cfe'
                             ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                             : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                        title="Recibos CFE"
                       >
-                        <TrendingUp className="w-4 h-4 stroke-[2]" />
+                        <TrendingUp className="w-4 h-4 stroke-[2] flex-shrink-0" />
                         {!sidebarCollapsed && <span>Recibos CFE</span>}
                       </button>
                       <button
@@ -490,9 +493,10 @@ export function Portal() {
                           activeTab === 'chat'
                             ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                             : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                        title="Asistente IA"
                       >
-                        <MessageSquare className="w-4 h-4 stroke-[2]" />
+                        <MessageSquare className="w-4 h-4 stroke-[2] flex-shrink-0" />
                         {!sidebarCollapsed && <span>Asistente IA</span>}
                       </button>
                     </>
@@ -509,9 +513,10 @@ export function Portal() {
                           activeTab === 'dashboard'
                             ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                             : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                        title="Dashboard General"
                       >
-                        <BarChart className="w-4 h-4 stroke-[2]" />
+                        <BarChart className="w-4 h-4 stroke-[2] flex-shrink-0" />
                         {!sidebarCollapsed && <span>Dashboard General</span>}
                       </button>
 
@@ -521,34 +526,37 @@ export function Portal() {
                           activeTab === 'clientes'
                             ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                             : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                        } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                        title="Clientes (CRM)"
                       >
-                        <Users className="w-4 h-4 stroke-[2]" />
+                        <Users className="w-4 h-4 stroke-[2] flex-shrink-0" />
                         {!sidebarCollapsed && <span>Clientes (CRM)</span>}
                       </button>
 
                       {/* CORE TOOLS (CFE, Esun, Cotizador, Legal, Bitacoras) */}
-                      <div className="pt-2">
+                      <div className="pt-2 space-y-1">
                         <button
                           onClick={() => setActiveTab('cfemanager')}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                             activeTab === 'cfemanager'
                               ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                               : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="CFE Manager"
                         >
-                          <FileText className="w-4 h-4 stroke-[2]" />
+                          <FileText className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>CFE Manager</span>}
                         </button>
-                         <button
+                        <button
                           onClick={() => setActiveTab('esun')}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                             activeTab === 'esun'
                               ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                               : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="Esun Solar"
                         >
-                          <Sun className="w-4 h-4 stroke-[2]" />
+                          <Sun className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Esun Solar</span>}
                         </button>
                         <button
@@ -557,9 +565,10 @@ export function Portal() {
                             activeTab === 'cotizador'
                               ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                               : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="Presupuestos esol"
                         >
-                          <Sparkles className="w-4 h-4 stroke-[2]" />
+                          <Sparkles className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Presupuestos esol</span>}
                         </button>
                         <button
@@ -568,9 +577,10 @@ export function Portal() {
                             activeTab === 'legal'
                               ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                               : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="Legal Esol"
                         >
-                          <Shield className="w-4 h-4 stroke-[2]" />
+                          <Shield className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Legal Esol</span>}
                         </button>
                         <button
@@ -579,9 +589,10 @@ export function Portal() {
                             activeTab === 'bitacoras'
                               ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                               : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="Bitácoras (App)"
                         >
-                          <Layers className="w-4 h-4 stroke-[2]" />
+                          <Layers className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Bitácoras (App)</span>}
                         </button>
                         <button
@@ -590,158 +601,168 @@ export function Portal() {
                             activeTab === 'mantenimientos'
                               ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                               : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                          } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="Mantenimientos (App)"
                         >
-                          <Wrench className="w-4 h-4 stroke-[2]" />
+                          <Wrench className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Mantenimientos (App)</span>}
                         </button>
                       </div>
 
-                      
                       <div className="mt-8 pt-4 border-t border-dark-4/50 space-y-1">
                         {!sidebarCollapsed && <div className="px-3 pb-2 text-[8px] font-black uppercase text-cream-muted/40 tracking-widest text-center">Opciones de Administración</div>}
-  {/* LANDING PAGE ACCORDION */}
-                      {currentUser.role === 'master' && (
-                      <div className="pt-2">
-                        {!sidebarCollapsed && (
-                          <button 
-                            onClick={() => setLandingExpanded(!landingExpanded)}
-                            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <LayoutTemplate className="w-3.5 h-3.5" />
-                              <span>Landing Page</span>
-                            </div>
-                            {landingExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                          </button>
-                        )}
-                        {(landingExpanded || sidebarCollapsed) && (
-                          <div className={sidebarCollapsed ? "space-y-0" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
-                            <button
-                              onClick={() => setActiveTab('cms')}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                activeTab === 'cms'
-                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        
+                        {/* LANDING PAGE ACCORDION */}
+                        {currentUser.role === 'master' && (
+                        <div className="pt-2">
+                          {!sidebarCollapsed && (
+                            <button 
+                              onClick={() => setLandingExpanded(!landingExpanded)}
+                              className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
                             >
-                              <Edit className="w-4 h-4 stroke-[2]" />
-                              {!sidebarCollapsed && <span>Contenido CMS</span>}
+                              <div className="flex items-center gap-2">
+                                <LayoutTemplate className="w-3.5 h-3.5" />
+                                <span>Landing Page</span>
+                              </div>
+                              {landingExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                             </button>
-                            <button
-                              onClick={() => setActiveTab('modules')}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                activeTab === 'modules'
-                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                            >
-                              <Layers className="w-4 h-4 stroke-[2]" />
-                              {!sidebarCollapsed && <span>Módulos</span>}
-                            </button>
-                            <button
-                              onClick={() => setActiveTab('seo')}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                activeTab === 'seo'
-                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                            >
-                              <Globe className="w-4 h-4 stroke-[2]" />
-                              {!sidebarCollapsed && <span>Lighthouse & SEO</span>}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      )}
-  {/* TIENDA ACCORDION */}
-                      <div className="pt-2">
-                        {!sidebarCollapsed && (
-                          <button 
-                            onClick={() => setTiendaExpanded(!tiendaExpanded)}
-                            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Store className="w-3.5 h-3.5" />
-                              <span>Tienda</span>
-                            </div>
-                            {tiendaExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                          </button>
-                        )}
-                        {(tiendaExpanded || sidebarCollapsed) && (
-                          <div className={sidebarCollapsed ? "space-y-0" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
-                            <button
-                              onClick={() => setActiveTab('inventory')}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                activeTab === 'inventory'
-                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                            >
-                              <Package className="w-4 h-4 stroke-[2]" />
-                              {!sidebarCollapsed && <span>Productos B2B</span>}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-  {/* CONFIGURACION ACCORDION */}
-                      {(currentUser.role === 'master' || currentUser.role === 'admin') && (
-                      <div className="pt-2">
-                        {!sidebarCollapsed && (
-                          <button 
-                            onClick={() => setConfigExpanded(!configExpanded)}
-                            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Settings className="w-3.5 h-3.5" />
-                              <span>Configuración</span>
-                            </div>
-                            {configExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                          </button>
-                        )}
-                        {(configExpanded || sidebarCollapsed) && (
-                          <div className={sidebarCollapsed ? "space-y-0" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
-                            {currentUser.role === 'master' && (
+                          )}
+                          {(landingExpanded || sidebarCollapsed) && (
+                            <div className={sidebarCollapsed ? "space-y-1" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
                               <button
-                                onClick={() => setActiveTab('agents')}
+                                onClick={() => setActiveTab('cms')}
                                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                  activeTab === 'agents'
+                                  activeTab === 'cms'
                                     ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
                                     : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                                } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                                } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                                title="Contenido CMS"
                               >
-                                <Bot className="w-4 h-4 stroke-[2]" />
-                                {!sidebarCollapsed && <span>Motores Chat IA</span>}
+                                <Edit className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                                {!sidebarCollapsed && <span>Contenido CMS</span>}
                               </button>
-                            )}
-                            <button
-                              onClick={() => setActiveTab('roles')}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                activeTab === 'roles'
-                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                              <button
+                                onClick={() => setActiveTab('modules')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                  activeTab === 'modules'
+                                    ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                    : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                                } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                                title="Módulos"
+                              >
+                                <Layers className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                                {!sidebarCollapsed && <span>Módulos</span>}
+                              </button>
+                              <button
+                                onClick={() => setActiveTab('seo')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                  activeTab === 'seo'
+                                    ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                    : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                                } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                                title="Lighthouse & SEO"
+                              >
+                                <Globe className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                                {!sidebarCollapsed && <span>Lighthouse & SEO</span>}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        )}
+
+                        {/* TIENDA ACCORDION */}
+                        <div className="pt-2">
+                          {!sidebarCollapsed && (
+                            <button 
+                              onClick={() => setTiendaExpanded(!tiendaExpanded)}
+                              className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
                             >
-                              <Sliders className="w-4 h-4 stroke-[2]" />
-                              {!sidebarCollapsed && <span>Roles y Permisos</span>}
+                              <div className="flex items-center gap-2">
+                                <Store className="w-3.5 h-3.5" />
+                                <span>Tienda</span>
+                              </div>
+                              {tiendaExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                             </button>
-                            <button
-                              onClick={() => setActiveTab('cfeconfig')}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                activeTab === 'cfeconfig'
-                                  ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                                  : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                              } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                          )}
+                          {(tiendaExpanded || sidebarCollapsed) && (
+                            <div className={sidebarCollapsed ? "space-y-1" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
+                              <button
+                                onClick={() => setActiveTab('inventory')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                  activeTab === 'inventory'
+                                    ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                    : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                                } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                                title="Productos B2B"
+                              >
+                                <Package className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                                {!sidebarCollapsed && <span>Productos B2B</span>}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* CONFIGURACION ACCORDION */}
+                        {(currentUser.role === 'master' || currentUser.role === 'admin') && (
+                        <div className="pt-2">
+                          {!sidebarCollapsed && (
+                            <button 
+                              onClick={() => setConfigExpanded(!configExpanded)}
+                              className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase text-gold/70 hover:text-gold transition-colors"
                             >
-                              <Settings className="w-4 h-4 stroke-[2]" />
-                              {!sidebarCollapsed && <span>Ajustes Generales</span>}
+                              <div className="flex items-center gap-2">
+                                <Settings className="w-3.5 h-3.5" />
+                                <span>Configuración</span>
+                              </div>
+                              {configExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                             </button>
-                          </div>
+                          )}
+                          {(configExpanded || sidebarCollapsed) && (
+                            <div className={sidebarCollapsed ? "space-y-1" : "pl-4 pr-2 py-1 space-y-1 border-l-2 border-dark-4 ml-4 mt-1"}>
+                              {currentUser.role === 'master' && (
+                                <button
+                                  onClick={() => setActiveTab('agents')}
+                                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                    activeTab === 'agents'
+                                      ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                      : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                                  } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                                  title="Motores Chat IA"
+                                >
+                                  <Bot className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                                  {!sidebarCollapsed && <span>Motores Chat IA</span>}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setActiveTab('roles')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                  activeTab === 'roles'
+                                    ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                    : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                                } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                                title="Roles y Permisos"
+                              >
+                                <Sliders className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                                {!sidebarCollapsed && <span>Roles y Permisos</span>}
+                              </button>
+                              <button
+                                onClick={() => setActiveTab('cfeconfig')}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                  activeTab === 'cfeconfig'
+                                    ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                                    : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                                } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                                title="Ajustes Generales"
+                              >
+                                <Settings className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                                {!sidebarCollapsed && <span>Ajustes Generales</span>}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         )}
                       </div>
-                      )}
-                      </div>
-                      </>
+                    </>
                   )}
                 </div>
               </div>
@@ -753,7 +774,7 @@ export function Portal() {
                   <button
                     onClick={() => window.open('/?sistema_administrativo=1', '_blank')}
                     className={`w-full group flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer border bg-gradient-to-r from-gold/20 via-gold/10 to-transparent border-gold/50 hover:border-gold hover:from-gold/30 hover:shadow-lg hover:shadow-gold/10 text-cream ${
-                      sidebarCollapsed ? 'justify-center p-2.5' : ''
+                      sidebarCollapsed ? 'justify-center p-2' : ''
                     }`}
                     title="Abrir Sistema Administrativo (ERP) en ventana independiente"
                   >
@@ -786,17 +807,18 @@ export function Portal() {
                 {/* Collapse button for desktop */}
                 <button 
                   onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                  className="hidden md:flex w-full items-center justify-center py-2 border border-dark-4 hover:border-gold/30 bg-dark-1 hover:bg-dark-3 text-cream-dim hover:text-gold rounded-xl transition-all cursor-pointer text-[9px] font-black uppercase tracking-wider"
+                  className="hidden md:flex w-full items-center justify-center py-2.5 px-2 border border-dark-4 hover:border-gold/30 bg-dark-1 hover:bg-dark-3 text-cream-dim hover:text-gold rounded-xl transition-all cursor-pointer text-[10px] font-black uppercase tracking-wider"
+                  title={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
                 >
                   {sidebarCollapsed ? '▶' : '◀ Colapsar'}
                 </button>
                 
                 <button
                   onClick={logout}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-red-400 hover:bg-red-500/5 transition-all border border-red-500/10 cursor-pointer ${sidebarCollapsed ? 'justify-center p-2' : ''}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-red-400 hover:bg-red-500/5 transition-all border border-red-500/10 cursor-pointer ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
                   title="Cerrar sesión"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 flex-shrink-0" />
                   {!sidebarCollapsed && <span>Cerrar Sesión</span>}
                 </button>
               </div>

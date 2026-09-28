@@ -60,8 +60,32 @@ export const getNextFolio = (existingOficios: OficioData[] = []): string => {
   return `OF-ESOL-${currentYear}-${String(nextNum).padStart(3, '0')}`;
 };
 
-export const getDefaultOficio = (initialBudgetId?: string | null, existingOficios: OficioData[] = []): OficioData => {
+export const getDefaultOficio = (
+  initialBudgetId?: string | null, 
+  existingOficios: OficioData[] = [],
+  user?: { name?: string; email?: string; role?: string }
+): OficioData => {
   const defaultTmpl = OFICIOS_TEMPLATES[0];
+  const userName = user?.name?.trim() || 'Manuel de Jesus Fregoso Samaniega';
+  let userCargo = 'REPRESENTANTE LEGAL';
+  if (user?.role === 'master') {
+    userCargo = 'DIRECCIÓN GENERAL / REPRESENTANTE LEGAL';
+  } else if (user?.role === 'admin') {
+    userCargo = 'ADMINISTRACIÓN Y CONTROL DE OPERACIONES';
+  } else if (user?.role) {
+    userCargo = 'SUPERVISOR DE OBRA Y PROYECTOS';
+  }
+
+  const userEmail = user?.email || '';
+  let storedSig: string | null = null;
+  try {
+    if (userEmail) {
+      storedSig = localStorage.getItem(`esol_firma_digital_${userEmail}`);
+    }
+    if (!storedSig) {
+      storedSig = localStorage.getItem('esol_firma_digital_precargada');
+    }
+  } catch (e) {}
 
   return {
     folio: getNextFolio(existingOficios),
@@ -85,16 +109,18 @@ export const getDefaultOficio = (initialBudgetId?: string | null, existingOficio
     fundamentacion: defaultTmpl.fundamentacionDefault,
     peticion: defaultTmpl.peticionDefault,
     despedida: defaultTmpl.despedidaDefault,
-    remitenteNombre: 'Manuel de Jesus Fregoso Samaniega',
-    remitenteCargo: 'REPRESENTANTE LEGAL',
+    remitenteNombre: userName,
+    remitenteCargo: userCargo,
     remitenteCedula: '',
     empresaRazonSocial: 'ESOL ENERGIAS',
     empresaRFC: '',
     empresaDomicilio: 'Tepic, Nayarit, México',
     empresaTelefono: '3112343034',
-    empresaEmail: 'contacto@esolenergias.com',
+    empresaEmail: userEmail || 'contacto@esolenergias.com',
     ccp: [...defaultTmpl.ccpDefault],
     anexos: [...defaultTmpl.anexosDefault],
+    firmaDigital: storedSig || undefined,
+    incluirFirmaDigital: Boolean(storedSig),
     estado: 'borrador'
   };
 };

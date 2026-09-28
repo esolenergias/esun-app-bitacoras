@@ -36,6 +36,7 @@ interface CentroOficiosTabProps {
   recepciones: RecepcionMercancia[];
   userRole?: string;
   userName?: string;
+  userEmail?: string;
   canEdit?: boolean;
   onRefresh: () => void;
   onNavigateTab?: (tab: any) => void;
@@ -109,6 +110,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   recepciones,
   userRole = 'master',
   userName = 'Administrador General',
+  userEmail,
   canEdit = true,
   onRefresh,
   onNavigateTab
@@ -119,8 +121,11 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   const [oficiosList, setOficiosList] = useState<OficioData[]>([]);
   const [loadingOficios, setLoadingOficios] = useState(false);
 
+  // Clave de firma personalizada por usuario
+  const userSigKey = userEmail ? `esol_firma_digital_${userEmail.trim().toLowerCase()}` : 'esol_firma_digital_precargada';
+
   // Form State
-  const [oficio, setOficio] = useState<OficioData>(() => getDefaultOficio(null));
+  const [oficio, setOficio] = useState<OficioData>(() => getDefaultOficio(null, [], { name: userName, email: userEmail, role: userRole }));
   const [selectedClienteId, setSelectedClienteId] = useState('');
   const [selectedProyectoId, setSelectedProyectoId] = useState('');
   const [selectedProveedorId, setSelectedProveedorId] = useState('');
@@ -206,14 +211,14 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
       const data = await adminDbService.getOficiosCompletos();
       setOficiosList(data);
 
-      // Obtener firma digital precargada de localStorage o de los oficios previos emitidos
-      let savedSig = typeof window !== 'undefined' ? localStorage.getItem('esol_firma_digital_precargada') : null;
+      // Obtener firma digital precargada específica del usuario o genérica de localStorage
+      let savedSig = typeof window !== 'undefined' ? (localStorage.getItem(userSigKey) || localStorage.getItem('esol_firma_digital_precargada')) : null;
       if (!savedSig && Array.isArray(data)) {
         const oficioConFirma = data.find(o => o.firmaDigital && o.firmaDigital.startsWith('data:image'));
         if (oficioConFirma && oficioConFirma.firmaDigital) {
           savedSig = oficioConFirma.firmaDigital;
           try {
-            localStorage.setItem('esol_firma_digital_precargada', savedSig);
+            localStorage.setItem(userSigKey, savedSig);
           } catch (e) {}
         }
       }
@@ -678,7 +683,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   const handleNuevoOficio = () => {
     const nextFolio = getNextFolio(oficiosList);
     setOficio({
-      ...getDefaultOficio(null, oficiosList),
+      ...getDefaultOficio(null, oficiosList, { name: userName, email: userEmail, role: userRole }),
       folio: nextFolio
     });
     setPartidas([]);
@@ -1695,9 +1700,9 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
               <div className="flex items-center gap-3">
                 <ShieldCheck className="w-6 h-6 text-gold flex-shrink-0" />
                 <div>
-                  <span className="font-bold text-cream block">Firma y Representación Legal</span>
+                  <span className="font-bold text-cream block">Firma y Representación del Emisor</span>
                   <p className="text-[11px] text-cream-muted">
-                    Emisor: <strong className="text-gold">{oficio.remitenteNombre}</strong> ({oficio.remitenteCargo}) &bull; Membrete oficial de eSol Energías.
+                    Emisor: <strong className="text-gold">{oficio.remitenteNombre || userName}</strong> ({oficio.remitenteCargo || 'DIRECCIÓN GENERAL / REPRESENTANTE LEGAL'}) &bull; Membrete oficial de eSol Energías.
                   </p>
                 </div>
               </div>
@@ -1716,7 +1721,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
                 <label className="cursor-pointer px-2.5 py-1 bg-dark-3 hover:bg-dark-4 text-cream hover:text-gold border border-dark-4 hover:border-gold/40 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition-all">
                   <Upload className="w-3.5 h-3.5 text-gold" />
-                  <span>{oficio.firmaDigital ? 'Cambiar Firma' : 'Cargar Firma'}</span>
+                  <span>{oficio.firmaDigital ? 'Cambiar Mi Firma' : 'Cargar Mi Firma'}</span>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
@@ -1734,7 +1739,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
                             incluirFirmaDigital: true
                           }));
                           try {
-                            localStorage.setItem('esol_firma_digital_precargada', base64);
+                            localStorage.setItem(userSigKey, base64);
                           } catch (err) {}
                         }
                       };

@@ -22,12 +22,15 @@ import { EgresosTab } from './components/finanzas/EgresosTab';
 import { ProveedoresTab } from './components/catalogos/ProveedoresTab';
 import { ClientesAdminView, ProyectosAdminView, MaterialesAdminView } from './components/catalogos/VistasEntidadesReales';
 import { CentroOficiosTab } from './components/oficios/CentroOficiosTab';
+import { PersonalTab } from './components/personal/PersonalTab';
 
 import { 
   ArrowLeft, LayoutDashboard, ShoppingCart, Truck, Package, ClipboardList, 
   FileCheck2, RotateCcw, FolderCheck, DollarSign, Building2, Database, Users, 
   Layers, RefreshCw, ShieldAlert, Sparkles, FileText, ChevronRight, ChevronDown, 
-  ExternalLink, Menu, X, Landmark, Wallet, CheckCircle2, ShieldCheck, Box, Eye
+  ExternalLink, Menu, X, Landmark, Wallet, CheckCircle2, ShieldCheck, Box, Eye,
+  Boxes, HardHat, AlertTriangle, ArrowUpRight, ArrowDownRight, FolderKanban, ClipboardCheck, PackageCheck,
+  UserCheck
 } from 'lucide-react';
 
 interface SistemaAdministrativoAppProps {
@@ -63,6 +66,7 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
   const [activeTab, setActiveTab] = useState<AdminTabType>('resumen');
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Accordion section states
   const [comprasOpen, setComprasOpen] = useState(true);
@@ -270,10 +274,12 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
         {/* ========================================================= */}
         <aside
           className={`${
-            sidebarOpen ? 'w-72' : 'w-0 -ml-72'
-          } lg:static fixed inset-y-16 left-0 z-30 bg-dark-2 border-r border-dark-4 flex flex-col justify-between transition-all duration-300 ease-in-out shadow-2xl lg:shadow-none overflow-y-auto scrollbar-thin select-none`}
+            sidebarOpen 
+              ? (sidebarCollapsed ? 'w-20' : 'w-72') 
+              : 'w-0 -ml-72'
+          } lg:static fixed inset-y-16 left-0 z-30 bg-dark-2 border-r border-dark-4 flex flex-col justify-between transition-all duration-300 ease-in-out shadow-2xl lg:shadow-none overflow-y-auto scrollbar-thin select-none flex-shrink-0`}
         >
-          <div className="p-4 space-y-4">
+          <div className={`${sidebarCollapsed ? 'p-2 space-y-2' : 'p-4 space-y-4'}`}>
             
             {/* Dashboard General */}
             <button
@@ -282,13 +288,14 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                 activeTab === 'resumen'
                   ? 'bg-gold/15 text-gold border-l-2 border-gold shadow-inner shadow-gold/5'
                   : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-              }`}
+              } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+              title="Dashboard Ejecutivo"
             >
               <div className="flex items-center gap-3">
-                <LayoutDashboard className="w-4 h-4 stroke-[2]" />
-                <span>Dashboard Ejecutivo</span>
+                <LayoutDashboard className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                {!sidebarCollapsed && <span>Dashboard Ejecutivo</span>}
               </div>
-              <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+              {!sidebarCollapsed && <ChevronRight className="w-3.5 h-3.5 opacity-50" />}
             </button>
 
             {/* Centro de Oficios y Peticiones */}
@@ -298,46 +305,55 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                 activeTab === 'oficios_central'
                   ? 'bg-gold/20 text-gold border-l-2 border-gold shadow-inner shadow-gold/10'
                   : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-              }`}
+              } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+              title="Centro de Oficios y Peticiones"
             >
               <div className="flex items-center gap-3">
-                <FileText className="w-4 h-4 stroke-[2] text-gold" />
-                <span>Centro de Oficios</span>
+                <FileText className="w-4 h-4 stroke-[2] text-gold flex-shrink-0" />
+                {!sidebarCollapsed && <span>Centro de Oficios</span>}
               </div>
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
-                Formal
-              </span>
+              {!sidebarCollapsed && (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
+                  Formal
+                </span>
+              )}
             </button>
 
-            <div className="pt-2 border-t border-dark-4/50 space-y-3">
+            <div className={`pt-2 border-t border-dark-4/50 ${sidebarCollapsed ? 'space-y-2' : 'space-y-3'}`}>
               
               {/* ----------------------------------------------------- */}
               {/* MÓDULO 1: COMPRAS */}
               {/* ----------------------------------------------------- */}
               <div className="space-y-1">
-                <button
-                  onClick={() => setComprasOpen(!comprasOpen)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-black uppercase text-gold/80 hover:text-gold tracking-wider rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <ShoppingCart className="w-3.5 h-3.5 text-gold" />
-                    <span>1. Compras</span>
-                  </div>
-                  {comprasOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                </button>
+                {!sidebarCollapsed && (
+                  <button
+                    onClick={() => setComprasOpen(!comprasOpen)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-black uppercase text-gold/80 hover:text-gold tracking-wider rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                      <span>1. Compras</span>
+                    </div>
+                    {comprasOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  </button>
+                )}
 
-                {comprasOpen && (
-                  <div className="pl-3 space-y-1 border-l border-dark-4 ml-3">
+                {(comprasOpen || sidebarCollapsed) && (
+                  <div className={sidebarCollapsed ? "space-y-1" : "pl-3 space-y-1 border-l border-dark-4 ml-3"}>
                     <button
                       onClick={() => setActiveTab('solicitudes_compra')}
                       className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-bold transition-all ${
                         activeTab === 'solicitudes_compra'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="1-2. Solicitudes de Compra"
                     >
-                      <span>1-2. Solicitudes de Compra</span>
-                      {pendingSc > 0 && (
+                      <div className="flex items-center gap-2.5">
+                        <ShoppingCart className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>1-2. Solicitudes de Compra</span>}
+                      </div>
+                      {!sidebarCollapsed && pendingSc > 0 && (
                         <span className="px-1.5 py-0.2 bg-amber-500 text-dark-1 rounded-full text-[9px] font-mono font-bold">
                           {pendingSc}
                         </span>
@@ -350,9 +366,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'ordenes_compra'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="3. Órdenes de Compra (OC)"
                     >
-                      <span>3. Órdenes de Compra (OC)</span>
+                      <div className="flex items-center gap-2.5">
+                        <ClipboardCheck className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>3. Órdenes de Compra (OC)</span>}
+                      </div>
                     </button>
 
                     <button
@@ -361,10 +381,14 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'recepciones'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="4. Recepción y Revisión"
                     >
-                      <span>4. Recepción y Revisión</span>
-                      {pendingRec > 0 && (
+                      <div className="flex items-center gap-2.5">
+                        <PackageCheck className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>4. Recepción y Revisión</span>}
+                      </div>
+                      {!sidebarCollapsed && pendingRec > 0 && (
                         <span className="px-1.5 py-0.2 bg-blue-500 text-cream rounded-full text-[9px] font-mono font-bold">
                           {pendingRec}
                         </span>
@@ -378,29 +402,35 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               {/* MÓDULO 2: ALMACÉN E INVENTARIO */}
               {/* ----------------------------------------------------- */}
               <div className="space-y-1">
-                <button
-                  onClick={() => setAlmacenOpen(!almacenOpen)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-black uppercase text-gold/80 hover:text-gold tracking-wider rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Package className="w-3.5 h-3.5 text-gold" />
-                    <span>2. Almacén & Obra</span>
-                  </div>
-                  {almacenOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                </button>
+                {!sidebarCollapsed && (
+                  <button
+                    onClick={() => setAlmacenOpen(!almacenOpen)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-black uppercase text-gold/80 hover:text-gold tracking-wider rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Package className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                      <span>2. Almacén & Obra</span>
+                    </div>
+                    {almacenOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  </button>
+                )}
 
-                {almacenOpen && (
-                  <div className="pl-3 space-y-1 border-l border-dark-4 ml-3">
+                {(almacenOpen || sidebarCollapsed) && (
+                  <div className={sidebarCollapsed ? "space-y-1" : "pl-3 space-y-1 border-l border-dark-4 ml-3"}>
                     <button
                       onClick={() => setActiveTab('inventario')}
                       className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-bold transition-all ${
                         activeTab === 'inventario'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="5. Inventario / Kardex"
                     >
-                      <span>5. Inventario / Kardex</span>
-                      {bajoStockCount > 0 && (
+                      <div className="flex items-center gap-2.5">
+                        <Boxes className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>5. Inventario / Kardex</span>}
+                      </div>
+                      {!sidebarCollapsed && bajoStockCount > 0 && (
                         <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-full text-[9px] font-mono font-bold">
                           {bajoStockCount} mín
                         </span>
@@ -413,10 +443,14 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'solicitudes_material'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="6-7. Solicitud a Obra"
                     >
-                      <span>6-7. Solicitud a Obra</span>
-                      {pendingSm > 0 && (
+                      <div className="flex items-center gap-2.5">
+                        <HardHat className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>6-7. Solicitud a Obra</span>}
+                      </div>
+                      {!sidebarCollapsed && pendingSm > 0 && (
                         <span className="px-1.5 py-0.2 bg-violet-400 text-dark-1 rounded-full text-[9px] font-mono font-bold">
                           {pendingSm}
                         </span>
@@ -429,9 +463,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'vales_entrega'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="8. Vales de Entrega"
                     >
-                      <span>8. Vales de Entrega</span>
+                      <div className="flex items-center gap-2.5">
+                        <Truck className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>8. Vales de Entrega</span>}
+                      </div>
                     </button>
 
                     <button
@@ -440,9 +478,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'devoluciones'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="9. Devoluciones & Mermas"
                     >
-                      <span>9. Devoluciones & Mermas</span>
+                      <div className="flex items-center gap-2.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>9. Devoluciones & Mermas</span>}
+                      </div>
                     </button>
 
                     <button
@@ -451,9 +493,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'cierre'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="10. Cierre de Proyecto"
                     >
-                      <span>10. Cierre de Proyecto</span>
+                      <div className="flex items-center gap-2.5">
+                        <FolderCheck className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>10. Cierre de Proyecto</span>}
+                      </div>
                     </button>
                   </div>
                 )}
@@ -463,28 +509,34 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               {/* MÓDULO 3: TESORERÍA Y FINANZAS */}
               {/* ----------------------------------------------------- */}
               <div className="space-y-1">
-                <button
-                  onClick={() => setFinanzasOpen(!finanzasOpen)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-black uppercase text-gold/80 hover:text-gold tracking-wider rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-3.5 h-3.5 text-gold" />
-                    <span>3. Tesorería & Finanzas</span>
-                  </div>
-                  {finanzasOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                </button>
+                {!sidebarCollapsed && (
+                  <button
+                    onClick={() => setFinanzasOpen(!finanzasOpen)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-black uppercase text-gold/80 hover:text-gold tracking-wider rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                      <span>3. Tesorería & Finanzas</span>
+                    </div>
+                    {finanzasOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  </button>
+                )}
 
-                {finanzasOpen && (
-                  <div className="pl-3 space-y-1 border-l border-dark-4 ml-3">
+                {(finanzasOpen || sidebarCollapsed) && (
+                  <div className={sidebarCollapsed ? "space-y-1" : "pl-3 space-y-1 border-l border-dark-4 ml-3"}>
                     <button
                       onClick={() => setActiveTab('finanzas_caja_bancos')}
                       className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-bold transition-all ${
                         activeTab === 'finanzas_caja_bancos'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="Caja Chica, Grande & Bancos"
                     >
-                      <span>Caja Chica, Grande & Bancos</span>
+                      <div className="flex items-center gap-2.5">
+                        <Wallet className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>Caja Chica, Grande & Bancos</span>}
+                      </div>
                     </button>
 
                     <button
@@ -493,9 +545,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'finanzas_ingresos'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="Ingresos (CxC)"
                     >
-                      <span>Ingresos (CxC)</span>
+                      <div className="flex items-center gap-2.5">
+                        <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>Ingresos (CxC)</span>}
+                      </div>
                     </button>
 
                     <button
@@ -504,9 +560,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'finanzas_egresos'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="Egresos (CxP)"
                     >
-                      <span>Egresos (CxP)</span>
+                      <div className="flex items-center gap-2.5">
+                        <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>Egresos (CxP)</span>}
+                      </div>
                     </button>
                   </div>
                 )}
@@ -516,28 +576,34 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               {/* MÓDULO 4: CATÁLOGOS Y DB REAL */}
               {/* ----------------------------------------------------- */}
               <div className="space-y-1">
-                <button
-                  onClick={() => setCatalogosOpen(!catalogosOpen)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-black uppercase text-gold/80 hover:text-gold tracking-wider rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Database className="w-3.5 h-3.5 text-gold" />
-                    <span>4. Catálogos & BD</span>
-                  </div>
-                  {catalogosOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                </button>
+                {!sidebarCollapsed && (
+                  <button
+                    onClick={() => setCatalogosOpen(!catalogosOpen)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-black uppercase text-gold/80 hover:text-gold tracking-wider rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Database className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                      <span>4. Catálogos & BD</span>
+                    </div>
+                    {catalogosOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  </button>
+                )}
 
-                {catalogosOpen && (
-                  <div className="pl-3 space-y-1 border-l border-dark-4 ml-3">
+                {(catalogosOpen || sidebarCollapsed) && (
+                  <div className={sidebarCollapsed ? "space-y-1" : "pl-3 space-y-1 border-l border-dark-4 ml-3"}>
                     <button
                       onClick={() => setActiveTab('catalogo_proveedores')}
                       className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-bold transition-all ${
                         activeTab === 'catalogo_proveedores'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="Proveedores"
                     >
-                      <span>Proveedores</span>
+                      <div className="flex items-center gap-2.5">
+                        <Truck className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>Proveedores</span>}
+                      </div>
                     </button>
 
                     <button
@@ -546,9 +612,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'db_clientes'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="Clientes CRM"
                     >
-                      <span>Clientes CRM</span>
+                      <div className="flex items-center gap-2.5">
+                        <Users className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>Clientes CRM</span>}
+                      </div>
                     </button>
 
                     <button
@@ -557,9 +627,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'db_proyectos'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="Proyectos y Presupuestos"
                     >
-                      <span>Proyectos y Presupuestos</span>
+                      <div className="flex items-center gap-2.5">
+                        <FolderKanban className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>Proyectos y Presupuestos</span>}
+                      </div>
                     </button>
 
                     <button
@@ -568,9 +642,13 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
                         activeTab === 'db_materiales'
                           ? 'bg-gold/10 text-gold border-l-2 border-gold'
                           : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                      }`}
+                      } ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : ''}`}
+                      title="Insumos Maestros"
                     >
-                      <span>Insumos Maestros</span>
+                      <div className="flex items-center gap-2.5">
+                        <Layers className="w-3.5 h-3.5 text-gold/70 flex-shrink-0" />
+                        {!sidebarCollapsed && <span>Insumos Maestros</span>}
+                      </div>
                     </button>
                   </div>
                 )}
@@ -579,10 +657,42 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
             </div>
           </div>
 
-          <div className="p-4 border-t border-dark-4 bg-dark-1/60">
-            <div className="text-[10px] text-cream-dim text-center font-mono">
-              eSol Energías Renovables &bull; ERP v2.0
-            </div>
+          <div className="p-2 border-t border-dark-4 bg-dark-1/60 space-y-2">
+            {/* Módulo: Personal & Nómina */}
+            <button
+              onClick={() => setActiveTab('personal')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === 'personal'
+                  ? 'bg-gold/20 text-gold border-l-2 border-gold shadow-inner shadow-gold/10'
+                  : 'text-cream-muted hover:text-cream hover:bg-dark-3 bg-dark-2/60 border border-dark-4/60'
+              } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+              title="Personal & Nómina"
+            >
+              <div className="flex items-center gap-3">
+                <UserCheck className="w-4 h-4 stroke-[2] text-gold flex-shrink-0" />
+                {!sidebarCollapsed && <span>Personal & Nómina</span>}
+              </div>
+              {!sidebarCollapsed && (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
+                  RH
+                </span>
+              )}
+            </button>
+
+            {/* Collapse button */}
+            <button 
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="hidden lg:flex w-full items-center justify-center py-2.5 px-2 border border-dark-4 hover:border-gold/30 bg-dark-1 hover:bg-dark-3 text-cream-dim hover:text-gold rounded-xl transition-all cursor-pointer text-[10px] font-black uppercase tracking-wider"
+              title={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
+            >
+              {sidebarCollapsed ? '▶' : '◀ Colapsar'}
+            </button>
+
+            {!sidebarCollapsed && (
+              <div className="text-[10px] text-cream-dim text-center font-mono py-1">
+                eSol Energías Renovables &bull; ERP v2.0
+              </div>
+            )}
           </div>
         </aside>
 
@@ -627,10 +737,17 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               recepciones={recepciones}
               userRole={effectiveRole}
               userName={userName}
+              userEmail={userEmail}
               canEdit={canEdit}
               onRefresh={cargarDatos}
               onNavigateTab={setActiveTab}
             />
+          )}
+
+          {activeTab === 'personal' && (
+            <div className="space-y-6">
+              <PersonalTab canEdit={canEdit} userRole={effectiveRole} />
+            </div>
           )}
 
           {activeTab === 'solicitudes_compra' && (

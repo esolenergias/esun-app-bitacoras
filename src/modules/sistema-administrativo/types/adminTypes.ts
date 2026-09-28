@@ -7,6 +7,7 @@ export type AdminAccessMode = 'editor' | 'visor';
 export type AdminTabType =
   | 'resumen'
   | 'oficios_central'
+  | 'personal'
   | 'solicitudes_compra'
   | 'ordenes_compra'
   | 'recepciones'
