@@ -833,10 +833,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (isPortalOpen && window.location.hash !== '#portal') {
         window.location.hash = 'portal';
       }
-    } else {
-      if (window.location.hash === '#portal' && !isPortalOpen) {
-        window.location.hash = '';
-      }
     }
   }, [currentUser, isPortalOpen]);
 

@@ -607,6 +607,17 @@ export function Portal() {
                           <Wrench className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Mantenimientos (App)</span>}
                         </button>
+                        <button
+                          onClick={() => window.open('/?sistema_administrativo=1', '_blank')}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20 shadow-sm ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="Sistema Administrativo (ERP)"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Building2 className="w-4 h-4 stroke-[2] flex-shrink-0 text-gold" />
+                            {!sidebarCollapsed && <span>Sistema Administrativo</span>}
+                          </div>
+                          {!sidebarCollapsed && <ExternalLink className="w-3.5 h-3.5 opacity-70" />}
+                        </button>
                       </div>
 
                       <div className="mt-8 pt-4 border-t border-dark-4/50 space-y-1">
