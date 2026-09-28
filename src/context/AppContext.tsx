@@ -709,7 +709,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [verificationPendingEmail, setVerificationPendingEmail] = useState<string | null>(null);
   const [verificationCodeSent, setVerificationCodeSent] = useState<string | null>(null);
-  const [isPortalOpen, setIsPortalOpen] = useState(false);
+  const [isPortalOpen, setIsPortalOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.hash === '#portal';
+    }
+    return false;
+  });
 
   // Listen for Supabase auth state changes
   useEffect(() => {
@@ -793,8 +798,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // View State (Landing vs Portal)
   const [currentView, setCurrentView] = useState<'landing' | 'portal'>(() => {
     if (typeof window !== 'undefined' && window.location.hash === '#portal') {
-      const stored = localStorage.getItem('esol_current_user');
-      if (stored) return 'portal';
+      return 'portal';
     }
     return 'landing';
   });
@@ -810,7 +814,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setIsPortalOpen(true);
         } else {
           // Logged out: stay on landing and open login modal
-          window.history.replaceState(null, '', ' ');
           setCurrentView('landing');
           setIsPortalOpen(true);
         }
@@ -831,7 +834,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         window.location.hash = 'portal';
       }
     } else {
-      if (window.location.hash === '#portal') {
+      if (window.location.hash === '#portal' && !isPortalOpen) {
         window.location.hash = '';
       }
     }
