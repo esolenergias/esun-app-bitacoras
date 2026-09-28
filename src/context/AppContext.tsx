@@ -791,19 +791,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // View State (Landing vs Portal)
-  const [currentView, setCurrentView] = useState<'landing' | 'portal'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'portal'>(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#portal') {
+      const stored = localStorage.getItem('esol_current_user');
+      if (stored) return 'portal';
+    }
+    return 'landing';
+  });
 
   // Synchronize with URL hash for clean SPA routing
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
       if (hash === '#portal') {
-        if (currentUser) {
+        const storedUser = currentUser || (localStorage.getItem('esol_current_user') ? JSON.parse(localStorage.getItem('esol_current_user')!) : null);
+        if (storedUser) {
           setCurrentView('portal');
           setIsPortalOpen(true);
         } else {
           // Logged out: stay on landing and open login modal
-          // Reset hash to avoid showing #portal in URL when not authenticated
           window.history.replaceState(null, '', ' ');
           setCurrentView('landing');
           setIsPortalOpen(true);
