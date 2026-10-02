@@ -816,9 +816,9 @@ OBRA CIVIL Y MANIOBRAS:
           body { margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
           
           .sheet {
-            width: 216mm;
-            min-height: 279mm;
-            padding: 14mm 16mm;
+            width: 215.9mm;
+            box-sizing: border-box;
+            padding: 12mm 15mm 10mm 15mm;
             margin: 0 auto;
             background: #ffffff;
             font-size: 9px;
@@ -1163,16 +1163,15 @@ OBRA CIVIL Y MANIOBRAS:
                   <span class="info-label">Fecha de Liquidación:</span>
                   <span class="info-value">${reg.fecha_pago ? formatDateShort(reg.fecha_pago) : 'Al término de periodo'}</span>
                 </div>
-                </div>
               </div>
             </div>
 
             <!-- Resumen de Actividades -->
-            <div style="margin-bottom: 14px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #f8fafc;">
-              <div style="font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+            <div style="margin-bottom: 12px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; background: #f8fafc;">
+              <div style="font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
                 Resumen de Actividades Realizadas
               </div>
-              <div style="font-size: 8.5px; color: #334155; line-height: 1.5; white-space: pre-wrap;">${reg.resumen_semanal || 'Sin registro de actividades.'}</div>
+              <div style="font-size: 8.5px; color: #334155; line-height: 1.45; white-space: pre-wrap;">${reg.resumen_semanal || 'Sin registro de actividades.'}</div>
             </div>
 
             <!-- Resumen Financiero y Cláusula -->
@@ -1214,14 +1213,14 @@ OBRA CIVIL Y MANIOBRAS:
             <!-- Firmas -->
             <div class="signatures-area">
               <div class="sig-box">
-                <div style="height: 42px;"></div>
+                <div style="height: 38px;"></div>
                 <div class="sig-line"></div>
                 <div class="sig-name">${reg.trabajador_nombre}</div>
                 <div class="sig-role">Firma de Conformidad / Colaborador</div>
               </div>
 
               <div class="sig-box">
-                <div style="height: 42px;"></div>
+                <div style="height: 38px;"></div>
                 <div class="sig-line"></div>
                 <div class="sig-name">ESOL ENERGÍAS</div>
                 <div class="sig-role">Vo.Bo. Autorización y Supervisión Operativa</div>
@@ -1241,9 +1240,13 @@ OBRA CIVIL Y MANIOBRAS:
         filename: `Comprobante_Semanal_${reg.folio}_${reg.trabajador_nombre.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
+      element.style.position = 'fixed';
+      element.style.left = '-9999px';
+      element.style.top = '0';
       document.body.appendChild(element);
       const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
       document.body.removeChild(element);
