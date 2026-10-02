@@ -336,7 +336,18 @@ export const PersonalTab: React.FC<PersonalTabProps> = ({ canEdit = true, userRo
           loadedRegistros = JSON.parse(localR);
         }
       } else {
-        loadedRegistros = regData || [];
+        loadedRegistros = (regData || []).map((r: any) => {
+          let resumen = r.resumen_semanal || '';
+          if (!resumen && Array.isArray(r.actividades) && r.actividades.length > 0) {
+            resumen = typeof r.actividades[0] === 'string'
+              ? r.actividades.join('\n')
+              : r.actividades.map((a: any) => a.descripcion || a.tarea || '').filter(Boolean).join('\n');
+          }
+          return {
+            ...r,
+            resumen_semanal: resumen
+          };
+        });
         localStorage.setItem('esol_personal_registros', JSON.stringify(loadedRegistros));
       }
       setRegistros(loadedRegistros);
@@ -687,33 +698,72 @@ OBRA CIVIL Y MANIOBRAS:
         observaciones: registroForm.observaciones || ''
       };
 
+      // Payload adaptado al esquema de Supabase (la tabla usa la columna 'actividades')
+      const actividadesArray = [
+        {
+          id: '1',
+          descripcion: registroForm.resumen_semanal || '',
+          completada: true
+        }
+      ];
+
+      const dbPayload: any = {
+        folio: payload.folio,
+        trabajador_id: payload.trabajador_id,
+        trabajador_nombre: payload.trabajador_nombre,
+        trabajador_puesto: payload.trabajador_puesto,
+        trabajador_banco: payload.trabajador_banco,
+        trabajador_clabe: payload.trabajador_clabe,
+        fecha_inicio: payload.fecha_inicio,
+        fecha_fin: payload.fecha_fin,
+        numero_semana: payload.numero_semana,
+        ano: payload.ano,
+        monto_base: payload.monto_base,
+        monto_ajuste: payload.monto_ajuste,
+        motivo_ajuste: payload.motivo_ajuste,
+        monto_total: payload.monto_total,
+        estado_pago: payload.estado_pago,
+        fecha_pago: payload.fecha_pago,
+        metodo_pago: payload.metodo_pago,
+        actividades: actividadesArray,
+        observaciones: payload.observaciones
+      };
+
+      let persistedId = editingRegistroId;
+
       if (!isDbOffline) {
         if (editingRegistroId) {
           const { error } = await supabase
             .from('personal_registros_semanales')
-            .update(payload)
+            .update(dbPayload)
             .eq('id', editingRegistroId);
           if (error) throw error;
         } else {
-          const { error } = await supabase
+          const { data: insertedData, error } = await supabase
             .from('personal_registros_semanales')
-            .insert([payload]);
+            .insert([dbPayload])
+            .select();
           if (error) throw error;
+          if (insertedData && insertedData[0]?.id) {
+            persistedId = insertedData[0].id;
+          }
         }
       }
 
       // Sync local
       let updatedList: RegistroSemanal[] = [];
+      const recordToSave: RegistroSemanal = {
+        id: persistedId || 'reg_' + Date.now(),
+        ...payload,
+        actividades: actividadesArray
+      } as RegistroSemanal;
+
       if (editingRegistroId) {
         updatedList = registros.map(item =>
-          item.id === editingRegistroId ? { ...item, ...payload } as RegistroSemanal : item
+          item.id === editingRegistroId ? recordToSave : item
         );
       } else {
-        const newRec: RegistroSemanal = {
-          id: 'reg_' + Date.now(),
-          ...payload
-        } as RegistroSemanal;
-        updatedList = [newRec, ...registros];
+        updatedList = [recordToSave, ...registros];
       }
 
       setRegistros(updatedList);
@@ -733,7 +783,7 @@ OBRA CIVIL Y MANIOBRAS:
       setRegistros(fallbackList);
       localStorage.setItem('esol_personal_registros', JSON.stringify(fallbackList));
       setIsRegistroModalOpen(false);
-      setNotification({ type: 'info', message: 'Guardado localmente. Recuerda ejecutar el script SQL en Supabase.' });
+      setNotification({ type: 'info', message: 'Guardado localmente. Error en BD: ' + (err.message || 'Error de conexión.') });
     }
   };
 
@@ -1532,7 +1582,7 @@ OBRA CIVIL Y MANIOBRAS:
 
                         <td className="py-3.5 px-4 text-center">
                           <span className="px-2 py-0.5 bg-dark-3 rounded-full text-[11px] border border-dark-4 text-cream-muted">
-                            {(reg.actividades || []).length} tareas
+                            {(reg.actividades && reg.actividades.length > 0) ? `${reg.actividades.length} tarea${reg.actividades.length > 1 ? 's' : ''}` : (reg.resumen_semanal ? '1 concepto' : '0 tareas')}
                           </span>
                         </td>
 
