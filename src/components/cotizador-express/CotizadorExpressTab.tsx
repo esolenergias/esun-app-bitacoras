@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   FileText, Plus, Search, Trash2, Edit3, Printer, ExternalLink, CheckCircle, Clock,
   ArrowRight, DollarSign, Send, FolderCheck, Building2, User, Phone, Mail, MapPin,
-  Calendar, ShieldCheck, Sparkles, AlertCircle, RefreshCw, Layers, FileCheck, Wrench, HardHat
+  Calendar, ShieldCheck, Sparkles, AlertCircle, RefreshCw, Layers, FileCheck, Wrench, HardHat,
+  ToggleLeft, ToggleRight, CheckSquare, Square
 } from 'lucide-react';
 import { supabase } from '../../context/supabase';
 import { useApp } from '../../context/AppContext';
@@ -34,7 +35,7 @@ export const CotizadorExpressTab: React.FC = () => {
   // Modo Editor / Formulario
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editorSection, setEditorSection] = useState<'hoja1' | 'hoja2' | 'hoja3'>('hoja1');
+  const [editorSection, setEditorSection] = useState<'hoja1' | 'hoja2' | 'hoja3'>('hoja2');
 
   // Date input ref para abrir el picker nativo al hacer click en cualquier parte o icono
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +58,8 @@ export const CotizadorExpressTab: React.FC = () => {
     vocativo: 'Estimado(a) Cliente / Comité de Operaciones:',
     tipo_servicio: 'servicios_profesionales',
     descripcion_alcance: '',
+    incluir_condiciones_servicio: true,
+    incluir_condiciones_trabajo: true,
     condiciones_servicio: '',
     metodologia_servicio: '',
     partidas: [],
@@ -132,7 +135,7 @@ export const CotizadorExpressTab: React.FC = () => {
     const totals = recomputeTotals(initialPartidas, 0, 16);
 
     setEditingId(null);
-    setEditorSection('hoja1');
+    setEditorSection('hoja2'); // Abrir por defecto en el cuerpo de cotización
     setFormData({
       id: `cot_${Date.now()}`,
       folio: '',
@@ -150,6 +153,8 @@ export const CotizadorExpressTab: React.FC = () => {
       vocativo: 'Estimado(a) Cliente / Representante Autorizado:',
       tipo_servicio: preset.tipo_servicio,
       descripcion_alcance: preset.alcanceDefault,
+      incluir_condiciones_servicio: true,
+      incluir_condiciones_trabajo: true,
       condiciones_servicio: preset.condicionesServicioDefault || '',
       metodologia_servicio: preset.metodologiaServicioDefault || '',
       partidas: initialPartidas,
@@ -396,6 +401,14 @@ Reglas:
     .filter(c => c.estado !== 'borrador')
     .reduce((acc, c) => acc + (c.total || 0), 0);
 
+  // Cantidad de hojas calculadas del formulario actual
+  const hojasSeleccionadasCount = useMemo(() => {
+    let count = 1; // Hoja 2 siempre presente
+    if (formData.incluir_condiciones_servicio !== false) count++;
+    if (formData.incluir_condiciones_trabajo !== false) count++;
+    return count;
+  }, [formData.incluir_condiciones_servicio, formData.incluir_condiciones_trabajo]);
+
   return (
     <div className="space-y-6 animate-fade-in p-4 sm:p-6 max-w-7xl mx-auto">
       {/* HEADER PRINCIPAL */}
@@ -408,10 +421,10 @@ Reglas:
             </span>
           </div>
           <h2 className="text-2xl font-bold text-cream tracking-tight">
-            Cotizaciones Rápidas (3 Hojas Formales)
+            Cotizaciones Rápidas y Modulares
           </h2>
           <p className="text-xs text-cream-muted mt-1 max-w-2xl">
-            Generador de oficios profesionales estructurados en 3 secciones: <strong className="text-gold">Hoja 1: Condiciones de Servicio</strong>, <strong className="text-gold">Hoja 2: Cuerpo de Cotización</strong> y <strong className="text-gold">Hoja 3: Condiciones de Trabajo y Firmas</strong>.
+            Generador de oficios profesionales. Permite cotizaciones simples de 1 hoja (solo cuerpo económico) o propuestas completas de 2 o 3 hojas con <strong className="text-gold">Condiciones de Servicio</strong> y <strong className="text-gold">Condiciones de Trabajo</strong>.
           </p>
         </div>
 
@@ -478,7 +491,7 @@ Reglas:
             <Layers className="w-4 h-4 text-gold" />
             <span>Crear a partir de Plantilla Formal:</span>
           </div>
-          <span className="text-[10px] text-cream-dim">Configuran alcances, normativas y 3 hojas automáticas</span>
+          <span className="text-[10px] text-cream-dim">Preconfiguran alcances, partidas y condiciones</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {PLANTILLAS_EXPRESS.map(p => (
@@ -573,6 +586,7 @@ Reglas:
                   <th className="py-3 px-4">Cliente / Contacto</th>
                   <th className="py-3 px-4">Asunto / Servicio</th>
                   <th className="py-3 px-4 text-right">Total (MXN)</th>
+                  <th className="py-3 px-4 text-center">Estructura</th>
                   <th className="py-3 px-4 text-center">Estado</th>
                   <th className="py-3 px-4 text-center">Google Drive</th>
                   <th className="py-3 px-4 text-right">Acciones</th>
@@ -582,6 +596,7 @@ Reglas:
                 {filteredList.map(cot => {
                   const isBorrador = cot.estado === 'borrador';
                   const isAprobada = cot.estado === 'aprobada';
+                  const cantHojas = (cot.incluir_condiciones_servicio !== false ? 1 : 0) + 1 + (cot.incluir_condiciones_trabajo !== false ? 1 : 0);
                   return (
                     <tr key={cot.id} className="hover:bg-dark-3/50 transition-colors">
                       <td className="py-3.5 px-4 whitespace-nowrap">
@@ -607,6 +622,11 @@ Reglas:
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-cream">
                         {formatCurrency(cot.total)}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-dark-3 border border-dark-4 text-cream-muted">
+                          {cantHojas} {cantHojas === 1 ? 'Hoja' : 'Hojas'}
+                        </span>
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
@@ -639,7 +659,7 @@ Reglas:
                           <button
                             onClick={() => handlePrint(cot)}
                             disabled={generatingPdf}
-                            title="Generar PDF Oficial (3 Hojas)"
+                            title={`Generar PDF Oficial (${cantHojas} ${cantHojas === 1 ? 'Hoja' : 'Hojas'})`}
                             className="p-1.5 bg-dark-3 hover:bg-gold/20 text-gold border border-dark-4 hover:border-gold/40 rounded-lg transition-colors cursor-pointer"
                           >
                             <Printer className="w-3.5 h-3.5" />
@@ -660,8 +680,12 @@ Reglas:
                           <button
                             onClick={() => {
                               setEditingId(cot.id);
-                              setFormData(cot);
-                              setEditorSection('hoja1');
+                              setFormData({
+                                ...cot,
+                                incluir_condiciones_servicio: cot.incluir_condiciones_servicio !== false,
+                                incluir_condiciones_trabajo: cot.incluir_condiciones_trabajo !== false
+                              });
+                              setEditorSection('hoja2');
                               setIsEditorOpen(true);
                             }}
                             title="Editar"
@@ -693,7 +717,7 @@ Reglas:
         )}
       </div>
 
-      {/* MODAL / EDITOR DE COTIZACIÓN EN 3 SECCIONES */}
+      {/* MODAL / EDITOR DE COTIZACIÓN MODULAR */}
       {isEditorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-dark-1/80 backdrop-blur-md animate-fade-in overflow-y-auto">
           <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
@@ -707,9 +731,12 @@ Reglas:
                   <span className="text-[10px] text-cream-dim font-mono">
                     {formData.folio || 'NUEVO FOLIO'}
                   </span>
+                  <span className="text-[10px] bg-dark-4 text-cream font-mono px-2 py-0.5 rounded">
+                    Estructura: {hojasSeleccionadasCount} {hojasSeleccionadasCount === 1 ? 'Hoja' : 'Hojas'}
+                  </span>
                 </div>
                 <h3 className="text-base font-bold text-cream mt-1">
-                  {editingId ? `Editar Cotización ${formData.folio || ''}` : 'Nueva Propuesta Formal de Servicios (3 Hojas)'}
+                  {editingId ? `Editar Cotización ${formData.folio || ''}` : 'Nueva Propuesta Formal de Servicios'}
                 </h3>
               </div>
               <button
@@ -720,25 +747,82 @@ Reglas:
               </button>
             </div>
 
-            {/* PESTAÑAS NAVEGADORAS DE LAS 3 HOJAS FORMALES */}
+            {/* BARRA DE CONFIGURACIÓN DE HOJAS (HABILITAR / INHABILITAR) */}
+            <div className="bg-dark-3/70 px-4 sm:px-6 py-2.5 border-b border-dark-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-cream uppercase tracking-wide">
+                  Hojas que componen el PDF:
+                </span>
+                <span className="text-[10px] text-cream-dim">
+                  (Marca o desmarca según lo requiera tu oficio)
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Switch Hoja 1 */}
+                <label className="flex items-center gap-2 cursor-pointer bg-dark-2 px-3 py-1.5 rounded-lg border border-dark-4 hover:border-gold/40 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={formData.incluir_condiciones_servicio !== false}
+                    onChange={e => {
+                      const enabled = e.target.checked;
+                      setFormData(p => ({ ...p, incluir_condiciones_servicio: enabled }));
+                      if (!enabled && editorSection === 'hoja1') setEditorSection('hoja2');
+                    }}
+                    className="accent-amber-500 w-3.5 h-3.5 cursor-pointer"
+                  />
+                  <span className={`text-xs font-semibold ${formData.incluir_condiciones_servicio !== false ? 'text-gold' : 'text-cream-dim line-through'}`}>
+                    Hoja 1: Condiciones de Servicio
+                  </span>
+                </label>
+
+                {/* Hoja 2 (Fija) */}
+                <div className="flex items-center gap-2 bg-dark-2 px-3 py-1.5 rounded-lg border border-dark-4 text-xs font-bold text-cream">
+                  <CheckSquare className="w-3.5 h-3.5 text-gold" />
+                  <span>Hoja 2: Cuerpo de Cotización</span>
+                  <span className="text-[9px] text-gold/80 font-mono">(Obligatoria)</span>
+                </div>
+
+                {/* Switch Hoja 3 */}
+                <label className="flex items-center gap-2 cursor-pointer bg-dark-2 px-3 py-1.5 rounded-lg border border-dark-4 hover:border-gold/40 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={formData.incluir_condiciones_trabajo !== false}
+                    onChange={e => {
+                      const enabled = e.target.checked;
+                      setFormData(p => ({ ...p, incluir_condiciones_trabajo: enabled }));
+                      if (!enabled && editorSection === 'hoja3') setEditorSection('hoja2');
+                    }}
+                    className="accent-amber-500 w-3.5 h-3.5 cursor-pointer"
+                  />
+                  <span className={`text-xs font-semibold ${formData.incluir_condiciones_trabajo !== false ? 'text-gold' : 'text-cream-dim line-through'}`}>
+                    Hoja 3: Condiciones de Trabajo
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* PESTAÑAS NAVEGADORAS DE EDICIÓN */}
             <div className="flex border-b border-dark-4 bg-dark-3/40 px-4 sm:px-6 gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setEditorSection('hoja1')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-                  editorSection === 'hoja1'
-                    ? 'border-gold text-gold bg-dark-2/60 rounded-t-lg'
-                    : 'border-transparent text-cream-dim hover:text-cream'
-                }`}
-              >
-                <FileCheck className="w-4 h-4" />
-                <span>Hoja 1: Condiciones de Servicio</span>
-              </button>
+              {formData.incluir_condiciones_servicio !== false && (
+                <button
+                  type="button"
+                  onClick={() => setEditorSection('hoja1')}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                    editorSection === 'hoja1'
+                      ? 'border-gold text-gold bg-dark-2/60 rounded-t-lg'
+                      : 'border-transparent text-cream-dim hover:text-cream'
+                  }`}
+                >
+                  <FileCheck className="w-4 h-4" />
+                  <span>Hoja 1: Condiciones de Servicio</span>
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={() => setEditorSection('hoja2')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer ${
                   editorSection === 'hoja2'
                     ? 'border-gold text-gold bg-dark-2/60 rounded-t-lg'
                     : 'border-transparent text-cream-dim hover:text-cream'
@@ -748,18 +832,20 @@ Reglas:
                 <span>Hoja 2: Cuerpo de Cotización</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setEditorSection('hoja3')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-                  editorSection === 'hoja3'
-                    ? 'border-gold text-gold bg-dark-2/60 rounded-t-lg'
-                    : 'border-transparent text-cream-dim hover:text-cream'
-                }`}
-              >
-                <HardHat className="w-4 h-4" />
-                <span>Hoja 3: Condiciones de Trabajo</span>
-              </button>
+              {formData.incluir_condiciones_trabajo !== false && (
+                <button
+                  type="button"
+                  onClick={() => setEditorSection('hoja3')}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                    editorSection === 'hoja3'
+                      ? 'border-gold text-gold bg-dark-2/60 rounded-t-lg'
+                      : 'border-transparent text-cream-dim hover:text-cream'
+                  }`}
+                >
+                  <HardHat className="w-4 h-4" />
+                  <span>Hoja 3: Condiciones de Trabajo</span>
+                </button>
+              )}
             </div>
 
             {/* Modal Body */}
@@ -769,7 +855,7 @@ Reglas:
               <div className="bg-dark-3/50 p-3.5 rounded-xl border border-dark-4">
                 <div className="text-[10px] font-black uppercase text-gold tracking-wider mb-2 flex items-center gap-1.5">
                   <Layers className="w-3 h-3" />
-                  <span>Cargar Plantilla Preconfigurada en 1 Clic (Actualiza las 3 hojas):</span>
+                  <span>Cargar Plantilla Preconfigurada en 1 Clic:</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {PLANTILLAS_EXPRESS.map(preset => (
@@ -791,233 +877,241 @@ Reglas:
               </div>
 
               {/* ============================================================== */}
-              {/* SECCIÓN 1: HOJA 1 - CONDICIONES DE SERVICIO                   */}
+              {/* DATOS DEL CLIENTE Y GENERALES (SIEMPRE DISPONIBLES)           */}
               {/* ============================================================== */}
-              {editorSection === 'hoja1' && (
-                <div className="space-y-4 animate-fade-in">
-                  {/* DATOS DEL CLIENTE Y GENERALES */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <label className="font-bold text-cream flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-gold" />
-                          <span>Cliente / Razón Social *</span>
-                        </label>
-                        {clientes.length > 0 && (
-                          <select
-                            onChange={(e) => handleSelectCliente(e.target.value)}
-                            className="bg-dark-3 border border-dark-4 rounded px-2 py-0.5 text-[10px] text-gold outline-none"
-                          >
-                            <option value="">Buscar en BD Clientes...</option>
-                            {clientes.map(c => (
-                              <option key={c.id} value={c.id}>
-                                {c.nombre_razon_social || c.nombre}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="font-bold text-cream flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-gold" />
+                      <span>Cliente / Razón Social *</span>
+                    </label>
+                    {clientes.length > 0 && (
+                      <select
+                        onChange={(e) => handleSelectCliente(e.target.value)}
+                        className="bg-dark-3 border border-dark-4 rounded px-2 py-0.5 text-[10px] text-gold outline-none"
+                      >
+                        <option value="">Buscar en BD Clientes...</option>
+                        {clientes.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre_razon_social || c.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Nombre o Razón Social del cliente..."
+                    value={formData.cliente_nombre}
+                    onChange={e => setFormData(p => ({ ...p, cliente_nombre: e.target.value }))}
+                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block">Atención a:</label>
                       <input
                         type="text"
-                        placeholder="Nombre o Razón Social del cliente..."
-                        value={formData.cliente_nombre}
-                        onChange={e => setFormData(p => ({ ...p, cliente_nombre: e.target.value }))}
-                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold"
+                        placeholder="Contacto o cargo..."
+                        value={formData.cliente_atencion || ''}
+                        onChange={e => setFormData(p => ({ ...p, cliente_atencion: e.target.value }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
                       />
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] text-cream-muted mb-1 block">Atención a:</label>
-                          <input
-                            type="text"
-                            placeholder="Contacto o cargo..."
-                            value={formData.cliente_atencion || ''}
-                            onChange={e => setFormData(p => ({ ...p, cliente_atencion: e.target.value }))}
-                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-cream-muted mb-1 block">RFC:</label>
-                          <input
-                            type="text"
-                            placeholder="XAXX010101000"
-                            value={formData.cliente_rfc || ''}
-                            onChange={e => setFormData(p => ({ ...p, cliente_rfc: e.target.value.toUpperCase() }))}
-                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold font-mono text-xs"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-cream-muted mb-1 block">Domicilio / Ubicación:</label>
-                        <input
-                          type="text"
-                          placeholder="Dirección fiscal o sitio del servicio..."
-                          value={formData.cliente_direccion || ''}
-                          onChange={e => setFormData(p => ({ ...p, cliente_direccion: e.target.value }))}
-                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                        />
-                      </div>
                     </div>
-
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* INPUT DE FECHA CON CALENDARIO FACILITADO */}
-                        <div>
-                          <label className="text-[10px] text-cream-muted mb-1 block flex items-center justify-between">
-                            <span>Fecha de Emisión:</span>
-                            <span className="text-[9px] text-gold">(Clic para abrir calendario)</span>
-                          </label>
-                          <div 
-                            onClick={() => {
-                              try {
-                                dateInputRef.current?.showPicker();
-                              } catch {
-                                dateInputRef.current?.focus();
-                              }
-                            }}
-                            className="relative flex items-center cursor-pointer group"
-                          >
-                            <input
-                              ref={dateInputRef}
-                              type="date"
-                              value={formData.fecha}
-                              onChange={e => setFormData(p => ({ ...p, fecha: e.target.value }))}
-                              className="w-full bg-dark-3 border border-dark-4 group-hover:border-gold/60 rounded-lg pl-8 pr-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs font-mono cursor-pointer"
-                            />
-                            <Calendar className="w-3.5 h-3.5 absolute left-2.5 text-gold group-hover:scale-110 transition-transform pointer-events-none" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] text-cream-muted mb-1 block">Vigencia (Días):</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={formData.vigencia_dias}
-                            onChange={e => setFormData(p => ({ ...p, vigencia_dias: Number(e.target.value) || 15 }))}
-                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs font-mono"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-cream-muted mb-1 block">Lugar de Expedición:</label>
-                        <input
-                          type="text"
-                          value={formData.lugar}
-                          onChange={e => setFormData(p => ({ ...p, lugar: e.target.value }))}
-                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] text-cream-muted mb-1 block">Teléfono Contacto:</label>
-                          <input
-                            type="text"
-                            placeholder="311..."
-                            value={formData.cliente_telefono || ''}
-                            onChange={e => setFormData(p => ({ ...p, cliente_telefono: e.target.value }))}
-                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-cream-muted mb-1 block">Correo Electrónico:</label>
-                          <input
-                            type="email"
-                            placeholder="cliente@ejemplo.com"
-                            value={formData.cliente_email || ''}
-                            onChange={e => setFormData(p => ({ ...p, cliente_email: e.target.value }))}
-                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                          />
-                        </div>
-                      </div>
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block">RFC:</label>
+                      <input
+                        type="text"
+                        placeholder="XAXX010101000"
+                        value={formData.cliente_rfc || ''}
+                        onChange={e => setFormData(p => ({ ...p, cliente_rfc: e.target.value.toUpperCase() }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold font-mono text-xs"
+                      />
                     </div>
                   </div>
 
-                  {/* ASUNTO Y VOCATIVO */}
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="sm:col-span-2">
-                        <label className="font-bold text-cream mb-1 block">Asunto Formal del Oficio *</label>
+                  <div>
+                    <label className="text-[10px] text-cream-muted mb-1 block">Domicilio / Ubicación:</label>
+                    <input
+                      type="text"
+                      placeholder="Dirección fiscal o sitio del servicio..."
+                      value={formData.cliente_direccion || ''}
+                      onChange={e => setFormData(p => ({ ...p, cliente_direccion: e.target.value }))}
+                      className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* INPUT DE FECHA CON CALENDARIO FACILITADO */}
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block flex items-center justify-between">
+                        <span>Fecha de Emisión:</span>
+                        <span className="text-[9px] text-gold">(Clic para abrir calendario)</span>
+                      </label>
+                      <div 
+                        onClick={() => {
+                          try {
+                            dateInputRef.current?.showPicker();
+                          } catch {
+                            dateInputRef.current?.focus();
+                          }
+                        }}
+                        className="relative flex items-center cursor-pointer group"
+                      >
                         <input
-                          type="text"
-                          value={formData.asunto}
-                          onChange={e => setFormData(p => ({ ...p, asunto: e.target.value }))}
-                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold font-bold text-xs"
+                          ref={dateInputRef}
+                          type="date"
+                          value={formData.fecha}
+                          onChange={e => setFormData(p => ({ ...p, fecha: e.target.value }))}
+                          className="w-full bg-dark-3 border border-dark-4 group-hover:border-gold/60 rounded-lg pl-8 pr-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs font-mono cursor-pointer"
                         />
-                      </div>
-                      <div>
-                        <label className="font-bold text-cream mb-1 block">Tipo de Servicio</label>
-                        <select
-                          value={formData.tipo_servicio}
-                          onChange={e => setFormData(p => ({ ...p, tipo_servicio: e.target.value as any }))}
-                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold text-xs"
-                        >
-                          <option value="visita_tecnica">Visita Técnica</option>
-                          <option value="servicios_profesionales">Servicios Profesionales / UVIE</option>
-                          <option value="suministro_insumos">Suministro de Insumos</option>
-                          <option value="mantenimiento">Póliza de Mantenimiento</option>
-                          <option value="libre">Servicio General / Libre</option>
-                        </select>
+                        <Calendar className="w-3.5 h-3.5 absolute left-2.5 text-gold group-hover:scale-110 transition-transform pointer-events-none" />
                       </div>
                     </div>
 
                     <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="font-bold text-cream">Alcance Técnico y Descripción del Servicio</label>
-                        <button
-                          type="button"
-                          onClick={() => handleMejorarConIA('alcance')}
-                          disabled={generatingAi}
-                          className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                          <Sparkles className={`w-3 h-3 ${generatingAi ? 'animate-pulse' : ''}`} />
-                          <span>{generatingAi ? 'Mejorando...' : 'Mejorar con IA'}</span>
-                        </button>
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={formData.descripcion_alcance}
-                        onChange={e => setFormData(p => ({ ...p, descripcion_alcance: e.target.value }))}
-                        placeholder="Describe los alcances y objetivos del servicio..."
-                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed"
+                      <label className="text-[10px] text-cream-muted mb-1 block">Vigencia (Días):</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.vigencia_dias}
+                        onChange={e => setFormData(p => ({ ...p, vigencia_dias: Number(e.target.value) || 15 }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs font-mono"
                       />
                     </div>
+                  </div>
 
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="font-bold text-cream">Términos, Especificaciones y Condiciones del Servicio</label>
-                        <button
-                          type="button"
-                          onClick={() => handleMejorarConIA('condiciones_servicio')}
-                          disabled={generatingAi}
-                          className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                          <Sparkles className="w-3 h-3" />
-                          <span>Redactar Cláusulas con IA</span>
-                        </button>
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={formData.condiciones_servicio || ''}
-                        onChange={e => setFormData(p => ({ ...p, condiciones_servicio: e.target.value }))}
-                        placeholder="Especificaciones de cumplimiento normativo (NOM/CFE), garantías de servicio y confidencialidad..."
-                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed font-mono"
-                      />
-                    </div>
+                  <div>
+                    <label className="text-[10px] text-cream-muted mb-1 block">Lugar de Expedición:</label>
+                    <input
+                      type="text"
+                      value={formData.lugar}
+                      onChange={e => setFormData(p => ({ ...p, lugar: e.target.value }))}
+                      className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                    />
+                  </div>
 
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="font-bold text-cream mb-1 block">Metodología de Ejecución y Entregables (Opcional):</label>
-                      <textarea
-                        rows={3}
-                        value={formData.metodologia_servicio || ''}
-                        onChange={e => setFormData(p => ({ ...p, metodologia_servicio: e.target.value }))}
-                        placeholder="Fase 1, Fase 2, Fase 3 y productos entregables al cliente..."
-                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed"
+                      <label className="text-[10px] text-cream-muted mb-1 block">Teléfono Contacto:</label>
+                      <input
+                        type="text"
+                        placeholder="311..."
+                        value={formData.cliente_telefono || ''}
+                        onChange={e => setFormData(p => ({ ...p, cliente_telefono: e.target.value }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
                       />
                     </div>
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block">Correo Electrónico:</label>
+                      <input
+                        type="email"
+                        placeholder="cliente@ejemplo.com"
+                        value={formData.cliente_email || ''}
+                        onChange={e => setFormData(p => ({ ...p, cliente_email: e.target.value }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ASUNTO Y TIPO DE SERVICIO */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="font-bold text-cream mb-1 block">Asunto Formal del Oficio *</label>
+                  <input
+                    type="text"
+                    value={formData.asunto}
+                    onChange={e => setFormData(p => ({ ...p, asunto: e.target.value }))}
+                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold font-bold text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-cream mb-1 block">Tipo de Servicio</label>
+                  <select
+                    value={formData.tipo_servicio}
+                    onChange={e => setFormData(p => ({ ...p, tipo_servicio: e.target.value as any }))}
+                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold text-xs"
+                  >
+                    <option value="visita_tecnica">Visita Técnica</option>
+                    <option value="servicios_profesionales">Servicios Profesionales / UVIE</option>
+                    <option value="suministro_insumos">Suministro de Insumos</option>
+                    <option value="mantenimiento">Póliza de Mantenimiento</option>
+                    <option value="libre">Servicio General / Libre</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* DESCRIPCIÓN Y ALCANCE GENERAL */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="font-bold text-cream">Alcance Técnico y Descripción del Servicio</label>
+                  <button
+                    type="button"
+                    onClick={() => handleMejorarConIA('alcance')}
+                    disabled={generatingAi}
+                    className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Sparkles className={`w-3 h-3 ${generatingAi ? 'animate-pulse' : ''}`} />
+                    <span>{generatingAi ? 'Mejorando...' : 'Mejorar con IA'}</span>
+                  </button>
+                </div>
+                <textarea
+                  rows={3}
+                  value={formData.descripcion_alcance}
+                  onChange={e => setFormData(p => ({ ...p, descripcion_alcance: e.target.value }))}
+                  placeholder="Describe los alcances, objetivos o justificación comercial del servicio..."
+                  className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed"
+                />
+              </div>
+
+              {/* ============================================================== */}
+              {/* SECCIÓN 1: HOJA 1 - CONDICIONES DE SERVICIO                   */}
+              {/* ============================================================== */}
+              {editorSection === 'hoja1' && formData.incluir_condiciones_servicio !== false && (
+                <div className="space-y-4 animate-fade-in border-t border-dark-4 pt-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-gold uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                      <FileCheck className="w-4 h-4" />
+                      <span>Contenido de Hoja 1: Condiciones de Servicio</span>
+                    </h4>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-cream">Términos, Especificaciones y Normativa (NOM/CFE)</label>
+                      <button
+                        type="button"
+                        onClick={() => handleMejorarConIA('condiciones_servicio')}
+                        disabled={generatingAi}
+                        className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Redactar Cláusulas con IA</span>
+                      </button>
+                    </div>
+                    <textarea
+                      rows={5}
+                      value={formData.condiciones_servicio || ''}
+                      onChange={e => setFormData(p => ({ ...p, condiciones_servicio: e.target.value }))}
+                      placeholder="Especificaciones de cumplimiento normativo (NOM/CFE), garantías de servicio y confidencialidad..."
+                      className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-cream mb-1 block">Metodología de Ejecución y Entregables (Opcional):</label>
+                    <textarea
+                      rows={3}
+                      value={formData.metodologia_servicio || ''}
+                      onChange={e => setFormData(p => ({ ...p, metodologia_servicio: e.target.value }))}
+                      placeholder="Fase 1, Fase 2, Fase 3 y productos entregables al cliente..."
+                      className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed"
+                    />
                   </div>
 
                   <div className="flex justify-end pt-2">
@@ -1026,7 +1120,7 @@ Reglas:
                       onClick={() => setEditorSection('hoja2')}
                       className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-gold border border-gold/30 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
                     >
-                      <span>Siguiente: Hoja 2 (Cuerpo de Cotización)</span>
+                      <span>Ir a Hoja 2: Cuerpo de Cotización</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1037,11 +1131,12 @@ Reglas:
               {/* SECCIÓN 2: HOJA 2 - CUERPO DE COTIZACIÓN (PARTIDAS & PRECIOS)  */}
               {/* ============================================================== */}
               {editorSection === 'hoja2' && (
-                <div className="space-y-4 animate-fade-in">
+                <div className="space-y-4 animate-fade-in border-t border-dark-4 pt-4">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h4 className="font-bold text-cream uppercase text-[11px] tracking-wider text-gold">
-                        Conceptos y Partidas de la Cotización
+                      <h4 className="font-bold text-cream uppercase text-[11px] tracking-wider text-gold flex items-center gap-1.5">
+                        <DollarSign className="w-4 h-4" />
+                        <span>Conceptos y Partidas de la Cotización</span>
                       </h4>
                       <p className="text-[10px] text-cream-dim">Desglose de cantidades, precios unitarios e importes en MXN</p>
                     </div>
@@ -1226,22 +1321,51 @@ Reglas:
                     </div>
                   </div>
 
+                  {/* DATOS DE FIRMAS (SI HOJA 3 ESTÁ INHABILITADA, SE CONFIGURAN AQUÍ) */}
+                  {formData.incluir_condiciones_trabajo === false && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
+                      <div>
+                        <label className="text-[10px] text-cream-muted mb-1 block">Responsable de Emisión ESOL:</label>
+                        <input
+                          type="text"
+                          value={formData.remitente_nombre}
+                          onChange={e => setFormData(p => ({ ...p, remitente_nombre: e.target.value }))}
+                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-cream-muted mb-1 block">Cargo Institucional:</label>
+                        <input
+                          type="text"
+                          value={formData.remitente_cargo}
+                          onChange={e => setFormData(p => ({ ...p, remitente_cargo: e.target.value }))}
+                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex justify-between pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditorSection('hoja1')}
-                      className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-cream-muted rounded-xl text-xs font-bold cursor-pointer"
-                    >
-                      ← Volver a Hoja 1
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditorSection('hoja3')}
-                      className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-gold border border-gold/30 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
-                    >
-                      <span>Siguiente: Hoja 3 (Condiciones de Trabajo)</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    {formData.incluir_condiciones_servicio !== false ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditorSection('hoja1')}
+                        className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-cream-muted rounded-xl text-xs font-bold cursor-pointer"
+                      >
+                        ← Volver a Hoja 1
+                      </button>
+                    ) : <div />}
+
+                    {formData.incluir_condiciones_trabajo !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setEditorSection('hoja3')}
+                        className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-gold border border-gold/30 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+                      >
+                        <span>Siguiente: Hoja 3 (Condiciones de Trabajo)</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1249,8 +1373,15 @@ Reglas:
               {/* ============================================================== */}
               {/* SECCIÓN 3: HOJA 3 - CONDICIONES DE TRABAJO Y FIRMAS            */}
               {/* ============================================================== */}
-              {editorSection === 'hoja3' && (
-                <div className="space-y-4 animate-fade-in">
+              {editorSection === 'hoja3' && formData.incluir_condiciones_trabajo !== false && (
+                <div className="space-y-4 animate-fade-in border-t border-dark-4 pt-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-gold uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                      <HardHat className="w-4 h-4" />
+                      <span>Contenido de Hoja 3: Condiciones de Trabajo y Seguridad</span>
+                    </h4>
+                  </div>
+
                   <div className="bg-dark-3/30 p-4 rounded-xl border border-dark-4 space-y-4">
                     <div>
                       <div className="flex justify-between items-center mb-1">
@@ -1365,7 +1496,7 @@ Reglas:
                   className="px-5 py-2 bg-gold hover:bg-gold-light text-dark-1 rounded-xl text-xs font-black shadow-lg shadow-gold/20 transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Emitir Oficialmente (3 Hojas)</span>
+                  <span>Emitir Oficialmente ({hojasSeleccionadasCount} {hojasSeleccionadasCount === 1 ? 'Hoja' : 'Hojas'})</span>
                 </button>
               </div>
             </div>

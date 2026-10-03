@@ -33,6 +33,10 @@ export interface CotizacionExpressData {
   tipo_servicio: 'visita_tecnica' | 'servicios_profesionales' | 'suministro_insumos' | 'mantenimiento' | 'libre';
   descripcion_alcance: string; // Cuerpo explicativo del servicio
 
+  // Opciones de Estructura de Hojas (Habilitar / Inhabilitar)
+  incluir_condiciones_servicio?: boolean; // Si es false, se omite Hoja 1
+  incluir_condiciones_trabajo?: boolean;  // Si es false, se omite Hoja 3
+
   // Hoja 1: Condiciones de Servicio
   condiciones_servicio?: string; // Especificaciones generales, alcance normativo, compromisos de ESOL
   metodologia_servicio?: string; // Procedimiento técnico y entregables formales
