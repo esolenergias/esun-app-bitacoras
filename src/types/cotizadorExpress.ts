@@ -33,7 +33,11 @@ export interface CotizacionExpressData {
   tipo_servicio: 'visita_tecnica' | 'servicios_profesionales' | 'suministro_insumos' | 'mantenimiento' | 'libre';
   descripcion_alcance: string; // Cuerpo explicativo del servicio
 
-  // Conceptos y Costos
+  // Hoja 1: Condiciones de Servicio
+  condiciones_servicio?: string; // Especificaciones generales, alcance normativo, compromisos de ESOL
+  metodologia_servicio?: string; // Procedimiento técnico y entregables formales
+
+  // Conceptos y Costos (Hoja 2: Cuerpo de Cotización)
   partidas: PartidaCotizacionExpress[];
   subtotal: number;
   descuento: number;
@@ -48,6 +52,11 @@ export interface CotizacionExpressData {
   banco_receptor?: string;
   cuenta_clabe?: string;
   notas_comerciales?: string;
+
+  // Hoja 3: Condiciones de Trabajo
+  condiciones_trabajo?: string; // Requisitos en sitio, seguridad industrial EPP, libranzas, horarios
+  responsabilidades_cliente?: string; // Accesos, permisos, suministro eléctrico/agua
+  exclusiones_garantias?: string; // Qué no incluye y términos de garantía
 
   // Remitente y Firmas
   remitente_nombre: string;
@@ -77,6 +86,11 @@ export interface PlantillaExpressPreset {
   asuntoDefault: string;
   tipo_servicio: CotizacionExpressData['tipo_servicio'];
   alcanceDefault: string;
+  condicionesServicioDefault?: string;
+  metodologiaServicioDefault?: string;
+  condicionesTrabajoDefault?: string;
+  responsabilidadesClienteDefault?: string;
+  exclusionesGarantiasDefault?: string;
   tiempoEntregaDefault: string;
   condicionesPagoDefault: string;
   partidasDefault: Omit<PartidaCotizacionExpress, 'id'>[];

@@ -14,8 +14,35 @@ export const cotizadorExpressService = {
         .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data)) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        return data;
+        const parsed: CotizacionExpressData[] = data.map((item: any) => {
+          let extra: any = {};
+          if (item.introduccion && typeof item.introduccion === 'string' && item.introduccion.startsWith('{')) {
+            try {
+              extra = JSON.parse(item.introduccion);
+            } catch {}
+          }
+          return {
+            ...item,
+            cliente_atencion: item.cliente_atencion || item.cliente_contacto || '',
+            cliente_email: item.cliente_email || item.cliente_correo || '',
+            condiciones_pago: item.condiciones_pago || item.forma_pago || '',
+            notas_comerciales: item.notas_comerciales || item.notas_adicionales || '',
+            vocativo: item.vocativo || extra.vocativo || 'Estimado(a) Cliente:',
+            descripcion_alcance: item.descripcion_alcance || extra.descripcion_alcance || '',
+            condiciones_servicio: item.condiciones_servicio || extra.condiciones_servicio || '',
+            metodologia_servicio: item.metodologia_servicio || extra.metodologia_servicio || '',
+            condiciones_trabajo: item.condiciones_trabajo || extra.condiciones_trabajo || '',
+            responsabilidades_cliente: item.responsabilidades_cliente || extra.responsabilidades_cliente || '',
+            exclusiones_garantias: item.exclusiones_garantias || extra.exclusiones_garantias || '',
+            remitente_nombre: item.remitente_nombre || extra.remitente_nombre || item.emisor_nombre || '',
+            remitente_cargo: item.remitente_cargo || extra.remitente_cargo || item.emisor_cargo || '',
+            banco_receptor: item.banco_receptor || extra.banco_receptor || 'BBVA Bancomer Esol Energías',
+            cuenta_clabe: item.cuenta_clabe || extra.cuenta_clabe || '',
+            descuento: item.descuento || extra.descuento || 0
+          };
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        return parsed;
       }
     } catch (e) {
       console.warn('Error fetching cotizaciones_express from Supabase, using local cache:', e);
@@ -81,11 +108,59 @@ export const cotizadorExpressService = {
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 
-    // Persistir en Supabase (si la tabla existe)
+    // Persistir en Supabase
     try {
-      await supabase
+      // Intentar primero guardar registro completo
+      const { error: fullError } = await supabase
         .from('cotizaciones_express')
         .upsert(record);
+
+      if (fullError) {
+        // Si faltan columnas en la tabla remota, guardar con columnas base y guardar el objeto completo serializado en introduccion/partidas
+        console.warn('Upsert completo con advertencia, intentando fallback de compatibilidad:', fullError.message);
+        const fallbackRecord = {
+          id: record.id,
+          folio: record.folio,
+          estado: record.estado,
+          fecha: record.fecha,
+          vigencia_dias: record.vigencia_dias,
+          lugar: record.lugar,
+          cliente_id: record.cliente_id,
+          cliente_nombre: record.cliente_nombre,
+          cliente_rfc: record.cliente_rfc,
+          cliente_contacto: record.cliente_atencion,
+          cliente_telefono: record.cliente_telefono,
+          cliente_correo: record.cliente_email,
+          cliente_direccion: record.cliente_direccion,
+          asunto: record.asunto,
+          introduccion: JSON.stringify({
+            vocativo: record.vocativo,
+            descripcion_alcance: record.descripcion_alcance,
+            condiciones_servicio: record.condiciones_servicio,
+            metodologia_servicio: record.metodologia_servicio,
+            condiciones_trabajo: record.condiciones_trabajo,
+            responsabilidades_cliente: record.responsabilidades_cliente,
+            exclusiones_garantias: record.exclusiones_garantias,
+            remitente_nombre: record.remitente_nombre,
+            remitente_cargo: record.remitente_cargo,
+            banco_receptor: record.banco_receptor,
+            cuenta_clabe: record.cuenta_clabe,
+            descuento: record.descuento
+          }),
+          partidas: record.partidas,
+          subtotal: record.subtotal,
+          iva_porcentaje: record.iva_porcentaje,
+          iva_monto: record.iva_monto,
+          total: record.total,
+          tiempo_entrega: record.tiempo_entrega,
+          forma_pago: record.condiciones_pago,
+          notas_adicionales: record.notas_comerciales,
+          drive_url: record.drive_url,
+          tesoreria_ingreso_id: record.ingreso_id,
+          updated_at: now
+        };
+        await supabase.from('cotizaciones_express').upsert(fallbackRecord);
+      }
     } catch (err) {
       console.warn('Could not upsert to Supabase cotizaciones_express:', err);
     }

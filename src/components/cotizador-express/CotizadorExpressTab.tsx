@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   FileText, Plus, Search, Trash2, Edit3, Printer, ExternalLink, CheckCircle, Clock,
   ArrowRight, DollarSign, Send, FolderCheck, Building2, User, Phone, Mail, MapPin,
-  Calendar, ShieldCheck, Sparkles, AlertCircle, RefreshCw, Layers
+  Calendar, ShieldCheck, Sparkles, AlertCircle, RefreshCw, Layers, FileCheck, Wrench, HardHat
 } from 'lucide-react';
 import { supabase } from '../../context/supabase';
 import { useApp } from '../../context/AppContext';
@@ -34,6 +34,10 @@ export const CotizadorExpressTab: React.FC = () => {
   // Modo Editor / Formulario
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editorSection, setEditorSection] = useState<'hoja1' | 'hoja2' | 'hoja3'>('hoja1');
+
+  // Date input ref para abrir el picker nativo al hacer click en cualquier parte o icono
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
   const [formData, setFormData] = useState<CotizacionExpressData>({
@@ -53,6 +57,8 @@ export const CotizadorExpressTab: React.FC = () => {
     vocativo: 'Estimado(a) Cliente / Comité de Operaciones:',
     tipo_servicio: 'servicios_profesionales',
     descripcion_alcance: '',
+    condiciones_servicio: '',
+    metodologia_servicio: '',
     partidas: [],
     subtotal: 0,
     descuento: 0,
@@ -63,7 +69,10 @@ export const CotizadorExpressTab: React.FC = () => {
     condiciones_pago: '50% anticipo al autorizar y 50% finiquito contra entrega',
     banco_receptor: 'BBVA Bancomer Esol Energías',
     cuenta_clabe: '',
-    notas_comerciales: 'Cotización sujeta a disponibilidad y cambios sin previo aviso tras vencer su vigencia.',
+    notas_comerciales: 'Precios en MXN. Validez sujeta a vigencia estipulada.',
+    condiciones_trabajo: '',
+    responsabilidades_cliente: '',
+    exclusiones_garantias: '',
     remitente_nombre: currentUser?.name || 'Ing. Manuel de Jesús Fregoso Samaniega',
     remitente_cargo: 'Representante Legal / Dirección de Operaciones',
     incluir_firma_digital: true
@@ -73,17 +82,17 @@ export const CotizadorExpressTab: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const list = await cotizadorExpressService.getCotizaciones();
-      setCotizaciones(list);
+      const data = await cotizadorExpressService.getCotizaciones();
+      setCotizaciones(data);
 
-      // Cargar clientes de Supabase
-      const { data: cliData } = await supabase
+      const { data: dbClientes } = await supabase
         .from('clientes')
         .select('*')
-        .order('nombre_razon_social', { ascending: true });
-      if (cliData) setClientes(cliData);
-    } catch (e) {
-      console.error('Error cargando cotizaciones express:', e);
+        .order('nombre', { ascending: true });
+
+      if (dbClientes) setClientes(dbClientes);
+    } catch (err) {
+      console.error('Error cargando datos de cotizador:', err);
     } finally {
       setLoading(false);
     }
@@ -93,9 +102,13 @@ export const CotizadorExpressTab: React.FC = () => {
     loadData();
   }, []);
 
-  // Recalcular montos
-  const recomputeTotals = (partidas: PartidaCotizacionExpress[], desc: number, ivaPct: number) => {
-    const sub = partidas.reduce((acc, p) => acc + (p.importe || 0), 0);
+  // Recálculo de totales
+  const recomputeTotals = (
+    parts: PartidaCotizacionExpress[],
+    desc: number,
+    ivaPct: number
+  ) => {
+    const sub = parts.reduce((acc, p) => acc + (p.importe || 0), 0);
     const subConDesc = Math.max(0, sub - (desc || 0));
     const iva = subConDesc * ((ivaPct || 0) / 100);
     const tot = subConDesc + iva;
@@ -119,9 +132,10 @@ export const CotizadorExpressTab: React.FC = () => {
     const totals = recomputeTotals(initialPartidas, 0, 16);
 
     setEditingId(null);
+    setEditorSection('hoja1');
     setFormData({
       id: `cot_${Date.now()}`,
-      folio: '', // Se asignará provisionalmente como BORR-XXX o COT al guardar
+      folio: '',
       estado: 'borrador',
       fecha: new Date().toISOString().split('T')[0],
       lugar: 'Tepic, Nayarit',
@@ -136,6 +150,8 @@ export const CotizadorExpressTab: React.FC = () => {
       vocativo: 'Estimado(a) Cliente / Representante Autorizado:',
       tipo_servicio: preset.tipo_servicio,
       descripcion_alcance: preset.alcanceDefault,
+      condiciones_servicio: preset.condicionesServicioDefault || '',
+      metodologia_servicio: preset.metodologiaServicioDefault || '',
       partidas: initialPartidas,
       ...totals,
       tiempo_entrega: preset.tiempoEntregaDefault,
@@ -143,6 +159,9 @@ export const CotizadorExpressTab: React.FC = () => {
       banco_receptor: 'BBVA Bancomer Esol Energías',
       cuenta_clabe: '',
       notas_comerciales: 'Precios expresados en Moneda Nacional (MXN). Validez sujeta a vigencia estipulada.',
+      condiciones_trabajo: preset.condicionesTrabajoDefault || '',
+      responsabilidades_cliente: preset.responsabilidadesClienteDefault || '',
+      exclusiones_garantias: preset.exclusionesGarantiasDefault || '',
       remitente_nombre: currentUser?.name || 'Ing. Manuel de Jesús Fregoso Samaniega',
       remitente_cargo: 'Representante Legal / Dirección de Operaciones',
       incluir_firma_digital: true
@@ -152,7 +171,7 @@ export const CotizadorExpressTab: React.FC = () => {
 
   // Aplicar plantilla rápida sobre el formulario abierto
   const handleApplyPreset = (preset: PlantillaExpressPreset) => {
-    if (!confirm(`¿Deseas aplicar la plantilla "${preset.titulo}"? Reemplazará el asunto, alcances y partidas actuales.`)) return;
+    if (!confirm(`¿Deseas aplicar la plantilla "${preset.titulo}"? Reemplazará las condiciones, alcances y conceptos actuales.`)) return;
 
     const newPartidas: PartidaCotizacionExpress[] = preset.partidasDefault.map(p => ({
       ...p,
@@ -165,6 +184,11 @@ export const CotizadorExpressTab: React.FC = () => {
       asunto: preset.asuntoDefault,
       tipo_servicio: preset.tipo_servicio,
       descripcion_alcance: preset.alcanceDefault,
+      condiciones_servicio: preset.condicionesServicioDefault || '',
+      metodologia_servicio: preset.metodologiaServicioDefault || '',
+      condiciones_trabajo: preset.condicionesTrabajoDefault || '',
+      responsabilidades_cliente: preset.responsabilidadesClienteDefault || '',
+      exclusiones_garantias: preset.exclusionesGarantiasDefault || '',
       tiempo_entrega: preset.tiempoEntregaDefault,
       condiciones_pago: preset.condicionesPagoDefault,
       partidas: newPartidas,
@@ -287,14 +311,16 @@ export const CotizadorExpressTab: React.FC = () => {
   };
 
   // Mejorar redacción con IA
-  const handleMejorarConIA = async () => {
+  const handleMejorarConIA = async (campo: 'alcance' | 'condiciones_servicio' | 'condiciones_trabajo') => {
     if (!globalGeminiApiKey && !siliconFlowApiKey) {
       alert('Configura tu API Key de Gemini o Silicon Flow en el sistema.');
       return;
     }
     setGeneratingAi(true);
     try {
-      const prompt = `Actúa como Director Técnico y Comercial de ESOL Energías Renovables.
+      let prompt = '';
+      if (campo === 'alcance') {
+        prompt = `Actúa como Director Técnico y Comercial de ESOL Energías Renovables.
 Mejora y formaliza la redacción técnica del alcance para esta cotización formal.
 Asunto: ${formData.asunto}
 Cliente: ${formData.cliente_nombre}
@@ -305,6 +331,27 @@ Reglas:
 - Tono corporativo, técnico, claro, ejecutivo y persuasivo.
 - Sin saludos excesivos ni despedidas. Directo a las especificaciones y entregables.
 - Formato con viñetas limpias para los alcances.`;
+      } else if (campo === 'condiciones_servicio') {
+        prompt = `Actúa como Director Legal y Técnico de ESOL Energías Renovables.
+Redacta o formaliza las "Condiciones del Servicio" para una cotización de tipo ${formData.tipo_servicio}.
+Asunto: ${formData.asunto}
+Texto base:
+${formData.condiciones_servicio || 'Especificaciones de cumplimiento y calidad'}
+
+Reglas:
+- Estructurar en cláusulas concisas: 1. Alcance Normativo (NOM-001-SEDE-2012 / CFE), 2. Garantías de servicio y confidencialidad, 3. Tiempos y vigencia.
+- Tono formal de ingeniería contractual, sin adornos vacíos.`;
+      } else {
+        prompt = `Actúa como Coordinador de Seguridad e Higiene y Operaciones de ESOL Energías Renovables.
+Redacta o mejora las "Condiciones de Trabajo y Seguridad" en sitio para una cotización formal.
+Asunto: ${formData.asunto}
+Texto base:
+${formData.condiciones_trabajo || 'Requisitos de EPP y seguridad en sitio'}
+
+Reglas:
+- Estructura: 1. Seguridad Industrial y EPP (DC-3, trabajos en altura si aplica), 2. Horarios y coordinación, 3. Responsabilidades del cliente (accesos, libranzas eléctricas).
+- Enfoque preventivo y profesional.`;
+      }
 
       const aiText = await generateAIContent(
         [{ role: 'user', content: prompt }],
@@ -314,7 +361,9 @@ Reglas:
         0.3
       );
       if (aiText) {
-        setFormData(p => ({ ...p, descripcion_alcance: aiText }));
+        if (campo === 'alcance') setFormData(p => ({ ...p, descripcion_alcance: aiText }));
+        else if (campo === 'condiciones_servicio') setFormData(p => ({ ...p, condiciones_servicio: aiText }));
+        else setFormData(p => ({ ...p, condiciones_trabajo: aiText }));
       }
     } catch (err: any) {
       alert('Error de IA: ' + err.message);
@@ -348,155 +397,208 @@ Reglas:
     .reduce((acc, c) => acc + (c.total || 0), 0);
 
   return (
-    <div className="space-y-6 animate-fade-in text-cream pb-12">
+    <div className="space-y-6 animate-fade-in p-4 sm:p-6 max-w-7xl mx-auto">
       {/* HEADER PRINCIPAL */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-dark-2 p-5 rounded-2xl border border-dark-4 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-dark-4 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-gold/20 text-gold border border-gold/30">
-              Propuestas Formales
+          <div className="flex items-center gap-2.5 text-gold mb-1">
+            <FileText className="w-6 h-6" />
+            <span className="text-xs font-mono uppercase tracking-widest bg-gold/10 px-2.5 py-0.5 rounded-full border border-gold/20">
+              Oficios de Cotización & Servicios
             </span>
-            <h2 className="text-xl font-bold text-cream">Cotizaciones Rápidas de Servicios e Insumos</h2>
           </div>
-          <p className="text-sm text-cream-muted mt-1">
-            Generador ejecutivo de propuestas tipo oficio para visitas técnicas, ingeniería, suministros y pólizas de mantenimiento.
+          <h2 className="text-2xl font-bold text-cream tracking-tight">
+            Cotizaciones Rápidas (3 Hojas Formales)
+          </h2>
+          <p className="text-xs text-cream-muted mt-1 max-w-2xl">
+            Generador de oficios profesionales estructurados en 3 secciones: <strong className="text-gold">Hoja 1: Condiciones de Servicio</strong>, <strong className="text-gold">Hoja 2: Cuerpo de Cotización</strong> y <strong className="text-gold">Hoja 3: Condiciones de Trabajo y Firmas</strong>.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        {/* BOTONES DE ACCIÓN RÁPIDA */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => handleOpenNew()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 rounded-xl font-black text-xs shadow-lg shadow-gold/20 transition-all cursor-pointer"
+            onClick={() => loadData()}
+            className="p-2.5 bg-dark-2 hover:bg-dark-3 text-cream-muted hover:text-cream border border-dark-4 rounded-xl transition-all cursor-pointer"
+            title="Refrescar lista"
           >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => handleOpenNew('visita_tecnica')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 font-bold text-xs rounded-xl shadow-lg shadow-gold/20 transition-all cursor-pointer hover:scale-[1.02]"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
             <span>Nueva Cotización</span>
           </button>
         </div>
       </div>
 
-      {/* KPI METRICS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-dark-2 border border-dark-4 p-4 rounded-xl flex items-center justify-between">
+      {/* KPIS RÁPIDOS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-dark-2 border border-dark-4 rounded-xl p-4 flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-cream-muted uppercase tracking-wider">Propuestas Emitidas</div>
-            <div className="text-2xl font-black text-gold font-mono mt-0.5">{totalEmitidas}</div>
-            <div className="text-[10px] text-cream-dim mt-0.5">Folios oficiales generados</div>
+            <div className="text-[11px] font-bold text-cream-dim uppercase tracking-wider">Propuestas Emitidas</div>
+            <div className="text-2xl font-black text-cream mt-1">{totalEmitidas}</div>
+            <div className="text-[10px] text-gold mt-0.5">Folios oficiales COT-ESOL</div>
           </div>
-          <div className="p-3 bg-gold/10 text-gold rounded-xl border border-gold/20">
-            <FolderCheck className="w-5 h-5" />
+          <div className="w-11 h-11 rounded-xl bg-gold/10 border border-gold/20 flex items-center justify-center text-gold">
+            <CheckCircle className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-dark-2 border border-dark-4 p-4 rounded-xl flex items-center justify-between">
+        <div className="bg-dark-2 border border-dark-4 rounded-xl p-4 flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-cream-muted uppercase tracking-wider">Monto Emitido ($ MXN)</div>
-            <div className="text-2xl font-black text-cream font-mono mt-0.5">{formatCurrency(montoTotalEmitido)}</div>
-            <div className="text-[10px] text-emerald-400 mt-0.5">En propuestas activas</div>
+            <div className="text-[11px] font-bold text-cream-dim uppercase tracking-wider">Borradores en Curso</div>
+            <div className="text-2xl font-black text-amber-400 mt-1">{totalBorradores}</div>
+            <div className="text-[10px] text-amber-300/70 mt-0.5">Pendientes de emisión oficial</div>
           </div>
-          <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
-            <DollarSign className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-dark-2 border border-dark-4 p-4 rounded-xl flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-bold text-cream-muted uppercase tracking-wider">Borradores en Curso</div>
-            <div className="text-2xl font-black text-amber-400 font-mono mt-0.5">{totalBorradores}</div>
-            <div className="text-[10px] text-cream-dim mt-0.5">Propuestas por confirmar</div>
-          </div>
-          <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
             <Clock className="w-5 h-5" />
           </div>
         </div>
-      </div>
 
-      {/* BARRA DE FILTROS Y BUSCADOR */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between bg-dark-2 p-4 rounded-xl border border-dark-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-cream-dim" />
-          <input
-            type="text"
-            placeholder="Buscar por folio, cliente o asunto..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-dark-3 border border-dark-4 rounded-lg text-xs text-cream focus:border-gold outline-none"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex bg-dark-3 rounded-lg p-0.5 border border-dark-4">
-            <button
-              onClick={() => setActiveTabSub('emitidas')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                activeTabSub === 'emitidas' ? 'bg-gold text-dark-1 shadow-sm' : 'text-cream-muted hover:text-cream'
-              }`}
-            >
-              Emitidas ({totalEmitidas})
-            </button>
-            <button
-              onClick={() => setActiveTabSub('borradores')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                activeTabSub === 'borradores' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'text-cream-muted hover:text-cream'
-              }`}
-            >
-              Borradores ({totalBorradores})
-            </button>
-            <button
-              onClick={() => setActiveTabSub('todas')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                activeTabSub === 'todas' ? 'bg-dark-4 text-cream' : 'text-cream-muted hover:text-cream'
-              }`}
-            >
-              Todas ({cotizaciones.length})
-            </button>
+        <div className="bg-dark-2 border border-dark-4 rounded-xl p-4 flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-bold text-cream-dim uppercase tracking-wider">Monto Total Cotizado</div>
+            <div className="text-2xl font-black text-cream mt-1 font-mono">{formatCurrency(montoTotalEmitido)}</div>
+            <div className="text-[10px] text-emerald-400 mt-0.5">Cartera propuesta activa</div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <DollarSign className="w-5 h-5" />
           </div>
         </div>
       </div>
 
-      {/* LISTADO DE COTIZACIONES */}
-      <div className="bg-dark-2 rounded-2xl border border-dark-4 overflow-hidden shadow-xl">
+      {/* PLANTILLAS PRECONFIGURADAS RÁPIDAS EN CABECERA */}
+      <div className="bg-dark-2 border border-dark-4 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-cream uppercase tracking-wider">
+            <Layers className="w-4 h-4 text-gold" />
+            <span>Crear a partir de Plantilla Formal:</span>
+          </div>
+          <span className="text-[10px] text-cream-dim">Configuran alcances, normativas y 3 hojas automáticas</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {PLANTILLAS_EXPRESS.map(p => (
+            <button
+              key={p.id}
+              onClick={() => handleOpenNew(p.id)}
+              className="text-left p-3 rounded-lg bg-dark-3 hover:bg-gold/10 border border-dark-4 hover:border-gold/40 transition-all cursor-pointer group flex flex-col justify-between"
+            >
+              <div>
+                <div className="text-xs font-bold text-cream group-hover:text-gold transition-colors">
+                  {p.titulo}
+                </div>
+                <div className="text-[10px] text-cream-muted mt-1 line-clamp-2 leading-relaxed">
+                  {p.subtitulo}
+                </div>
+              </div>
+              <div className="mt-3 pt-2 border-t border-dark-4 flex items-center justify-between text-[10px] text-gold font-bold">
+                <span>Usar Plantilla</span>
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* BARRA DE FILTROS Y BÚSQUEDA */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-dark-2 border border-dark-4 p-3 rounded-xl">
+        <div className="flex items-center gap-1.5 p-1 bg-dark-3 rounded-lg border border-dark-4">
+          <button
+            onClick={() => setActiveTabSub('emitidas')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              activeTabSub === 'emitidas' 
+                ? 'bg-gold text-dark-1 shadow-sm' 
+                : 'text-cream-dim hover:text-cream'
+            }`}
+          >
+            Emitidas ({totalEmitidas})
+          </button>
+          <button
+            onClick={() => setActiveTabSub('borradores')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              activeTabSub === 'borradores' 
+                ? 'bg-amber-500 text-dark-1 shadow-sm' 
+                : 'text-cream-dim hover:text-cream'
+            }`}
+          >
+            Borradores ({totalBorradores})
+          </button>
+          <button
+            onClick={() => setActiveTabSub('todas')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              activeTabSub === 'todas' 
+                ? 'bg-dark-4 text-cream shadow-sm' 
+                : 'text-cream-dim hover:text-cream'
+            }`}
+          >
+            Todas ({cotizaciones.length})
+          </button>
+        </div>
+
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-cream-dim" />
+          <input
+            type="text"
+            placeholder="Buscar por folio, cliente, asunto..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full bg-dark-3 border border-dark-4 rounded-lg pl-9 pr-3 py-1.5 text-xs text-cream placeholder:text-cream-dim/60 outline-none focus:border-gold"
+          />
+        </div>
+      </div>
+
+      {/* TABLA PRINCIPAL DE COTIZACIONES */}
+      <div className="bg-dark-2 border border-dark-4 rounded-xl overflow-hidden shadow-xl">
         {loading ? (
-          <div className="p-12 text-center text-cream-muted text-xs">Cargando cotizaciones...</div>
+          <div className="p-12 text-center text-cream-dim">
+            <RefreshCw className="w-7 h-7 mx-auto animate-spin mb-3 text-gold" />
+            <p className="text-xs">Cargando cotizaciones express...</p>
+          </div>
         ) : filteredList.length === 0 ? (
-          <div className="p-12 text-center">
-            <FileText className="w-12 h-12 text-cream-dim/40 mx-auto mb-3" />
-            <div className="text-base font-bold text-cream">No hay cotizaciones en esta vista</div>
-            <p className="text-xs text-cream-muted max-w-sm mx-auto mt-1">
-              Comienza emitiendo una nueva cotización formal o selecciona una de las plantillas preconfiguradas.
-            </p>
+          <div className="p-12 text-center text-cream-dim">
+            <FolderCheck className="w-10 h-10 mx-auto mb-3 opacity-40 text-gold" />
+            <p className="text-sm font-bold text-cream">No hay cotizaciones para mostrar</p>
+            <p className="text-xs text-cream-muted mt-1">Crea una nueva propuesta o selecciona otra pestaña de filtro.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-dark-3/90 border-b border-dark-4 text-[10px] font-black uppercase text-cream-muted tracking-wider">
+              <thead className="bg-dark-3 text-cream-dim uppercase font-bold text-[10px] tracking-wider border-b border-dark-4">
                 <tr>
-                  <th className="py-3 px-4">Folio</th>
-                  <th className="py-3 px-4">Fecha</th>
-                  <th className="py-3 px-4">Cliente / Destinatario</th>
+                  <th className="py-3 px-4">Folio / Fecha</th>
+                  <th className="py-3 px-4">Cliente / Contacto</th>
                   <th className="py-3 px-4">Asunto / Servicio</th>
-                  <th className="py-3 px-4 text-right">Total Net</th>
+                  <th className="py-3 px-4 text-right">Total (MXN)</th>
                   <th className="py-3 px-4 text-center">Estado</th>
                   <th className="py-3 px-4 text-center">Google Drive</th>
                   <th className="py-3 px-4 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-dark-4/60">
-                {filteredList.map((cot) => {
+              <tbody className="divide-y divide-dark-4">
+                {filteredList.map(cot => {
                   const isBorrador = cot.estado === 'borrador';
-                  const isAprobada = cot.estado === 'aprobada' || cot.estado === 'cobrada';
-
+                  const isAprobada = cot.estado === 'aprobada';
                   return (
                     <tr key={cot.id} className="hover:bg-dark-3/50 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-gold">
-                        {cot.folio || 'BORRADOR'}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-mono font-bold text-cream text-[13px] flex items-center gap-1.5">
+                          <span className={isBorrador ? 'text-amber-400' : 'text-gold'}>
+                            {cot.folio || 'BORRADOR'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-cream-dim flex items-center gap-1 mt-0.5">
+                          <Calendar className="w-3 h-3 text-gold/60" />
+                          <span>{cot.fecha}</span>
+                        </div>
                       </td>
-                      <td className="py-3.5 px-4 text-cream-muted">
-                        {new Date(cot.fecha).toLocaleDateString('es-MX')}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-cream">{cot.cliente_nombre}</div>
+                      <td className="py-3.5 px-4 max-w-xs truncate">
+                        <div className="font-bold text-cream truncate">{cot.cliente_nombre}</div>
                         {cot.cliente_atencion && (
-                          <div className="text-[10px] text-cream-dim">At´n: {cot.cliente_atencion}</div>
+                          <div className="text-[10px] text-cream-dim truncate">Att: {cot.cliente_atencion}</div>
                         )}
                       </td>
                       <td className="py-3.5 px-4 max-w-xs truncate text-cream-muted">
@@ -537,13 +639,13 @@ Reglas:
                           <button
                             onClick={() => handlePrint(cot)}
                             disabled={generatingPdf}
-                            title="Generar PDF Oficial"
+                            title="Generar PDF Oficial (3 Hojas)"
                             className="p-1.5 bg-dark-3 hover:bg-gold/20 text-gold border border-dark-4 hover:border-gold/40 rounded-lg transition-colors cursor-pointer"
                           >
                             <Printer className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Pasar a Ingresos en Tesorería si está aprobada */}
+                          {/* Pasar a Ingresos en Tesorería si está emitida */}
                           {!isBorrador && !cot.ingreso_id && (
                             <button
                               onClick={() => handleMandarACobrar(cot)}
@@ -559,6 +661,7 @@ Reglas:
                             onClick={() => {
                               setEditingId(cot.id);
                               setFormData(cot);
+                              setEditorSection('hoja1');
                               setIsEditorOpen(true);
                             }}
                             title="Editar"
@@ -590,25 +693,72 @@ Reglas:
         )}
       </div>
 
-      {/* MODAL / EDITOR DE COTIZACIÓN */}
+      {/* MODAL / EDITOR DE COTIZACIÓN EN 3 SECCIONES */}
       {isEditorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-dark-1/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-          <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+          <div className="bg-dark-2 border border-dark-4 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
             {/* Modal Header */}
-            <div className="p-5 border-b border-dark-4 flex justify-between items-center bg-dark-3/60">
+            <div className="p-4 sm:p-5 border-b border-dark-4 flex justify-between items-center bg-dark-3/60">
               <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-gold bg-gold/10 px-2 py-0.5 rounded border border-gold/20">
-                  {formData.estado === 'borrador' ? 'Modo Borrador' : 'Propuesta Emitida'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-gold bg-gold/10 px-2 py-0.5 rounded border border-gold/20">
+                    {formData.estado === 'borrador' ? 'Modo Borrador' : 'Propuesta Emitida'}
+                  </span>
+                  <span className="text-[10px] text-cream-dim font-mono">
+                    {formData.folio || 'NUEVO FOLIO'}
+                  </span>
+                </div>
                 <h3 className="text-base font-bold text-cream mt-1">
-                  {editingId ? `Editar Cotización ${formData.folio || ''}` : 'Nueva Propuesta Formal de Servicios'}
+                  {editingId ? `Editar Cotización ${formData.folio || ''}` : 'Nueva Propuesta Formal de Servicios (3 Hojas)'}
                 </h3>
               </div>
               <button
                 onClick={() => setIsEditorOpen(false)}
-                className="text-cream-dim hover:text-cream p-1.5 rounded-lg bg-dark-3 border border-dark-4"
+                className="text-cream-dim hover:text-cream p-1.5 rounded-lg bg-dark-3 border border-dark-4 cursor-pointer"
               >
                 ✕
+              </button>
+            </div>
+
+            {/* PESTAÑAS NAVEGADORAS DE LAS 3 HOJAS FORMALES */}
+            <div className="flex border-b border-dark-4 bg-dark-3/40 px-4 sm:px-6 gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditorSection('hoja1')}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  editorSection === 'hoja1'
+                    ? 'border-gold text-gold bg-dark-2/60 rounded-t-lg'
+                    : 'border-transparent text-cream-dim hover:text-cream'
+                }`}
+              >
+                <FileCheck className="w-4 h-4" />
+                <span>Hoja 1: Condiciones de Servicio</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEditorSection('hoja2')}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  editorSection === 'hoja2'
+                    ? 'border-gold text-gold bg-dark-2/60 rounded-t-lg'
+                    : 'border-transparent text-cream-dim hover:text-cream'
+                }`}
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>Hoja 2: Cuerpo de Cotización</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEditorSection('hoja3')}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  editorSection === 'hoja3'
+                    ? 'border-gold text-gold bg-dark-2/60 rounded-t-lg'
+                    : 'border-transparent text-cream-dim hover:text-cream'
+                }`}
+              >
+                <HardHat className="w-4 h-4" />
+                <span>Hoja 3: Condiciones de Trabajo</span>
               </button>
             </div>
 
@@ -619,7 +769,7 @@ Reglas:
               <div className="bg-dark-3/50 p-3.5 rounded-xl border border-dark-4">
                 <div className="text-[10px] font-black uppercase text-gold tracking-wider mb-2 flex items-center gap-1.5">
                   <Layers className="w-3 h-3" />
-                  <span>Cargar Plantilla Preconfigurada (1 clic):</span>
+                  <span>Cargar Plantilla Preconfigurada en 1 Clic (Actualiza las 3 hojas):</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {PLANTILLAS_EXPRESS.map(preset => (
@@ -640,351 +790,552 @@ Reglas:
                 </div>
               </div>
 
-              {/* DATOS DEL CLIENTE Y GENERALES */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="font-bold text-cream flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-gold" />
-                      <span>Cliente / Razón Social *</span>
-                    </label>
-                    {clientes.length > 0 && (
-                      <select
-                        onChange={(e) => handleSelectCliente(e.target.value)}
-                        className="bg-dark-3 border border-dark-4 rounded px-2 py-0.5 text-[10px] text-gold outline-none"
-                      >
-                        <option value="">Buscar en BD Clientes...</option>
-                        {clientes.map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.nombre_razon_social || c.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Nombre o Razón Social del cliente..."
-                    value={formData.cliente_nombre}
-                    onChange={e => setFormData(p => ({ ...p, cliente_nombre: e.target.value }))}
-                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold"
-                  />
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-cream-muted mb-1 block">Atención a:</label>
+              {/* ============================================================== */}
+              {/* SECCIÓN 1: HOJA 1 - CONDICIONES DE SERVICIO                   */}
+              {/* ============================================================== */}
+              {editorSection === 'hoja1' && (
+                <div className="space-y-4 animate-fade-in">
+                  {/* DATOS DEL CLIENTE Y GENERALES */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <label className="font-bold text-cream flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-gold" />
+                          <span>Cliente / Razón Social *</span>
+                        </label>
+                        {clientes.length > 0 && (
+                          <select
+                            onChange={(e) => handleSelectCliente(e.target.value)}
+                            className="bg-dark-3 border border-dark-4 rounded px-2 py-0.5 text-[10px] text-gold outline-none"
+                          >
+                            <option value="">Buscar en BD Clientes...</option>
+                            {clientes.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.nombre_razon_social || c.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                       <input
                         type="text"
-                        placeholder="Contacto o cargo..."
-                        value={formData.cliente_atencion || ''}
-                        onChange={e => setFormData(p => ({ ...p, cliente_atencion: e.target.value }))}
+                        placeholder="Nombre o Razón Social del cliente..."
+                        value={formData.cliente_nombre}
+                        onChange={e => setFormData(p => ({ ...p, cliente_nombre: e.target.value }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold"
+                      />
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-cream-muted mb-1 block">Atención a:</label>
+                          <input
+                            type="text"
+                            placeholder="Contacto o cargo..."
+                            value={formData.cliente_atencion || ''}
+                            onChange={e => setFormData(p => ({ ...p, cliente_atencion: e.target.value }))}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-cream-muted mb-1 block">RFC:</label>
+                          <input
+                            type="text"
+                            placeholder="XAXX010101000"
+                            value={formData.cliente_rfc || ''}
+                            onChange={e => setFormData(p => ({ ...p, cliente_rfc: e.target.value.toUpperCase() }))}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold font-mono text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-cream-muted mb-1 block">Domicilio / Ubicación:</label>
+                        <input
+                          type="text"
+                          placeholder="Dirección fiscal o sitio del servicio..."
+                          value={formData.cliente_direccion || ''}
+                          onChange={e => setFormData(p => ({ ...p, cliente_direccion: e.target.value }))}
+                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* INPUT DE FECHA CON CALENDARIO FACILITADO */}
+                        <div>
+                          <label className="text-[10px] text-cream-muted mb-1 block flex items-center justify-between">
+                            <span>Fecha de Emisión:</span>
+                            <span className="text-[9px] text-gold">(Clic para abrir calendario)</span>
+                          </label>
+                          <div 
+                            onClick={() => {
+                              try {
+                                dateInputRef.current?.showPicker();
+                              } catch {
+                                dateInputRef.current?.focus();
+                              }
+                            }}
+                            className="relative flex items-center cursor-pointer group"
+                          >
+                            <input
+                              ref={dateInputRef}
+                              type="date"
+                              value={formData.fecha}
+                              onChange={e => setFormData(p => ({ ...p, fecha: e.target.value }))}
+                              className="w-full bg-dark-3 border border-dark-4 group-hover:border-gold/60 rounded-lg pl-8 pr-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs font-mono cursor-pointer"
+                            />
+                            <Calendar className="w-3.5 h-3.5 absolute left-2.5 text-gold group-hover:scale-110 transition-transform pointer-events-none" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-cream-muted mb-1 block">Vigencia (Días):</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={formData.vigencia_dias}
+                            onChange={e => setFormData(p => ({ ...p, vigencia_dias: Number(e.target.value) || 15 }))}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-cream-muted mb-1 block">Lugar de Expedición:</label>
+                        <input
+                          type="text"
+                          value={formData.lugar}
+                          onChange={e => setFormData(p => ({ ...p, lugar: e.target.value }))}
+                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-cream-muted mb-1 block">Teléfono Contacto:</label>
+                          <input
+                            type="text"
+                            placeholder="311..."
+                            value={formData.cliente_telefono || ''}
+                            onChange={e => setFormData(p => ({ ...p, cliente_telefono: e.target.value }))}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-cream-muted mb-1 block">Correo Electrónico:</label>
+                          <input
+                            type="email"
+                            placeholder="cliente@ejemplo.com"
+                            value={formData.cliente_email || ''}
+                            onChange={e => setFormData(p => ({ ...p, cliente_email: e.target.value }))}
+                            className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ASUNTO Y VOCATIVO */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="font-bold text-cream mb-1 block">Asunto Formal del Oficio *</label>
+                        <input
+                          type="text"
+                          value={formData.asunto}
+                          onChange={e => setFormData(p => ({ ...p, asunto: e.target.value }))}
+                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-cream mb-1 block">Tipo de Servicio</label>
+                        <select
+                          value={formData.tipo_servicio}
+                          onChange={e => setFormData(p => ({ ...p, tipo_servicio: e.target.value as any }))}
+                          className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold text-xs"
+                        >
+                          <option value="visita_tecnica">Visita Técnica</option>
+                          <option value="servicios_profesionales">Servicios Profesionales / UVIE</option>
+                          <option value="suministro_insumos">Suministro de Insumos</option>
+                          <option value="mantenimiento">Póliza de Mantenimiento</option>
+                          <option value="libre">Servicio General / Libre</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-cream">Alcance Técnico y Descripción del Servicio</label>
+                        <button
+                          type="button"
+                          onClick={() => handleMejorarConIA('alcance')}
+                          disabled={generatingAi}
+                          className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <Sparkles className={`w-3 h-3 ${generatingAi ? 'animate-pulse' : ''}`} />
+                          <span>{generatingAi ? 'Mejorando...' : 'Mejorar con IA'}</span>
+                        </button>
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={formData.descripcion_alcance}
+                        onChange={e => setFormData(p => ({ ...p, descripcion_alcance: e.target.value }))}
+                        placeholder="Describe los alcances y objetivos del servicio..."
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-cream">Términos, Especificaciones y Condiciones del Servicio</label>
+                        <button
+                          type="button"
+                          onClick={() => handleMejorarConIA('condiciones_servicio')}
+                          disabled={generatingAi}
+                          className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          <span>Redactar Cláusulas con IA</span>
+                        </button>
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={formData.condiciones_servicio || ''}
+                        onChange={e => setFormData(p => ({ ...p, condiciones_servicio: e.target.value }))}
+                        placeholder="Especificaciones de cumplimiento normativo (NOM/CFE), garantías de servicio y confidencialidad..."
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-cream mb-1 block">Metodología de Ejecución y Entregables (Opcional):</label>
+                      <textarea
+                        rows={3}
+                        value={formData.metodologia_servicio || ''}
+                        onChange={e => setFormData(p => ({ ...p, metodologia_servicio: e.target.value }))}
+                        placeholder="Fase 1, Fase 2, Fase 3 y productos entregables al cliente..."
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditorSection('hoja2')}
+                      className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-gold border border-gold/30 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>Siguiente: Hoja 2 (Cuerpo de Cotización)</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================== */}
+              {/* SECCIÓN 2: HOJA 2 - CUERPO DE COTIZACIÓN (PARTIDAS & PRECIOS)  */}
+              {/* ============================================================== */}
+              {editorSection === 'hoja2' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="font-bold text-cream uppercase text-[11px] tracking-wider text-gold">
+                        Conceptos y Partidas de la Cotización
+                      </h4>
+                      <p className="text-[10px] text-cream-dim">Desglose de cantidades, precios unitarios e importes en MXN</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddPartida}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar Concepto</span>
+                    </button>
+                  </div>
+
+                  <div className="border border-dark-4 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-dark-3 text-[10px] uppercase font-bold text-cream-muted border-b border-dark-4">
+                        <tr>
+                          <th className="py-2.5 px-3">Descripción / Notas</th>
+                          <th className="py-2.5 px-2 w-28">Unidad</th>
+                          <th className="py-2.5 px-2 w-20 text-center">Cant.</th>
+                          <th className="py-2.5 px-2 w-28 text-right">P. Unitario</th>
+                          <th className="py-2.5 px-2 w-28 text-right">Importe</th>
+                          <th className="py-2.5 px-2 w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-dark-4">
+                        {formData.partidas.map((item, idx) => (
+                          <tr key={item.id} className="bg-dark-2">
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={item.descripcion}
+                                onChange={e => handleUpdatePartida(idx, 'descripcion', e.target.value)}
+                                className="w-full bg-dark-3 border border-dark-4 rounded px-2 py-1 text-xs text-cream outline-none focus:border-gold"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Notas técnicas complementarias (opcional)..."
+                                value={item.notas || ''}
+                                onChange={e => handleUpdatePartida(idx, 'notas', e.target.value)}
+                                className="w-full bg-transparent border-0 px-2 py-0.5 text-[10px] text-cream-dim outline-none focus:text-cream mt-0.5"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <select
+                                value={item.unidad}
+                                onChange={e => handleUpdatePartida(idx, 'unidad', e.target.value)}
+                                className="w-full bg-dark-3 border border-dark-4 rounded px-2 py-1 text-xs text-cream outline-none focus:border-gold"
+                              >
+                                <option value="Servicio">Servicio</option>
+                                <option value="Visita">Visita</option>
+                                <option value="Proyecto">Proyecto</option>
+                                <option value="Trámite">Trámite</option>
+                                <option value="PZA">PZA</option>
+                                <option value="Lote">Lote</option>
+                                <option value="ML">ML</option>
+                                <option value="M2">M2</option>
+                              </select>
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.cantidad}
+                                onChange={e => handleUpdatePartida(idx, 'cantidad', Number(e.target.value) || 0)}
+                                className="w-full bg-dark-3 border border-dark-4 rounded px-2 py-1 text-xs text-center font-bold text-cream outline-none focus:border-gold"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.precio_unitario}
+                                onChange={e => handleUpdatePartida(idx, 'precio_unitario', Number(e.target.value) || 0)}
+                                className="w-full bg-dark-3 border border-dark-4 rounded px-2 py-1 text-xs text-right font-mono text-cream outline-none focus:border-gold"
+                              />
+                            </td>
+                            <td className="p-2 text-right font-mono font-bold text-gold">
+                              {formatCurrency(item.importe)}
+                            </td>
+                            <td className="p-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePartida(idx)}
+                                className="text-rose-400 hover:text-rose-300 p-1 rounded cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* TOTALES */}
+                  <div className="flex justify-end pt-2">
+                    <div className="w-80 bg-dark-3/60 p-4 rounded-xl border border-dark-4 space-y-2">
+                      <div className="flex justify-between text-cream-muted">
+                        <span>Subtotal:</span>
+                        <span className="font-mono font-bold text-cream">{formatCurrency(formData.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-cream-muted">
+                        <span>Descuento ($):</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.descuento}
+                          onChange={e => {
+                            const desc = Number(e.target.value) || 0;
+                            const t = recomputeTotals(formData.partidas, desc, formData.iva_porcentaje);
+                            setFormData(p => ({ ...p, ...t }));
+                          }}
+                          className="w-24 bg-dark-3 border border-dark-4 rounded px-1.5 py-0.5 text-right font-mono text-rose-400 outline-none"
+                        />
+                      </div>
+                      <div className="flex justify-between items-center text-cream-muted">
+                        <span>IVA (%):</span>
+                        <select
+                          value={formData.iva_porcentaje}
+                          onChange={e => {
+                            const pct = Number(e.target.value) || 0;
+                            const t = recomputeTotals(formData.partidas, formData.descuento, pct);
+                            setFormData(p => ({ ...p, ...t }));
+                          }}
+                          className="bg-dark-3 border border-dark-4 rounded px-1.5 py-0.5 text-xs text-cream outline-none"
+                        >
+                          <option value="16">16% (General)</option>
+                          <option value="8">8% (Frontera)</option>
+                          <option value="0">0% (Exento)</option>
+                        </select>
+                      </div>
+                      <div className="flex justify-between text-cream-muted">
+                        <span>IVA Monto:</span>
+                        <span className="font-mono text-cream">{formatCurrency(formData.iva_monto)}</span>
+                      </div>
+                      <div className="border-t border-dark-4 pt-2 flex justify-between font-black text-sm text-gold">
+                        <span>TOTAL:</span>
+                        <span className="font-mono text-base">{formatCurrency(formData.total)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CONDICIONES COMERCIALES Y BANCARIAS */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block">Tiempo de Ejecución / Entrega:</label>
+                      <input
+                        type="text"
+                        value={formData.tiempo_entrega}
+                        onChange={e => setFormData(p => ({ ...p, tiempo_entrega: e.target.value }))}
                         className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-cream-muted mb-1 block">RFC:</label>
+                      <label className="text-[10px] text-cream-muted mb-1 block">Condiciones de Pago:</label>
                       <input
                         type="text"
-                        placeholder="XAXX010101000"
-                        value={formData.cliente_rfc || ''}
-                        onChange={e => setFormData(p => ({ ...p, cliente_rfc: e.target.value.toUpperCase() }))}
+                        value={formData.condiciones_pago}
+                        onChange={e => setFormData(p => ({ ...p, condiciones_pago: e.target.value }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block">Banco / Beneficiario SPEI:</label>
+                      <input
+                        type="text"
+                        value={formData.banco_receptor || ''}
+                        onChange={e => setFormData(p => ({ ...p, banco_receptor: e.target.value }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block">CLABE Interbancaria (Opcional):</label>
+                      <input
+                        type="text"
+                        placeholder="18 dígitos..."
+                        value={formData.cuenta_clabe || ''}
+                        onChange={e => setFormData(p => ({ ...p, cuenta_clabe: e.target.value }))}
                         className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold font-mono text-xs"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-[10px] text-cream-muted mb-1 block">Domicilio / Ubicación:</label>
-                    <input
-                      type="text"
-                      placeholder="Dirección fiscal o sitio del servicio..."
-                      value={formData.cliente_direccion || ''}
-                      onChange={e => setFormData(p => ({ ...p, cliente_direccion: e.target.value }))}
-                      className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-cream-muted mb-1 block">Fecha Emisión:</label>
-                      <input
-                        type="date"
-                        value={formData.fecha}
-                        onChange={e => setFormData(p => ({ ...p, fecha: e.target.value }))}
-                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-cream-muted mb-1 block">Vigencia (Días):</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={formData.vigencia_dias}
-                        onChange={e => setFormData(p => ({ ...p, vigencia_dias: Number(e.target.value) || 15 }))}
-                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] text-cream-muted mb-1 block">Lugar de Expedición:</label>
-                    <input
-                      type="text"
-                      value={formData.lugar}
-                      onChange={e => setFormData(p => ({ ...p, lugar: e.target.value }))}
-                      className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-cream-muted mb-1 block">Teléfono Contacto:</label>
-                      <input
-                        type="text"
-                        placeholder="311..."
-                        value={formData.cliente_telefono || ''}
-                        onChange={e => setFormData(p => ({ ...p, cliente_telefono: e.target.value }))}
-                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-cream-muted mb-1 block">Correo Electrónico:</label>
-                      <input
-                        type="email"
-                        placeholder="cliente@ejemplo.com"
-                        value={formData.cliente_email || ''}
-                        onChange={e => setFormData(p => ({ ...p, cliente_email: e.target.value }))}
-                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ASUNTO Y ALCANCE */}
-              <div className="space-y-3">
-                <div>
-                  <label className="font-bold text-cream mb-1 block">Asunto Formal del Oficio *</label>
-                  <input
-                    type="text"
-                    value={formData.asunto}
-                    onChange={e => setFormData(p => ({ ...p, asunto: e.target.value }))}
-                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-3 py-2 text-cream outline-none focus:border-gold font-bold text-xs"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="font-bold text-cream">Alcance Técnico y Descripción del Servicio</label>
+                  <div className="flex justify-between pt-2">
                     <button
                       type="button"
-                      onClick={handleMejorarConIA}
-                      disabled={generatingAi}
-                      className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                      onClick={() => setEditorSection('hoja1')}
+                      className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-cream-muted rounded-xl text-xs font-bold cursor-pointer"
                     >
-                      <Sparkles className={`w-3 h-3 ${generatingAi ? 'animate-pulse' : ''}`} />
-                      <span>{generatingAi ? 'Mejorando...' : 'Mejorar con IA'}</span>
+                      ← Volver a Hoja 1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditorSection('hoja3')}
+                      className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-gold border border-gold/30 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>Siguiente: Hoja 3 (Condiciones de Trabajo)</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <textarea
-                    rows={4}
-                    value={formData.descripcion_alcance}
-                    onChange={e => setFormData(p => ({ ...p, descripcion_alcance: e.target.value }))}
-                    placeholder="Describe los alcances, normativas aplicables y entregables..."
-                    className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed"
-                  />
                 </div>
-              </div>
+              )}
 
-              {/* TABLA DE PARTIDAS Y CONCEPTOS */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-bold text-cream uppercase text-[11px] tracking-wider text-gold">
-                    Conceptos y Partidas de la Cotización
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={handleAddPartida}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] font-bold transition-all cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Agregar Concepto</span>
-                  </button>
-                </div>
-
-                <div className="border border-dark-4 rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-dark-3 text-[10px] uppercase font-bold text-cream-muted border-b border-dark-4">
-                      <tr>
-                        <th className="py-2.5 px-3">Descripción</th>
-                        <th className="py-2.5 px-2 w-24">Unidad</th>
-                        <th className="py-2.5 px-2 w-20 text-center">Cant.</th>
-                        <th className="py-2.5 px-2 w-28 text-right">P. Unitario</th>
-                        <th className="py-2.5 px-2 w-28 text-right">Importe</th>
-                        <th className="py-2.5 px-2 w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-dark-4">
-                      {formData.partidas.map((item, idx) => (
-                        <tr key={item.id} className="bg-dark-2">
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              value={item.descripcion}
-                              onChange={e => handleUpdatePartida(idx, 'descripcion', e.target.value)}
-                              className="w-full bg-dark-3 border border-dark-4 rounded px-2 py-1 text-xs text-cream outline-none focus:border-gold"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Notas técnicas complementarias (opcional)..."
-                              value={item.notas || ''}
-                              onChange={e => handleUpdatePartida(idx, 'notas', e.target.value)}
-                              className="w-full bg-transparent border-0 px-2 py-0.5 text-[10px] text-cream-dim outline-none focus:text-cream mt-0.5"
-                            />
-                          </td>
-                          <td className="p-2">
-                            <select
-                              value={item.unidad}
-                              onChange={e => handleUpdatePartida(idx, 'unidad', e.target.value)}
-                              className="w-full bg-dark-3 border border-dark-4 rounded px-2 py-1 text-xs text-cream outline-none focus:border-gold"
-                            >
-                              <option value="Servicio">Servicio</option>
-                              <option value="Visita">Visita</option>
-                              <option value="Proyecto">Proyecto</option>
-                              <option value="Trámite">Trámite</option>
-                              <option value="PZA">PZA</option>
-                              <option value="Lote">Lote</option>
-                              <option value="ML">ML</option>
-                              <option value="M2">M2</option>
-                            </select>
-                          </td>
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={item.cantidad}
-                              onChange={e => handleUpdatePartida(idx, 'cantidad', Number(e.target.value) || 0)}
-                              className="w-full bg-dark-3 border border-dark-4 rounded px-2 py-1 text-xs text-center font-bold text-cream outline-none focus:border-gold"
-                            />
-                          </td>
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.precio_unitario}
-                              onChange={e => handleUpdatePartida(idx, 'precio_unitario', Number(e.target.value) || 0)}
-                              className="w-full bg-dark-3 border border-dark-4 rounded px-2 py-1 text-xs text-right font-mono text-cream outline-none focus:border-gold"
-                            />
-                          </td>
-                          <td className="p-2 text-right font-mono font-bold text-gold">
-                            {formatCurrency(item.importe)}
-                          </td>
-                          <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemovePartida(idx)}
-                              className="text-rose-400 hover:text-rose-300 p-1 rounded"
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* TOTALES */}
-                <div className="flex justify-end pt-2">
-                  <div className="w-72 bg-dark-3/60 p-3.5 rounded-xl border border-dark-4 space-y-1.5">
-                    <div className="flex justify-between text-cream-muted">
-                      <span>Subtotal:</span>
-                      <span className="font-mono font-bold text-cream">{formatCurrency(formData.subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-cream-muted">
-                      <span>Descuento ($):</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={formData.descuento}
-                        onChange={e => {
-                          const desc = Number(e.target.value) || 0;
-                          const t = recomputeTotals(formData.partidas, desc, formData.iva_porcentaje);
-                          setFormData(p => ({ ...p, ...t }));
-                        }}
-                        className="w-24 bg-dark-3 border border-dark-4 rounded px-1.5 py-0.5 text-right font-mono text-rose-400 outline-none"
+              {/* ============================================================== */}
+              {/* SECCIÓN 3: HOJA 3 - CONDICIONES DE TRABAJO Y FIRMAS            */}
+              {/* ============================================================== */}
+              {editorSection === 'hoja3' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="bg-dark-3/30 p-4 rounded-xl border border-dark-4 space-y-4">
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-cream flex items-center gap-1.5">
+                          <HardHat className="w-3.5 h-3.5 text-gold" />
+                          <span>1. Requisitos Operativos y Seguridad Industrial (EPP)</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleMejorarConIA('condiciones_trabajo')}
+                          disabled={generatingAi}
+                          className="px-2.5 py-1 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          <span>Redactar Seguridad con IA</span>
+                        </button>
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={formData.condiciones_trabajo || ''}
+                        onChange={e => setFormData(p => ({ ...p, condiciones_trabajo: e.target.value }))}
+                        placeholder="Requisitos en sitio, líneas de vida, DC-3, horarios laborales y protocolos de seguridad..."
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed font-mono"
                       />
                     </div>
-                    <div className="flex justify-between items-center text-cream-muted">
-                      <span>IVA (%):</span>
-                      <select
-                        value={formData.iva_porcentaje}
-                        onChange={e => {
-                          const pct = Number(e.target.value) || 0;
-                          const t = recomputeTotals(formData.partidas, formData.descuento, pct);
-                          setFormData(p => ({ ...p, ...t }));
-                        }}
-                        className="bg-dark-3 border border-dark-4 rounded px-1.5 py-0.5 text-xs text-cream outline-none"
-                      >
-                        <option value="16">16% (General)</option>
-                        <option value="8">8% (Frontera)</option>
-                        <option value="0">0% (Exento)</option>
-                      </select>
+
+                    <div>
+                      <label className="font-bold text-cream mb-1 block">2. Facilidades y Responsabilidades del Cliente</label>
+                      <textarea
+                        rows={3}
+                        value={formData.responsabilidades_cliente || ''}
+                        onChange={e => setFormData(p => ({ ...p, responsabilidades_cliente: e.target.value }))}
+                        placeholder="Accesos a azoteas, suministro de agua/electricidad, enlace técnico asignado..."
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed font-mono"
+                      />
                     </div>
-                    <div className="flex justify-between text-cream-muted">
-                      <span>IVA Monto:</span>
-                      <span className="font-mono text-cream">{formatCurrency(formData.iva_monto)}</span>
-                    </div>
-                    <div className="border-t border-dark-4 pt-1.5 flex justify-between font-black text-sm text-gold">
-                      <span>TOTAL:</span>
-                      <span className="font-mono text-base">{formatCurrency(formData.total)}</span>
+
+                    <div>
+                      <label className="font-bold text-cream mb-1 block">3. Exclusiones y Términos de Garantía</label>
+                      <textarea
+                        rows={3}
+                        value={formData.exclusiones_garantias || ''}
+                        onChange={e => setFormData(p => ({ ...p, exclusiones_garantias: e.target.value }))}
+                        placeholder="Qué conceptos no están amparados (obra civil mayor, derechos gubernamentales ajenos, etc.)..."
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg p-3 text-cream outline-none focus:border-gold text-xs leading-relaxed font-mono"
+                      />
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* CONDICIONES COMERCIALES */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
-                <div>
-                  <label className="text-[10px] text-cream-muted mb-1 block">Tiempo de Ejecución / Entrega:</label>
-                  <input
-                    type="text"
-                    value={formData.tiempo_entrega}
-                    onChange={e => setFormData(p => ({ ...p, tiempo_entrega: e.target.value }))}
-                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                  />
+                  {/* REMITENTE Y FIRMAS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-dark-3/30 p-4 rounded-xl border border-dark-4">
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block">Responsable de Emisión ESOL:</label>
+                      <input
+                        type="text"
+                        value={formData.remitente_nombre}
+                        onChange={e => setFormData(p => ({ ...p, remitente_nombre: e.target.value }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-cream-muted mb-1 block">Cargo Institucional:</label>
+                      <input
+                        type="text"
+                        value={formData.remitente_cargo}
+                        onChange={e => setFormData(p => ({ ...p, remitente_cargo: e.target.value }))}
+                        className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditorSection('hoja2')}
+                      className="px-4 py-2 bg-dark-3 hover:bg-dark-4 text-cream-muted rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      ← Volver a Hoja 2
+                    </button>
+                    <span className="text-[10px] text-cream-dim flex items-center">
+                      ✓ Estructura de 3 hojas completada
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] text-cream-muted mb-1 block">Condiciones de Pago:</label>
-                  <input
-                    type="text"
-                    value={formData.condiciones_pago}
-                    onChange={e => setFormData(p => ({ ...p, condiciones_pago: e.target.value }))}
-                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-cream-muted mb-1 block">Banco / Datos para SPEI:</label>
-                  <input
-                    type="text"
-                    value={formData.banco_receptor || ''}
-                    onChange={e => setFormData(p => ({ ...p, banco_receptor: e.target.value }))}
-                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-cream-muted mb-1 block">CLABE Interbancaria (Opcional):</label>
-                  <input
-                    type="text"
-                    placeholder="18 dígitos..."
-                    value={formData.cuenta_clabe || ''}
-                    onChange={e => setFormData(p => ({ ...p, cuenta_clabe: e.target.value }))}
-                    className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-1.5 text-cream outline-none focus:border-gold font-mono text-xs"
-                  />
-                </div>
-              </div>
+              )}
 
             </div>
 
@@ -993,9 +1344,9 @@ Reglas:
               <button
                 type="button"
                 onClick={() => setIsEditorOpen(false)}
-                className="px-4 py-2 bg-dark-4 hover:bg-dark-3 text-cream-muted hover:text-cream rounded-xl text-xs font-semibold transition-colors"
+                className="px-4 py-2 bg-dark-4 hover:bg-dark-3 text-cream-muted hover:text-cream rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
-                Cancelar
+                Cerrar
               </button>
 
               <div className="flex items-center gap-2">
@@ -1014,7 +1365,7 @@ Reglas:
                   className="px-5 py-2 bg-gold hover:bg-gold-light text-dark-1 rounded-xl text-xs font-black shadow-lg shadow-gold/20 transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Emitir Oficialmente</span>
+                  <span>Emitir Oficialmente (3 Hojas)</span>
                 </button>
               </div>
             </div>
