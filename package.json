@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "deploy": "powershell -ExecutionPolicy Bypass -File ./ftp_deploy.ps1",
     "test:esun": "npx tsx tests/esunService.test.ts"
   },
   "dependencies": {

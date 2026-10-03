@@ -750,7 +750,14 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
 
           {activeTab === 'personal' && (
             <div className="space-y-6">
-              <PersonalTab canEdit={canEdit} userRole={effectiveRole} />
+              <PersonalTab
+                canEdit={canEdit}
+                userRole={effectiveRole}
+                userName={userName}
+                cuentas={cuentas}
+                onRefreshFinanzas={cargarDatos}
+                onNavigateToFinanzas={() => setActiveTab('finanzas_egresos')}
+              />
             </div>
           )}
 
@@ -935,13 +942,6 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               userRole={effectiveRole}
               canEdit={canEdit}
               onRefresh={cargarDatos}
-            />
-          )}
-
-          {activeTab === 'personal' && (
-            <PersonalTab
-              canEdit={canEdit}
-              userRole={effectiveRole}
             />
           )}
         </main>

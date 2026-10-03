@@ -4,6 +4,8 @@ import { getPresupuestos } from '../../../../lib/cotizadorService';
 import { generarFolioCentralizado } from '../../../../utils/folioGenerator';
 import { useApp } from '../../../../context/AppContext';
 import { generateAIContent } from '../../../../lib/aiService';
+import { adminDbService } from '../../services/adminDbService';
+import type { CuentaFinanciera } from '../../types/adminTypes';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 import {
@@ -28,6 +30,7 @@ import {
   Check,
   UserCheck,
   ChevronDown,
+  ChevronRight,
   Sparkles,
   Phone,
   FileSignature
@@ -84,6 +87,7 @@ export interface RegistroSemanal {
   estado_pago: 'pendiente' | 'pagado';
   fecha_pago?: string;
   metodo_pago: string;
+  cuenta_origen_id?: string;
   resumen_semanal?: string;
   observaciones?: string;
   created_at?: string;
@@ -214,9 +218,20 @@ const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sáb
 interface PersonalTabProps {
   canEdit?: boolean;
   userRole?: string;
+  userName?: string;
+  cuentas?: CuentaFinanciera[];
+  onRefreshFinanzas?: () => void;
+  onNavigateToFinanzas?: () => void;
 }
 
-export const PersonalTab: React.FC<PersonalTabProps> = ({ canEdit = true, userRole = 'master' }) => {
+export const PersonalTab: React.FC<PersonalTabProps> = ({
+  canEdit = true,
+  userRole = 'master',
+  userName = 'Administrador',
+  cuentas = [],
+  onRefreshFinanzas,
+  onNavigateToFinanzas
+}) => {
   const isAllowedToEdit = canEdit && userRole !== 'visor';
   const { globalGeminiApiKey, siliconFlowApiKey } = useApp();
   const [activeView, setActiveView] = useState<'registros' | 'trabajadores'>('registros');
@@ -237,6 +252,8 @@ export const PersonalTab: React.FC<PersonalTabProps> = ({ canEdit = true, userRo
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'pendiente' | 'pagado'>('todos');
   const [selectedTrabajadorFilter, setSelectedTrabajadorFilter] = useState<string>('todos');
+  const [groupBy, setGroupBy] = useState<'mes' | 'todos'>('mes');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   // Modals & Forms
   const [isTrabajadorModalOpen, setIsTrabajadorModalOpen] = useState(false);
@@ -273,6 +290,7 @@ export const PersonalTab: React.FC<PersonalTabProps> = ({ canEdit = true, userRo
     estado_pago: 'pendiente',
     fecha_pago: '',
     metodo_pago: 'Transferencia Bancaria',
+    cuenta_origen_id: '',
     resumen_semanal: '',
     observaciones: ''
   });
@@ -351,6 +369,29 @@ export const PersonalTab: React.FC<PersonalTabProps> = ({ canEdit = true, userRo
         localStorage.setItem('esol_personal_registros', JSON.stringify(loadedRegistros));
       }
       setRegistros(loadedRegistros);
+
+      // Auto-asegurar consistencia con Tesorería & Finanzas (egresos de nómina existentes)
+      if (loadedRegistros.length > 0) {
+        Promise.all(
+          loadedRegistros.map(r =>
+            adminDbService.sincronizarEgresoNomina({
+              id: r.id,
+              folio: r.folio,
+              trabajador_nombre: r.trabajador_nombre,
+              numero_semana: r.numero_semana,
+              ano: r.ano,
+              monto_total: r.monto_total,
+              estado_pago: r.estado_pago,
+              fecha_pago: r.fecha_pago,
+              metodo_pago: r.metodo_pago,
+              cuenta_origen_id: r.cuenta_origen_id,
+              usuario_registro: 'Sincronización Personal'
+            })
+          )
+        ).then(() => {
+          if (onRefreshFinanzas) onRefreshFinanzas();
+        }).catch(err => console.warn('Sync egresos warning:', err));
+      }
 
     } catch (err: any) {
       console.error("Error loading data in PersonalTab:", err);
@@ -516,6 +557,7 @@ export const PersonalTab: React.FC<PersonalTabProps> = ({ canEdit = true, userRo
       estado_pago: 'pendiente',
       fecha_pago: '',
       metodo_pago: 'Transferencia Bancaria',
+      cuenta_origen_id: cuentas.find(c => c.tipo === 'banco')?.id || cuentas[0]?.id || '',
       resumen_semanal: '',
       observaciones: ''
     });
@@ -527,6 +569,7 @@ export const PersonalTab: React.FC<PersonalTabProps> = ({ canEdit = true, userRo
     setEditingRegistroId(reg.id);
     setRegistroForm({
       ...reg,
+      cuenta_origen_id: reg.cuenta_origen_id || cuentas.find(c => c.tipo === 'banco')?.id || cuentas[0]?.id || '',
       resumen_semanal: reg.resumen_semanal || ''
     });
     setIsRegistroModalOpen(true);
@@ -769,10 +812,32 @@ OBRA CIVIL Y MANIOBRAS:
       setRegistros(updatedList);
       localStorage.setItem('esol_personal_registros', JSON.stringify(updatedList));
 
+      // Sincronización automática bilateral con Tesorería & Finanzas (Egresos)
+      try {
+        await adminDbService.sincronizarEgresoNomina({
+          id: recordToSave.id,
+          folio: recordToSave.folio,
+          trabajador_nombre: recordToSave.trabajador_nombre,
+          numero_semana: recordToSave.numero_semana,
+          ano: recordToSave.ano,
+          monto_total: recordToSave.monto_total,
+          estado_pago: recordToSave.estado_pago,
+          fecha_pago: recordToSave.fecha_pago,
+          metodo_pago: recordToSave.metodo_pago,
+          cuenta_origen_id: recordToSave.cuenta_origen_id,
+          usuario_registro: userName
+        });
+        if (onRefreshFinanzas) onRefreshFinanzas();
+      } catch (finErr) {
+        console.warn("No se pudo reflejar en egresos inmediatamente:", finErr);
+      }
+
       setIsRegistroModalOpen(false);
       setNotification({
         type: 'success',
-        message: editingRegistroId ? 'Registro semanal actualizado.' : 'Registro semanal guardado exitosamente.'
+        message: editingRegistroId 
+          ? 'Registro semanal actualizado y sincronizado con Tesorería & Egresos.' 
+          : 'Registro semanal guardado y conectado con Tesorería & Egresos.'
       });
     } catch (err: any) {
       console.error("Error saving registro semanal:", err);
@@ -782,13 +847,35 @@ OBRA CIVIL Y MANIOBRAS:
         : [{ id: 'reg_' + Date.now(), ...registroForm } as RegistroSemanal, ...registros];
       setRegistros(fallbackList);
       localStorage.setItem('esol_personal_registros', JSON.stringify(fallbackList));
+
+      // Intentar sincronizar también en fallback
+      try {
+        const itemFallback = fallbackList[0];
+        if (itemFallback) {
+          await adminDbService.sincronizarEgresoNomina({
+            id: itemFallback.id,
+            folio: itemFallback.folio,
+            trabajador_nombre: itemFallback.trabajador_nombre,
+            numero_semana: itemFallback.numero_semana,
+            ano: itemFallback.ano,
+            monto_total: itemFallback.monto_total,
+            estado_pago: itemFallback.estado_pago,
+            fecha_pago: itemFallback.fecha_pago,
+            metodo_pago: itemFallback.metodo_pago,
+            cuenta_origen_id: itemFallback.cuenta_origen_id,
+            usuario_registro: userName
+          });
+          if (onRefreshFinanzas) onRefreshFinanzas();
+        }
+      } catch (e) {}
+
       setIsRegistroModalOpen(false);
       setNotification({ type: 'info', message: 'Guardado localmente. Error en BD: ' + (err.message || 'Error de conexión.') });
     }
   };
 
   const handleDeleteRegistro = async (id: string) => {
-    if (!confirm('¿Deseas eliminar este registro semanal?')) return;
+    if (!confirm('¿Deseas eliminar este registro semanal? Se removerá también el egreso asociado en Tesorería.')) return;
 
     try {
       if (!isDbOffline) {
@@ -797,12 +884,23 @@ OBRA CIVIL Y MANIOBRAS:
       const filtered = registros.filter(r => r.id !== id);
       setRegistros(filtered);
       localStorage.setItem('esol_personal_registros', JSON.stringify(filtered));
-      setNotification({ type: 'success', message: 'Registro eliminado.' });
+
+      // Remover de Egresos en Tesorería
+      try {
+        await adminDbService.eliminarEgresoNomina(id);
+        if (onRefreshFinanzas) onRefreshFinanzas();
+      } catch (e) {}
+
+      setNotification({ type: 'success', message: 'Registro de nómina y egreso eliminados.' });
     } catch (err) {
       console.error("Error deleting registro:", err);
       const filtered = registros.filter(r => r.id !== id);
       setRegistros(filtered);
       localStorage.setItem('esol_personal_registros', JSON.stringify(filtered));
+      try {
+        await adminDbService.eliminarEgresoNomina(id);
+        if (onRefreshFinanzas) onRefreshFinanzas();
+      } catch (e) {}
     }
   };
 
@@ -820,9 +918,30 @@ OBRA CIVIL Y MANIOBRAS:
       const updated = registros.map(r => r.id === reg.id ? { ...r, estado_pago: nuevoEstado, fecha_pago: fechaPago } : r);
       setRegistros(updated);
       localStorage.setItem('esol_personal_registros', JSON.stringify(updated));
+
+      // Sincronizar actualización de pago con Tesorería & Egresos
+      try {
+        await adminDbService.sincronizarEgresoNomina({
+          id: reg.id,
+          folio: reg.folio,
+          trabajador_nombre: reg.trabajador_nombre,
+          numero_semana: reg.numero_semana,
+          ano: reg.ano,
+          monto_total: reg.monto_total,
+          estado_pago: nuevoEstado,
+          fecha_pago: fechaPago,
+          metodo_pago: reg.metodo_pago,
+          cuenta_origen_id: reg.cuenta_origen_id,
+          usuario_registro: userName
+        });
+        if (onRefreshFinanzas) onRefreshFinanzas();
+      } catch (finErr) {
+        console.warn("Error sincronizando estado en finanzas:", finErr);
+      }
+
       setNotification({
         type: 'success',
-        message: `Registro marcado como ${nuevoEstado.toUpperCase()}.`
+        message: `Nómina marcada como ${nuevoEstado === 'pagado' ? 'LIQUIDADA' : 'PENDIENTE'} y sincronizada en Tesorería.`
       });
     } catch (err) {
       console.error("Error updating payment status:", err);
@@ -865,19 +984,21 @@ OBRA CIVIL Y MANIOBRAS:
           * { box-sizing: border-box; }
           body { margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }
           
-          .sheet {
-            width: 215.9mm;
-            box-sizing: border-box;
+          .letter-sheet {
+            width: 216mm;
+            height: 279mm;
             padding: 12mm 15mm 10mm 15mm;
             margin: 0 auto;
             background: #ffffff;
-            font-size: 9px;
-            line-height: 1.35;
+            font-size: 10.5px;
+            line-height: 1.4;
             color: #1e293b;
             position: relative;
+            box-sizing: border-box;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            overflow: hidden;
           }
 
           .header {
@@ -896,14 +1017,14 @@ OBRA CIVIL Y MANIOBRAS:
           }
 
           .logo-img {
-            max-height: 48px;
+            max-height: 52px;
             width: auto;
             object-fit: contain;
           }
 
           .company-title {
             font-family: 'Cinzel', serif;
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 700;
             color: #0f172a;
             letter-spacing: 1px;
@@ -912,7 +1033,7 @@ OBRA CIVIL Y MANIOBRAS:
           }
 
           .company-sub {
-            font-size: 8px;
+            font-size: 9.5px;
             color: #64748b;
             margin-top: 2px;
             letter-spacing: 0.5px;
@@ -924,7 +1045,7 @@ OBRA CIVIL Y MANIOBRAS:
           }
 
           .doc-title {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 800;
             color: #0f172a;
             letter-spacing: 0.5px;
@@ -933,27 +1054,27 @@ OBRA CIVIL Y MANIOBRAS:
           }
 
           .doc-folio {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 700;
             color: #d4af37;
-            margin-top: 2px;
+            margin-top: 3px;
             letter-spacing: 1px;
           }
 
           .doc-date {
-            font-size: 8px;
+            font-size: 9px;
             color: #64748b;
-            margin-top: 1px;
+            margin-top: 2px;
           }
 
           .intro-box {
             background: #f8fafc;
-            border-left: 3px solid #0f172a;
-            padding: 8px 12px;
+            border-left: 3.5px solid #0f172a;
+            padding: 9px 12px;
             border-radius: 4px;
             margin-bottom: 12px;
-            font-size: 8px;
-            line-height: 1.4;
+            font-size: 9.5px;
+            line-height: 1.45;
             color: #334155;
           }
 
@@ -961,7 +1082,7 @@ OBRA CIVIL Y MANIOBRAS:
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
           }
 
           .info-card {
@@ -972,14 +1093,14 @@ OBRA CIVIL Y MANIOBRAS:
           }
 
           .info-card-header {
-            font-size: 8.5px;
+            font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
             color: #0f172a;
             letter-spacing: 0.5px;
             border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 4px;
-            margin-bottom: 6px;
+            padding-bottom: 5px;
+            margin-bottom: 7px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -988,8 +1109,8 @@ OBRA CIVIL Y MANIOBRAS:
           .info-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 3px;
-            font-size: 8px;
+            margin-bottom: 4px;
+            font-size: 9.5px;
           }
 
           .info-label {
@@ -1004,7 +1125,7 @@ OBRA CIVIL Y MANIOBRAS:
           }
 
           .table-container {
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             border: 1px solid #cbd5e1;
             border-radius: 6px;
             overflow: hidden;
@@ -1019,7 +1140,7 @@ OBRA CIVIL Y MANIOBRAS:
             background: #0f172a;
             color: #ffffff;
             padding: 7px 10px;
-            font-size: 8px;
+            font-size: 9.5px;
             font-weight: 700;
             letter-spacing: 0.5px;
             text-align: left;
@@ -1028,9 +1149,9 @@ OBRA CIVIL Y MANIOBRAS:
 
           .payment-summary {
             display: grid;
-            grid-template-columns: 1.4fr 1fr;
+            grid-template-columns: 1.35fr 1fr;
             gap: 12px;
-            margin-bottom: 14px;
+            margin-bottom: 10px;
           }
 
           .clause-box {
@@ -1041,15 +1162,15 @@ OBRA CIVIL Y MANIOBRAS:
           }
 
           .clause-title {
-            font-size: 8px;
+            font-size: 9px;
             font-weight: 700;
             color: #0f172a;
             text-transform: uppercase;
-            margin-bottom: 4px;
+            margin-bottom: 5px;
           }
 
           .clause-text {
-            font-size: 7.5px;
+            font-size: 8.5px;
             line-height: 1.4;
             color: #475569;
             text-align: justify;
@@ -1069,7 +1190,7 @@ OBRA CIVIL Y MANIOBRAS:
           .total-row {
             display: flex;
             justify-content: space-between;
-            font-size: 8px;
+            font-size: 9.5px;
             color: #94a3b8;
             margin-bottom: 3px;
           }
@@ -1084,34 +1205,34 @@ OBRA CIVIL Y MANIOBRAS:
           }
 
           .total-label {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 700;
             color: #d4af37;
             text-transform: uppercase;
           }
 
           .total-value {
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 800;
             color: #ffffff;
             letter-spacing: 0.5px;
           }
 
           .total-words {
-            font-size: 6.8px;
+            font-size: 8px;
             color: #cbd5e1;
             margin-top: 4px;
             font-weight: 500;
             text-align: right;
-            line-height: 1.2;
+            line-height: 1.25;
           }
 
           .signatures-area {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 35px;
-            margin-top: 20px;
-            padding-top: 10px;
+            gap: 40px;
+            padding-top: 6px;
+            margin-bottom: 8px;
           }
 
           .sig-box {
@@ -1120,32 +1241,33 @@ OBRA CIVIL Y MANIOBRAS:
 
           .sig-line {
             border-top: 1.2px solid #64748b;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
           }
 
           .sig-name {
-            font-size: 9px;
+            font-size: 10.5px;
             font-weight: 700;
             color: #0f172a;
           }
 
           .sig-role {
-            font-size: 7.5px;
+            font-size: 8.5px;
             color: #64748b;
+            margin-top: 2px;
           }
 
           .footer-note {
             text-align: center;
-            font-size: 7px;
+            font-size: 8px;
             color: #94a3b8;
             border-top: 1px solid #e2e8f0;
-            padding-top: 8px;
-            margin-top: 12px;
+            padding-top: 6px;
           }
         </style>
 
-        <div class="sheet">
-          <div>
+        <div class="letter-sheet">
+          <!-- Cuerpo superior y contenido -->
+          <div style="flex: 1 1 auto; display: flex; flex-direction: column;">
             <!-- Header Institucional -->
             <div class="header">
               <div class="brand-col">
@@ -1217,11 +1339,11 @@ OBRA CIVIL Y MANIOBRAS:
             </div>
 
             <!-- Resumen de Actividades -->
-            <div style="margin-bottom: 12px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; background: #f8fafc;">
-              <div style="font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+            <div style="margin-bottom: 12px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; background: #f8fafc;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #0f172a; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
                 Resumen de Actividades Realizadas
               </div>
-              <div style="font-size: 8.5px; color: #334155; line-height: 1.45; white-space: pre-wrap;">${reg.resumen_semanal || 'Sin registro de actividades.'}</div>
+              <div style="font-size: 10px; color: #334155; line-height: 1.5; white-space: pre-wrap;">${reg.resumen_semanal || 'Sin registro de actividades.'}</div>
             </div>
 
             <!-- Resumen Financiero y Cláusula -->
@@ -1259,28 +1381,31 @@ OBRA CIVIL Y MANIOBRAS:
                 </div>
               </div>
             </div>
+          </div>
 
+          <!-- Pie de página anclado (Firmas y Nota Institucional) -->
+          <div style="flex-shrink: 0; margin-top: auto; padding-top: 12px;">
             <!-- Firmas -->
             <div class="signatures-area">
               <div class="sig-box">
-                <div style="height: 38px;"></div>
+                <div style="height: 42px;"></div>
                 <div class="sig-line"></div>
                 <div class="sig-name">${reg.trabajador_nombre}</div>
                 <div class="sig-role">Firma de Conformidad / Colaborador</div>
               </div>
 
               <div class="sig-box">
-                <div style="height: 38px;"></div>
+                <div style="height: 42px;"></div>
                 <div class="sig-line"></div>
                 <div class="sig-name">ESOL ENERGÍAS</div>
                 <div class="sig-role">Vo.Bo. Autorización y Supervisión Operativa</div>
               </div>
             </div>
-          </div>
 
-          <!-- Pie de página -->
-          <div class="footer-note">
-            Este documento representa el registro oficial de actividades de campo y liquidación semanal de ESOL Energías. Prohibida su alteración o reproducción sin autorización previa.
+            <!-- Nota institucional de pie de página -->
+            <div class="footer-note">
+              Este documento representa el registro oficial de actividades de campo y liquidación semanal de ESOL Energías. Prohibida su alteración o reproducción sin autorización previa.
+            </div>
           </div>
         </div>
       `;
@@ -1290,17 +1415,10 @@ OBRA CIVIL Y MANIOBRAS:
         filename: `Comprobante_Semanal_${reg.folio}_${reg.trabajador_nombre.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
       };
 
-      element.style.position = 'fixed';
-      element.style.left = '-9999px';
-      element.style.top = '0';
-      document.body.appendChild(element);
       const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-      document.body.removeChild(element);
-
       const blobUrl = URL.createObjectURL(pdfBlob);
       window.open(blobUrl, '_blank');
 
@@ -1349,6 +1467,81 @@ OBRA CIVIL Y MANIOBRAS:
 
     return { totalPagado, totalPendiente, activosCount, totalRegistros: registros.length };
   }, [registros, trabajadores]);
+
+  // Agrupación por Mes y Año para facilitar navegación de históricos
+  const groupedRegistros = useMemo(() => {
+    const MESES = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    const groups: {
+      key: string;
+      label: string;
+      year: number;
+      monthNum: number;
+      items: RegistroSemanal[];
+      totalMonto: number;
+      pagadosCount: number;
+      pendientesCount: number;
+    }[] = [];
+
+    const map = new Map<string, typeof groups[0]>();
+
+    filteredRegistros.forEach(reg => {
+      let d: Date;
+      if (reg.fecha_inicio) {
+        const parts = reg.fecha_inicio.split('-');
+        if (parts.length === 3) {
+          d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        } else {
+          d = new Date(reg.fecha_inicio);
+        }
+      } else {
+        d = new Date();
+      }
+
+      const year = reg.ano || d.getFullYear();
+      const monthNum = isNaN(d.getMonth()) ? 0 : d.getMonth();
+      const key = `${year}-${String(monthNum + 1).padStart(2, '0')}`;
+      const label = `${MESES[monthNum]} ${year}`;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          label,
+          year,
+          monthNum,
+          items: [],
+          totalMonto: 0,
+          pagadosCount: 0,
+          pendientesCount: 0
+        });
+      }
+
+      const grp = map.get(key)!;
+      grp.items.push(reg);
+      grp.totalMonto += Number(reg.monto_total) || 0;
+      if (reg.estado_pago === 'pagado') {
+        grp.pagadosCount++;
+      } else {
+        grp.pendientesCount++;
+      }
+    });
+
+    // Ordenar grupos descendentemente por fecha (meses recientes primero)
+    const sorted = Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
+    // Ordenar elementos dentro de cada grupo por fecha_inicio descendente
+    sorted.forEach(grp => {
+      grp.items.sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''));
+    });
+
+    return sorted;
+  }, [filteredRegistros]);
+
+  const toggleGroupCollapse = (key: string) => {
+    setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // ==========================================
   // RENDER
@@ -1435,6 +1628,17 @@ OBRA CIVIL Y MANIOBRAS:
             <Users className="w-3.5 h-3.5" />
             Directorio de Trabajadores ({trabajadores.length})
           </button>
+
+          {onNavigateToFinanzas && (
+            <button
+              onClick={onNavigateToFinanzas}
+              title="Ver cómo impactan estos pagos en Egresos y Tesorería"
+              className="px-3 py-2 rounded-lg text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/20 transition-all flex items-center gap-1.5"
+            >
+              <CreditCard className="w-3.5 h-3.5 text-rose-400" />
+              <span>Ver en Egresos (CxP)</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1518,6 +1722,34 @@ OBRA CIVIL Y MANIOBRAS:
                   <option key={t.id} value={t.id}>{t.nombre_completo}</option>
                 ))}
               </select>
+
+              {/* Group By Selector */}
+              <div className="flex items-center bg-dark-3 rounded-lg p-0.5 border border-dark-4">
+                <button
+                  type="button"
+                  onClick={() => setGroupBy('mes')}
+                  className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                    groupBy === 'mes'
+                      ? 'bg-gold text-dark-1 font-bold'
+                      : 'text-cream-muted hover:text-cream'
+                  }`}
+                  title="Agrupar registros por mes"
+                >
+                  Por Mes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupBy('todos')}
+                  className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                    groupBy === 'todos'
+                      ? 'bg-gold text-dark-1 font-bold'
+                      : 'text-cream-muted hover:text-cream'
+                  }`}
+                  title="Mostrar todos los registros en lista continua"
+                >
+                  Lista Completa
+                </button>
+              </div>
             </div>
 
             <button
@@ -1529,22 +1761,174 @@ OBRA CIVIL Y MANIOBRAS:
             </button>
           </div>
 
-          {/* Registros Table */}
-          <div className="bg-dark-2 border border-dark-4 rounded-2xl overflow-hidden shadow-xl">
-            {isLoading ? (
-              <div className="p-12 text-center text-cream-muted text-xs">Cargando registros...</div>
-            ) : filteredRegistros.length === 0 ? (
-              <div className="p-12 text-center space-y-3">
-                <FileText className="w-10 h-10 text-cream-muted/40 mx-auto" />
-                <p className="text-cream-muted text-xs">No se encontraron registros semanales.</p>
-                <button
-                  onClick={handleOpenNewRegistro}
-                  className="px-4 py-2 bg-dark-3 hover:bg-dark-4 border border-dark-4 text-gold rounded-lg text-xs transition-colors"
-                >
-                  Crear primer registro semanal
-                </button>
-              </div>
-            ) : (
+          {/* Registros Display */}
+          {isLoading ? (
+            <div className="bg-dark-2 border border-dark-4 rounded-2xl p-12 text-center text-cream-muted text-xs">
+              Cargando registros...
+            </div>
+          ) : filteredRegistros.length === 0 ? (
+            <div className="bg-dark-2 border border-dark-4 rounded-2xl p-12 text-center space-y-3">
+              <FileText className="w-10 h-10 text-cream-muted/40 mx-auto" />
+              <p className="text-cream-muted text-xs">No se encontraron registros semanales.</p>
+              <button
+                onClick={handleOpenNewRegistro}
+                className="px-4 py-2 bg-dark-3 hover:bg-dark-4 border border-dark-4 text-gold rounded-lg text-xs transition-colors"
+              >
+                Crear primer registro semanal
+              </button>
+            </div>
+          ) : groupBy === 'mes' ? (
+            /* ========================================================
+               MODO AGRUPADO POR MES (Acordeón con resumen financiero)
+               ======================================================== */
+            <div className="space-y-4">
+              {groupedRegistros.map(group => {
+                const isCollapsed = collapsedGroups[group.key];
+                return (
+                  <div
+                    key={group.key}
+                    className="bg-dark-2 border border-dark-4 rounded-2xl overflow-hidden shadow-lg transition-all"
+                  >
+                    {/* Header del Grupo / Mes */}
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupCollapse(group.key)}
+                      className="w-full flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-dark-3/60 hover:bg-dark-3 border-b border-dark-4 transition-colors text-left gap-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/30 flex items-center justify-center text-gold">
+                          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-cream">{group.label}</h3>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-dark-2 border border-dark-4 text-gold">
+                              {group.items.length} registro{group.items.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-cream-muted mt-0.5">
+                            {group.pagadosCount} liquidados • {group.pendientesCount} pendientes
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs">
+                        <div className="text-right">
+                          <span className="text-[10px] uppercase text-cream-muted tracking-wider block">Total Periodo</span>
+                          <span className="text-sm font-extrabold text-gold">{formatCurrency(group.totalMonto)}</span>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Contenido del Mes */}
+                    {!isCollapsed && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-dark-3/40 text-cream-muted border-b border-dark-4/70">
+                            <tr>
+                              <th className="py-2.5 px-4 font-medium">Folio / Emisión</th>
+                              <th className="py-2.5 px-4 font-medium">Colaborador</th>
+                              <th className="py-2.5 px-4 font-medium">Periodo</th>
+                              <th className="py-2.5 px-4 font-medium text-center">Actividades</th>
+                              <th className="py-2.5 px-4 font-medium text-right">Total a Pagar</th>
+                              <th className="py-2.5 px-4 font-medium text-center">Estado</th>
+                              <th className="py-2.5 px-4 font-medium text-right">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-dark-4 text-cream">
+                            {group.items.map(reg => (
+                              <tr key={reg.id} className="hover:bg-dark-3/40 transition-colors">
+                                <td className="py-3 px-4 font-mono font-medium text-gold">
+                                  <div>{reg.folio}</div>
+                                  <div className="text-[10px] text-cream-muted font-sans mt-0.5">
+                                    Semana {reg.numero_semana} • {reg.ano}
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="font-semibold text-cream">{reg.trabajador_nombre}</div>
+                                  <div className="text-[11px] text-cream-muted">{reg.trabajador_puesto || 'Técnico'}</div>
+                                </td>
+
+                                <td className="py-3 px-4 text-cream-muted">
+                                  <div className="flex items-center gap-1.5 text-xs text-cream">
+                                    <Calendar className="w-3.5 h-3.5 text-gold/70" />
+                                    <span>{reg.fecha_inicio} al {reg.fecha_fin}</span>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4 text-center">
+                                  <span className="px-2 py-0.5 bg-dark-3 rounded-full text-[11px] border border-dark-4 text-cream-muted">
+                                    {(reg.actividades && reg.actividades.length > 0) ? `${reg.actividades.length} tarea${reg.actividades.length > 1 ? 's' : ''}` : (reg.resumen_semanal ? '1 concepto' : '0 tareas')}
+                                  </span>
+                                </td>
+
+                                <td className="py-3 px-4 text-right">
+                                  <div className="font-bold text-cream text-sm">{formatCurrency(reg.monto_total)}</div>
+                                  {reg.monto_ajuste !== 0 && (
+                                    <div className={`text-[10px] ${reg.monto_ajuste > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                      Ajuste: {reg.monto_ajuste > 0 ? '+' : ''}{formatCurrency(reg.monto_ajuste)}
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td className="py-3 px-4 text-center">
+                                  <button
+                                    onClick={() => handleToggleEstadoPago(reg)}
+                                    title="Haz clic para cambiar estado"
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all border ${
+                                      reg.estado_pago === 'pagado'
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                                        : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                                    }`}
+                                  >
+                                    {reg.estado_pago === 'pagado' ? 'Liquidado' : 'Pendiente'}
+                                  </button>
+                                </td>
+
+                                <td className="py-3 px-4 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => handleGeneratePDF(reg)}
+                                      disabled={isGeneratingPdf}
+                                      title="Generar y abrir PDF con vista blob"
+                                      className="p-1.5 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded-lg transition-colors"
+                                    >
+                                      <Printer className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleEditRegistro(reg)}
+                                      title="Editar registro"
+                                      className="p-1.5 bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-cream border border-dark-4 rounded-lg transition-colors"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleDeleteRegistro(reg.id)}
+                                      title="Eliminar"
+                                      className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg transition-colors"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* ========================================================
+               MODO LISTA CONTINUA (Tabla única)
+               ======================================================== */
+            <div className="bg-dark-2 border border-dark-4 rounded-2xl overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-dark-3/80 text-cream-muted border-b border-dark-4">
@@ -1642,8 +2026,8 @@ OBRA CIVIL Y MANIOBRAS:
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1773,30 +2157,59 @@ OBRA CIVIL Y MANIOBRAS:
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-cream-muted mb-1.5">
-                    Rango de Fechas (Semana {registroForm.numero_semana})
+                  <label className="block text-xs font-medium text-cream-muted mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-gold" />
+                    <span>Rango de Fechas (Semana {registroForm.numero_semana})</span>
                   </label>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={registroForm.fecha_inicio}
-                      onChange={e => setRegistroForm(p => ({ ...p, fecha_inicio: e.target.value }))}
-                      className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-2 text-xs text-cream focus:border-gold outline-none font-mono"
-                    />
-                    <span className="text-cream-muted text-xs">al</span>
-                    <input
-                      type="date"
-                      value={registroForm.fecha_fin}
-                      onChange={e => setRegistroForm(p => ({ ...p, fecha_fin: e.target.value }))}
-                      className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2.5 py-2 text-xs text-cream focus:border-gold outline-none font-mono"
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="date"
+                        value={registroForm.fecha_inicio}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setRegistroForm(p => {
+                            const d = new Date(val);
+                            const num = !isNaN(d.getTime()) ? getWeekNumber(d) : p.numero_semana;
+                            return { ...p, fecha_inicio: val, numero_semana: num };
+                          });
+                        }}
+                        onClick={e => {
+                          try {
+                            if ('showPicker' in e.currentTarget) {
+                              (e.currentTarget as any).showPicker();
+                            }
+                          } catch {}
+                        }}
+                        className="w-full bg-dark-3 border border-dark-4 hover:border-gold/50 rounded-lg px-2.5 py-2 text-xs text-cream focus:border-gold outline-none font-mono cursor-pointer"
+                        title="Haz clic para abrir el calendario"
+                      />
+                    </div>
+                    <span className="text-cream-muted text-xs font-semibold">al</span>
+                    <div className="relative flex-1">
+                      <input
+                        type="date"
+                        value={registroForm.fecha_fin}
+                        onChange={e => setRegistroForm(p => ({ ...p, fecha_fin: e.target.value }))}
+                        onClick={e => {
+                          try {
+                            if ('showPicker' in e.currentTarget) {
+                              (e.currentTarget as any).showPicker();
+                            }
+                          } catch {}
+                        }}
+                        className="w-full bg-dark-3 border border-dark-4 hover:border-gold/50 rounded-lg px-2.5 py-2 text-xs text-cream focus:border-gold outline-none font-mono cursor-pointer"
+                        title="Haz clic para abrir el calendario"
+                      />
+                    </div>
                   </div>
-                  <div className="flex gap-2 mt-1.5">
+                  <div className="flex gap-2 mt-1.5 items-center">
                     <button
                       type="button"
                       onClick={() => handleDateRangePreset('esta')}
-                      className="text-[10px] text-gold hover:underline"
+                      className="text-[10px] text-gold hover:underline flex items-center gap-1"
                     >
+                      <Calendar className="w-2.5 h-2.5" />
                       Esta semana
                     </button>
                     <span className="text-cream-muted/50 text-[10px]">•</span>
@@ -1871,7 +2284,7 @@ OBRA CIVIL Y MANIOBRAS:
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-dark-4/50">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2 border-t border-dark-4/50">
                   <div>
                     <label className="block text-xs font-medium text-cream-muted mb-1">Estado del Pago</label>
                     <select
@@ -1886,21 +2299,78 @@ OBRA CIVIL Y MANIOBRAS:
 
                   <div>
                     <label className="block text-xs font-medium text-cream-muted mb-1">Método de Pago</label>
-                    <input
-                      type="text"
-                      value={registroForm.metodo_pago}
-                      onChange={e => setRegistroForm(p => ({ ...p, metodo_pago: e.target.value }))}
+                    <select
+                      value={
+                        ['Transferencia Electrónica (SPEI)', 'Efectivo', 'Cheque nominativo', 'Depósito en Ventanilla', 'Tarjeta de Débito'].includes(registroForm.metodo_pago || '')
+                          ? registroForm.metodo_pago
+                          : (registroForm.metodo_pago ? 'Otro' : 'Transferencia Electrónica (SPEI)')
+                      }
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === 'Otro') {
+                          setRegistroForm(p => ({ ...p, metodo_pago: '' }));
+                        } else {
+                          setRegistroForm(p => ({ ...p, metodo_pago: val }));
+                        }
+                      }}
                       className="w-full bg-dark-2 border border-dark-4 rounded-lg px-3 py-2 text-xs text-cream focus:border-gold outline-none"
-                    />
+                    >
+                      <option value="Transferencia Electrónica (SPEI)">Transferencia Electrónica (SPEI)</option>
+                      <option value="Efectivo">Efectivo</option>
+                      <option value="Cheque nominativo">Cheque nominativo</option>
+                      <option value="Depósito en Ventanilla">Depósito en Ventanilla</option>
+                      <option value="Tarjeta de Débito">Tarjeta de Débito</option>
+                      <option value="Otro">Otro (especificar)...</option>
+                    </select>
+                    {!['Transferencia Electrónica (SPEI)', 'Efectivo', 'Cheque nominativo', 'Depósito en Ventanilla', 'Tarjeta de Débito'].includes(registroForm.metodo_pago || '') && (
+                      <input
+                        type="text"
+                        placeholder="Especifica el método de pago..."
+                        value={registroForm.metodo_pago || ''}
+                        onChange={e => setRegistroForm(p => ({ ...p, metodo_pago: e.target.value }))}
+                        className="w-full mt-2 bg-dark-2 border border-gold/40 rounded-lg px-3 py-1.5 text-xs text-cream focus:border-gold outline-none"
+                      />
+                    )}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-cream-muted mb-1">Fecha de Liquidación</label>
+                    <label className="block text-xs font-medium text-cream-muted mb-1 flex items-center gap-1.5">
+                      <CreditCard className="w-3 h-3 text-gold" />
+                      <span>Cuenta de Tesorería</span>
+                    </label>
+                    <select
+                      value={registroForm.cuenta_origen_id || ''}
+                      onChange={e => setRegistroForm(p => ({ ...p, cuenta_origen_id: e.target.value }))}
+                      className="w-full bg-dark-2 border border-dark-4 rounded-lg px-3 py-2 text-xs text-cream focus:border-gold outline-none"
+                    >
+                      <option value="">-- Automática según método --</option>
+                      {cuentas.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre} (${c.saldo_actual.toLocaleString('es-MX')})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-cream-muted/70 mt-0.5">Egreso directo en Tesorería</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-cream-muted mb-1 flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3 text-gold" />
+                      <span>Fecha Liquidación</span>
+                    </label>
                     <input
                       type="date"
                       value={registroForm.fecha_pago || ''}
                       onChange={e => setRegistroForm(p => ({ ...p, fecha_pago: e.target.value }))}
-                      className="w-full bg-dark-2 border border-dark-4 rounded-lg px-3 py-2 text-xs text-cream focus:border-gold outline-none font-mono"
+                      onClick={e => {
+                        try {
+                          if ('showPicker' in e.currentTarget) {
+                            (e.currentTarget as any).showPicker();
+                          }
+                        } catch {}
+                      }}
+                      className="w-full bg-dark-2 border border-dark-4 hover:border-gold/50 rounded-lg px-3 py-2 text-xs text-cream focus:border-gold outline-none font-mono cursor-pointer"
+                      title="Haz clic para abrir el calendario"
                     />
                   </div>
                 </div>

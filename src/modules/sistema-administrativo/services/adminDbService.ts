@@ -1046,11 +1046,11 @@ export class AdminDbService {
     const folio = generateAdminFolio('EGR', list);
 
     const nuevo: EgresoRegistro = {
-      id: `egr-${Date.now()}`,
+      id: data.id || `egr-${Date.now()}`,
       folio,
-      fecha: new Date().toISOString(),
+      fecha: data.fecha || new Date().toISOString(),
       proveedor_id: data.proveedor_id,
-      proveedor_nombre: data.proveedor_nombre || 'Proveedor',
+      proveedor_nombre: data.proveedor_nombre || (data.trabajador_nombre ? `Nómina: ${data.trabajador_nombre}` : 'Proveedor'),
       orden_compra_id: data.orden_compra_id,
       folio_oc: data.folio_oc,
       concepto: data.concepto || 'Pago / Egreso',
@@ -1061,26 +1061,132 @@ export class AdminDbService {
       cuenta_origen_id: data.cuenta_origen_id,
       referencia_factura: data.referencia_factura,
       usuario_registro: data.usuario_registro || 'Administrador',
-      created_at: new Date().toISOString()
+      tipo_egreso: data.tipo_egreso || (data.personal_registro_id ? 'nomina_personal' : (data.orden_compra_id ? 'proveedor_oc' : 'gasto_operativo')),
+      personal_registro_id: data.personal_registro_id,
+      trabajador_nombre: data.trabajador_nombre,
+      numero_semana: data.numero_semana,
+      created_at: data.created_at || new Date().toISOString()
     };
 
-    list.unshift(nuevo);
+    const existingIdx = list.findIndex(e => e.id === nuevo.id || (nuevo.personal_registro_id && e.personal_registro_id === nuevo.personal_registro_id));
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...nuevo, id: list[existingIdx].id, folio: list[existingIdx].folio };
+    } else {
+      list.unshift(nuevo);
+    }
     setLocal(KEYS.EGRESOS, list);
 
     // Si se pagó y tiene cuenta origen, descontar de tesorería
     if (nuevo.monto_pagado > 0 && nuevo.cuenta_origen_id) {
+      const cat = nuevo.tipo_egreso === 'nomina_personal' ? 'pago_nomina' : 'pago_proveedor';
       await this.crearMovimientoFinanciero({
         cuenta_id: nuevo.cuenta_origen_id,
         tipo: 'egreso',
-        categoria: 'pago_proveedor',
+        categoria: cat,
         monto: nuevo.monto_pagado,
-        concepto: `Pago ${nuevo.folio} - ${nuevo.proveedor_nombre} (${nuevo.concepto})`,
+        concepto: `${nuevo.tipo_egreso === 'nomina_personal' ? 'Nómina' : 'Pago'} ${nuevo.folio} - ${nuevo.proveedor_nombre} (${nuevo.concepto})`,
         referencia: nuevo.referencia_factura || nuevo.folio,
         usuario_registro: nuevo.usuario_registro
       });
     }
 
     return nuevo;
+  }
+
+  // Sincronizar pago o estado de nómina desde PersonalTab hacia Tesorería/Egresos
+  async sincronizarEgresoNomina(registro: {
+    id: string;
+    folio?: string;
+    trabajador_nombre: string;
+    numero_semana: number;
+    ano: number;
+    monto_total: number;
+    estado_pago: 'pendiente' | 'pagado';
+    fecha_pago?: string;
+    metodo_pago?: string;
+    cuenta_origen_id?: string;
+    usuario_registro?: string;
+  }): Promise<EgresoRegistro> {
+    const list = this.getEgresos();
+    const existing = list.find(e => e.personal_registro_id === registro.id);
+
+    const normalizarMetodo = (m?: string): 'transferencia' | 'efectivo' | 'tarjeta' | 'cheque' => {
+      if (!m) return 'transferencia';
+      const lower = m.toLowerCase();
+      if (lower.includes('efectivo')) return 'efectivo';
+      if (lower.includes('cheque')) return 'cheque';
+      if (lower.includes('tarjeta') || lower.includes('débito')) return 'tarjeta';
+      return 'transferencia';
+    };
+
+    const estaPagado = registro.estado_pago === 'pagado';
+    const montoPagado = estaPagado ? registro.monto_total : 0;
+    const estatusFinal = estaPagado ? 'pagado' : 'pendiente';
+
+    // Determinar cuenta de tesorería por defecto si está pagado y no se seleccionó ninguna
+    let cuentaOrigen = registro.cuenta_origen_id || existing?.cuenta_origen_id;
+    if (estaPagado && !cuentaOrigen) {
+      const cuentas = this.getCuentas();
+      // Si el método es efectivo usar caja chica, si es transferencia usar banco
+      if (normalizarMetodo(registro.metodo_pago) === 'efectivo') {
+        cuentaOrigen = cuentas.find(c => c.tipo === 'caja_chica')?.id || 'caja-chica-01';
+      } else {
+        cuentaOrigen = cuentas.find(c => c.tipo === 'banco')?.id || cuentas[0]?.id || 'banco-bbva-01';
+      }
+    }
+
+    if (existing) {
+      const estabaPagado = existing.estatus === 'pagado';
+      existing.monto_total = registro.monto_total;
+      existing.monto_pagado = montoPagado;
+      existing.estatus = estatusFinal;
+      existing.metodo_pago = normalizarMetodo(registro.metodo_pago);
+      existing.concepto = `Nómina Sem. ${registro.numero_semana}/${registro.ano} - ${registro.trabajador_nombre}`;
+      existing.proveedor_nombre = `Colaborador: ${registro.trabajador_nombre}`;
+      existing.numero_semana = registro.numero_semana;
+      if (registro.fecha_pago) existing.fecha = registro.fecha_pago;
+
+      // Si cambió de pendiente a pagado y hay cuenta origen, crear movimiento de tesorería
+      if (!estabaPagado && estaPagado && cuentaOrigen) {
+        existing.cuenta_origen_id = cuentaOrigen;
+        await this.crearMovimientoFinanciero({
+          cuenta_id: cuentaOrigen,
+          tipo: 'egreso',
+          categoria: 'pago_nomina',
+          monto: registro.monto_total,
+          concepto: `Nómina ${existing.folio} - ${registro.trabajador_nombre} (Sem. ${registro.numero_semana})`,
+          referencia: registro.folio || existing.folio,
+          usuario_registro: registro.usuario_registro || 'Personal & Nómina'
+        });
+      }
+
+      setLocal(KEYS.EGRESOS, list);
+      return existing;
+    } else {
+      // Crear nuevo egreso vinculado a la nómina
+      return await this.crearEgreso({
+        proveedor_nombre: `Colaborador: ${registro.trabajador_nombre}`,
+        concepto: `Nómina Sem. ${registro.numero_semana}/${registro.ano} - ${registro.trabajador_nombre}`,
+        monto_total: registro.monto_total,
+        monto_pagado: montoPagado,
+        estatus: estatusFinal,
+        metodo_pago: normalizarMetodo(registro.metodo_pago),
+        cuenta_origen_id: cuentaOrigen,
+        referencia_factura: registro.folio || `SEM-${registro.numero_semana}`,
+        usuario_registro: registro.usuario_registro || 'Personal & Nómina',
+        tipo_egreso: 'nomina_personal',
+        personal_registro_id: registro.id,
+        trabajador_nombre: registro.trabajador_nombre,
+        numero_semana: registro.numero_semana,
+        fecha: registro.fecha_pago || new Date().toISOString()
+      });
+    }
+  }
+
+  // Eliminar egreso de nómina si se borra el registro semanal
+  async eliminarEgresoNomina(personalRegistroId: string): Promise<void> {
+    const list = this.getEgresos().filter(e => e.personal_registro_id !== personalRegistroId);
+    setLocal(KEYS.EGRESOS, list);
   }
 
   // ----------------------------------------------------------

@@ -23,6 +23,7 @@ import MantenimientosApp from './mantenimientos/MantenimientosApp';
 import LegalTab from './legal/LegalTab';
 import WhatsAppConfig from './legal/WhatsAppConfig';
 import ClientesTab from './crm/ClientesTab';
+import { CotizadorExpressTab } from './cotizador-express/CotizadorExpressTab';
 import { SistemaAdministrativoApp } from '../modules/sistema-administrativo/SistemaAdministrativoApp';
 
 const CATEGORIES = [
@@ -558,6 +559,18 @@ export function Portal() {
                         >
                           <Sun className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Esun Solar</span>}
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('cotizador_express')}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'cotizador_express'
+                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="Cotizaciones Rápidas"
+                        >
+                          <FileText className="w-4 h-4 stroke-[2] text-gold flex-shrink-0" />
+                          {!sidebarCollapsed && <span>Cotizaciones Rápidas</span>}
                         </button>
                         <button
                           onClick={() => setActiveTab('cotizador')}
@@ -2125,6 +2138,12 @@ export function Portal() {
               {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'mantenimientos' && (
                 <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
                   <MantenimientosApp reporterName={currentUser.name} />
+                </div>
+              )}
+
+              {(currentUser.role === 'admin' || currentUser.role === 'master') && activeTab === 'cotizador_express' && (
+                <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+                  <CotizadorExpressTab />
                 </div>
               )}
 

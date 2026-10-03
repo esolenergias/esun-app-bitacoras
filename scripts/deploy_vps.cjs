@@ -1,3 +1,10 @@
+// ==============================================================================
+// ADVERTENCIA CRÍTICA:
+// El dominio de producción www.esolenergias.com NO está servido por este VPS.
+// El DNS de esolenergias.com apunta a Hostinger Web Hosting (FTP).
+// Para desplegar esolenergias.com en producción, usa: npm run deploy
+// ==============================================================================
+
 const { Client } = require('ssh2');
 const fs = require('fs');
 const path = require('path');

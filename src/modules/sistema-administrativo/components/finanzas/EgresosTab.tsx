@@ -29,6 +29,7 @@ export const EgresosTab: React.FC<EgresosTabProps> = ({
   const isAllowedToEdit = canEdit && userRole !== 'visor';
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'pagado' | 'pendiente' | 'parcial'>('todos');
+  const [filterTipo, setFilterTipo] = useState<'todos' | 'nomina' | 'proveedor'>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form State
@@ -107,9 +108,14 @@ export const EgresosTab: React.FC<EgresosTabProps> = ({
       eg.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
       eg.concepto.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (eg.proveedor_nombre && eg.proveedor_nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (eg.trabajador_nombre && eg.trabajador_nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (eg.referencia_factura && eg.referencia_factura.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'todos' || eg.estatus === filterStatus;
-    return matchesSearch && matchesStatus;
+    const matchesTipo = 
+      filterTipo === 'todos' ||
+      (filterTipo === 'nomina' && eg.tipo_egreso === 'nomina_personal') ||
+      (filterTipo === 'proveedor' && eg.tipo_egreso !== 'nomina_personal');
+    return matchesSearch && matchesStatus && matchesTipo;
   });
 
   return (
@@ -185,7 +191,36 @@ export const EgresosTab: React.FC<EgresosTabProps> = ({
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex bg-dark-3 rounded-lg p-0.5 border border-dark-4">
+            <button
+              onClick={() => setFilterTipo('todos')}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                filterTipo === 'todos' ? 'bg-gold/20 text-gold' : 'text-cream-muted hover:text-cream'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFilterTipo('nomina')}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                filterTipo === 'nomina' ? 'bg-purple-500/20 text-purple-300' : 'text-cream-muted hover:text-cream'
+              }`}
+            >
+              Nómina Personal
+            </button>
+            <button
+              onClick={() => setFilterTipo('proveedor')}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                filterTipo === 'proveedor' ? 'bg-rose-500/20 text-rose-300' : 'text-cream-muted hover:text-cream'
+              }`}
+            >
+              Proveedores / OC
+            </button>
+          </div>
+
+          <div className="h-4 w-px bg-dark-4" />
+
           {(['todos', 'pagado', 'parcial', 'pendiente'] as const).map(st => (
             <button
               key={st}
@@ -237,8 +272,16 @@ export const EgresosTab: React.FC<EgresosTabProps> = ({
                         {new Date(eg.fecha).toLocaleDateString('es-MX')}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-cream">{eg.proveedor_nombre}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-cream">{eg.proveedor_nombre}</span>
+                          {eg.tipo_egreso === 'nomina_personal' && (
+                            <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                              Nómina
+                            </span>
+                          )}
+                        </div>
                         {eg.folio_oc && <div className="text-xs font-mono text-gold">{eg.folio_oc}</div>}
+                        {eg.numero_semana && <div className="text-[11px] font-mono text-cream-muted">Semana #{eg.numero_semana}</div>}
                       </td>
                       <td className="py-3 px-4 text-cream/90 text-xs">
                         {eg.concepto}

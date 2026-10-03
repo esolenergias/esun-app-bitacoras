@@ -363,6 +363,11 @@ export interface EgresoRegistro {
   cuenta_origen_id?: string;
   referencia_factura?: string;
   usuario_registro?: string;
+  // Vinculación opcional a Personal & Nómina
+  tipo_egreso?: 'proveedor_oc' | 'gasto_operativo' | 'nomina_personal';
+  personal_registro_id?: string;
+  trabajador_nombre?: string;
+  numero_semana?: number;
   created_at?: string;
 }
 
