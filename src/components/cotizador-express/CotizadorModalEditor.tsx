@@ -17,7 +17,7 @@ interface CotizadorModalEditorProps {
   clientes: any[];
   generatingAi: boolean;
   onClose: () => void;
-  onSave: (estado: 'borrador' | 'emitido') => void;
+  onSave: (estado?: EstadoCotizacionExpress) => void;
   onApplyPreset: (preset: PlantillaExpressPreset) => void;
   onSelectCliente: (clienteId: string) => void;
   onAddPartida: () => void;
@@ -60,9 +60,28 @@ export const CotizadorModalEditor: React.FC<CotizadorModalEditorProps> = ({
         {/* MODAL HEADER */}
         <div className="px-5 py-3.5 border-b border-dark-4 flex justify-between items-center bg-dark-3/70 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-gold bg-gold/10 px-2.5 py-1 rounded border border-gold/20">
-              {formData.estado === 'borrador' ? 'Modo Borrador' : 'Propuesta Emitida'}
-            </span>
+            {/* Selector de Estado en el Editor */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-cream-dim">Estado:</span>
+              <select
+                value={formData.estado || 'borrador'}
+                onChange={e => setFormData(p => ({ ...p, estado: e.target.value as any }))}
+                className={`text-[10.5px] font-black uppercase px-2.5 py-1 rounded-lg border outline-none cursor-pointer ${
+                  formData.estado === 'aceptado' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' :
+                  formData.estado === 'emitido' ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' :
+                  formData.estado === 'borrador' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
+                  formData.estado === 'rechazado' ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' :
+                  'bg-zinc-500/20 text-zinc-400 border-zinc-500/40'
+                }`}
+              >
+                <option value="emitido" className="bg-dark-1 text-blue-300">Emitido</option>
+                <option value="borrador" className="bg-dark-1 text-amber-300">Borrador</option>
+                <option value="rechazado" className="bg-dark-1 text-rose-400">Rechazado</option>
+                <option value="cancelado" className="bg-dark-1 text-zinc-400">Cancelado</option>
+                <option value="aceptado" className="bg-dark-1 text-emerald-400">Aceptado</option>
+              </select>
+            </div>
+
             <span className="text-[11px] text-cream font-mono font-bold">
               {formData.folio || 'NUEVO FOLIO'}
             </span>
@@ -334,8 +353,14 @@ export const CotizadorModalEditor: React.FC<CotizadorModalEditorProps> = ({
                       <input
                         type="number"
                         min="1"
-                        value={formData.vigencia_dias}
-                        onChange={e => setFormData(p => ({ ...p, vigencia_dias: Number(e.target.value) || 15 }))}
+                        value={formData.vigencia_dias || ''}
+                        onFocus={e => e.target.select()}
+                        onClick={e => (e.target as HTMLInputElement).select()}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setFormData(p => ({ ...p, vigencia_dias: val === '' ? 0 : Number(val) }));
+                        }}
+                        placeholder="15"
                         className="w-full bg-dark-3 border border-dark-4 rounded-lg px-2 py-1 text-cream outline-none focus:border-gold text-xs font-mono"
                       />
                     </div>
@@ -396,6 +421,7 @@ export const CotizadorModalEditor: React.FC<CotizadorModalEditorProps> = ({
                   >
                     <option value="visita_tecnica">Visita Técnica</option>
                     <option value="servicios_profesionales">Servicios Profesionales / UVIE</option>
+                    <option value="expediente_tecnico">Expediente Técnico</option>
                     <option value="suministro_insumos">Suministro de Insumos</option>
                     <option value="mantenimiento">Póliza de Mantenimiento</option>
                     <option value="libre">Servicio General / Libre</option>
@@ -874,7 +900,7 @@ export const CotizadorModalEditor: React.FC<CotizadorModalEditorProps> = ({
           {/* PANEL DERECHO: VISTA PREVIA EN VIVO "BLOB:" (SPLIT VIEW) */}
           {showLivePreview && (
             <div className="hidden lg:block lg:w-[46%] xl:w-[50%] h-full p-3 bg-dark-1/60 overflow-hidden">
-              <CotizadorBlobPreview formData={formData} />
+              <CotizadorBlobPreview formData={formData} activeSection={editorSection} />
             </div>
           )}
 
@@ -894,19 +920,23 @@ export const CotizadorModalEditor: React.FC<CotizadorModalEditorProps> = ({
             <button
               type="button"
               onClick={() => onSave('borrador')}
-              className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-dark-1 rounded-xl text-xs font-black shadow-md shadow-amber-500/20 transition-all cursor-pointer flex items-center gap-1.5 hover:scale-[1.02] active:scale-95"
             >
-              <Clock className="w-3.5 h-3.5" />
+              <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Guardar Borrador</span>
             </button>
 
             <button
               type="button"
-              onClick={() => onSave('emitido')}
-              className="px-5 py-2 bg-gold hover:bg-gold-light text-dark-1 rounded-xl text-xs font-black shadow-lg shadow-gold/20 transition-all cursor-pointer flex items-center gap-1.5"
+              onClick={() => onSave(formData.estado === 'borrador' ? 'emitido' : formData.estado)}
+              className="px-5 py-2 bg-gold hover:bg-gold-light text-dark-1 rounded-xl text-xs font-black shadow-lg shadow-gold/20 transition-all cursor-pointer flex items-center gap-1.5 hover:scale-[1.02]"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Emitir Oficialmente ({hojasSeleccionadasCount} {hojasSeleccionadasCount === 1 ? 'Hoja' : 'Hojas'})</span>
+              <span>
+                {formData.estado && formData.estado !== 'borrador' && formData.estado !== 'emitido'
+                  ? `Guardar como ${formData.estado.charAt(0).toUpperCase() + formData.estado.slice(1)}`
+                  : `Emitir Oficialmente (${hojasSeleccionadasCount} ${hojasSeleccionadasCount === 1 ? 'Hoja' : 'Hojas'})`}
+              </span>
             </button>
           </div>
         </div>

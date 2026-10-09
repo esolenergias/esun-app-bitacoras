@@ -83,12 +83,27 @@ function getLocal<T>(key: string, defaultVal: T): T {
   }
 }
 
-// Helper: Generic Local Storage setter
+// Helper: Sincronizador en la nube (Supabase) + memoria
 function setLocal<T>(key: string, val: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(val));
   } catch (e) {
     console.warn(`LocalStorage quota exceeded for ${key}:`, e);
+  }
+
+  // Sincronización automática e inmediata en Supabase (cms_content)
+  try {
+    supabase.from('cms_content').upsert({
+      key: key,
+      data: val,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'key' }).then(({ error }) => {
+      if (error) {
+        console.warn(`Error sincronizando ${key} en Supabase:`, error);
+      }
+    });
+  } catch (err) {
+    console.warn(`Excepción al sincronizar ${key} en Supabase:`, err);
   }
 }
 
@@ -134,48 +149,44 @@ export class AdminDbService {
   }
 
   constructor() {
-    this.purgarDatosInventadosLegacy();
+    // Constructor limpio sin purga destructiva de localStorage
   }
 
-  // Purga definitiva de datos de ejemplo o seed antiguos del navegador
-  private purgarDatosInventadosLegacy() {
-    try {
-      const recepciones = getLocal<any[]>(KEYS.RECEPCIONES, []);
-      // Si no hay recepciones de mercancía reales registradas, resetear inventario y kardex a existencia 0
-      if (recepciones.length === 0) {
-        localStorage.removeItem(KEYS.INVENTARIO);
-        localStorage.removeItem(KEYS.KARDEX);
-      }
-
-      // Purgar proveedores fake si existen
-      const provs = getLocal<Proveedor[]>(KEYS.PROVEEDORES, []);
-      if (provs.some(p => p.id.startsWith('prov-00') || p.nombre.includes('Distribuidora Solar'))) {
-        localStorage.removeItem(KEYS.PROVEEDORES);
-      }
-
-      // Reajustar saldos inflados en cuentas de prueba a 0 si no tienen movimientos reales
-      const movs = getLocal<MovimientoFinanciero[]>(KEYS.MOVIMIENTOS, []);
-      if (movs.length === 0) {
-        localStorage.removeItem(KEYS.CUENTAS);
-      }
-    } catch (e) {
-      console.warn('Error purgando datos legacy:', e);
-    }
-  }
-
-  // 1. CARGA COMPLETA DE DATOS (CONECTADO EXCLUSIVAMENTE A BASES REALES)
+  // 1. CARGA COMPLETA DE DATOS (CONECTADO EXCLUSIVAMENTE A BASES REALES DE SUPABASE)
   async cargarDatosCompletos() {
+    // Hidratar colecciones administrativas desde Supabase cms_content
+    try {
+      const { data: cloudData } = await supabase
+        .from('cms_content')
+        .select('key, data')
+        .in('key', Object.values(KEYS));
+
+      if (cloudData && Array.isArray(cloudData)) {
+        cloudData.forEach(row => {
+          if (row.data) {
+            try {
+              localStorage.setItem(row.key, JSON.stringify(row.data));
+            } catch (e) {}
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Error hidratando datos administrativos desde Supabase:', err);
+    }
+
     const [
       clientesRes,
       presupuestosRes,
-      insumosRes
+      insumosRes,
+      proveedoresRes
     ] = await Promise.all([
       this.fetchClientesReales(),
       this.fetchProyectosReales(),
-      this.fetchInsumosReales()
+      this.fetchInsumosReales(),
+      this.fetchProveedores()
     ]);
 
-    const proveedores = this.getProveedores();
+    const proveedores = proveedoresRes;
     const solicitudesCompra = this.getSolicitudesCompra();
     const ordenesCompra = this.getOrdenesCompra();
     const recepciones = this.getRecepciones();
@@ -465,8 +476,26 @@ export class AdminDbService {
   }
 
   // ----------------------------------------------------------
-  // PROVEEDORES (Almacenados y gestionados por el usuario)
+  // PROVEEDORES (Sincronizados en Supabase cms_content con fallback local)
   // ----------------------------------------------------------
+  async fetchProveedores(): Promise<Proveedor[]> {
+    try {
+      const { data, error } = await supabase
+        .from('cms_content')
+        .select('data')
+        .eq('key', 'admin_proveedores')
+        .maybeSingle();
+
+      if (!error && data && Array.isArray(data.data)) {
+        setLocal(KEYS.PROVEEDORES, data.data);
+        return data.data;
+      }
+    } catch (e) {
+      console.warn('Error fetching proveedores from Supabase cms_content:', e);
+    }
+    return this.getProveedores();
+  }
+
   getProveedores(): Proveedor[] {
     return getLocal<Proveedor[]>(KEYS.PROVEEDORES, []);
   }
@@ -491,6 +520,18 @@ export class AdminDbService {
     const idx = list.findIndex(p => p.id === updated.id);
     if (idx >= 0) list[idx] = updated; else list.push(updated);
     setLocal(KEYS.PROVEEDORES, list);
+
+    // Sync to Supabase cms_content
+    try {
+      await supabase.from('cms_content').upsert({
+        key: 'admin_proveedores',
+        data: list,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+    } catch (err) {
+      console.warn('Error syncing proveedores to Supabase:', err);
+    }
+
     return updated;
   }
 
@@ -498,6 +539,17 @@ export class AdminDbService {
     this.assertCanMutate('eliminar proveedores');
     const list = this.getProveedores().filter(p => p.id !== id);
     setLocal(KEYS.PROVEEDORES, list);
+
+    // Sync deletion to Supabase cms_content
+    try {
+      await supabase.from('cms_content').upsert({
+        key: 'admin_proveedores',
+        data: list,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+    } catch (err) {
+      console.warn('Error syncing proveedores removal to Supabase:', err);
+    }
   }
 
   // ----------------------------------------------------------
@@ -1203,16 +1255,7 @@ export class AdminDbService {
       updated_at: new Date().toISOString()
     };
 
-    const list = getLocal<OficioData[]>('esol_oficios_guardados_local', []);
-    const idx = list.findIndex(o => o.folio === updatedRecord.folio || (updatedRecord.id && o.id === updatedRecord.id));
-    if (idx >= 0) {
-      list[idx] = updatedRecord;
-    } else {
-      list.unshift(updatedRecord);
-    }
-    setLocal('esol_oficios_guardados_local', list);
-
-    // Guardar en Supabase (oficios_obra) con todos los campos para visibilidad en CRM ClienteDetail
+    // Guardar exclusivamente en Supabase (oficios_obra) con todos los campos para visibilidad en CRM ClienteDetail
     try {
       const dbPayload: any = {
         folio: updatedRecord.folio,
@@ -1260,7 +1303,49 @@ export class AdminDbService {
 
       const { error } = await supabase.from('oficios_obra').upsert(dbPayload, { onConflict: 'folio' });
       if (error) {
-        console.warn('Error upserting into oficios_obra:', error);
+        console.warn('Error upserting with extended columns into oficios_obra, retrying with core columns:', error);
+        const corePayload: any = {
+          folio: updatedRecord.folio,
+          fecha: updatedRecord.fecha,
+          lugar: updatedRecord.lugar || 'Tepic, Nayarit',
+          presupuesto_id: updatedRecord.presupuestoId || null,
+          nombre_obra: updatedRecord.nombreObra || '',
+          ubicacion_obra: updatedRecord.ubicacionObra || '',
+          cliente_final: updatedRecord.clienteFinal || '',
+          tipo_oficio: updatedRecord.tipoOficio || 'libre',
+          destinatario_titulo: updatedRecord.destinatarioTitulo || '',
+          destinatario_nombre: updatedRecord.destinatarioNombre || '',
+          destinatario_cargo: updatedRecord.destinatarioCargo || '',
+          destinatario_empresa: updatedRecord.destinatarioEmpresa || '',
+          destinatario_atencion: updatedRecord.destinatarioAtencion || '',
+          asunto: updatedRecord.asunto || '',
+          referencia: updatedRecord.referencia || '',
+          vocativo: updatedRecord.vocativo || '',
+          antecedentes: updatedRecord.antecedentes || '',
+          cuerpo: updatedRecord.cuerpo || '',
+          fundamentacion: updatedRecord.fundamentacion || '',
+          peticion: updatedRecord.peticion || '',
+          despedida: updatedRecord.despedida || '',
+          remitente_nombre: updatedRecord.remitenteNombre || 'Manuel de Jesus Fregoso Samaniega',
+          remitente_cargo: updatedRecord.remitenteCargo || 'REPRESENTANTE LEGAL',
+          remitente_cedula: updatedRecord.remitenteCedula || '',
+          empresa_razon_social: updatedRecord.empresaRazonSocial || 'ESOL ENERGIAS',
+          empresa_rfc: updatedRecord.empresaRFC || '',
+          empresa_domicilio: updatedRecord.empresaDomicilio || 'Tepic, Nayarit, México',
+          empresa_telefono: updatedRecord.empresaTelefono || '3112343034',
+          empresa_email: updatedRecord.empresaEmail || 'contacto@esolenergias.com',
+          ccp: updatedRecord.ccp || [],
+          anexos: updatedRecord.anexos || [],
+          estado: updatedRecord.estado || 'emitido',
+          updated_at: updatedRecord.updated_at
+        };
+        if (updatedRecord.id && !updatedRecord.id.startsWith('temp-')) {
+          corePayload.id = updatedRecord.id;
+        }
+        const { error: coreErr } = await supabase.from('oficios_obra').upsert(corePayload, { onConflict: 'folio' });
+        if (coreErr) {
+          console.error('Error persistente guardando oficio en Supabase:', coreErr);
+        }
       }
     } catch (e) {
       console.warn('Error guardando oficio en Supabase:', e);
@@ -1327,59 +1412,17 @@ export class AdminDbService {
             firmaDigital: d.firma_digital || undefined,
             incluirFirmaDigital: d.incluir_firma_digital ?? true,
             created_at: d.created_at,
-            updated_at: d.updated_at
           };
         });
       }
     } catch (e) {
       console.warn('Error fetching oficios from Supabase:', e);
     }
-
-    const localStr = localStorage.getItem('esol_oficios_guardados_local');
-    if (localStr) {
-      try {
-        const parsed = JSON.parse(localStr);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((item: any) => {
-            const existingIdx = list.findIndex(o => o.folio === item.folio || (item.id && o.id === item.id));
-            if (existingIdx === -1) {
-              // Normalizar item local
-              const localEmitido = item.estado === 'emitido' || Boolean(item.drive_url) || (item.folio && item.destinatarioNombre && item.cuerpo && item.estado !== 'borrador');
-              list.push({
-                ...item,
-                estado: localEmitido ? 'emitido' : (item.estado || 'emitido')
-              });
-            } else {
-              // Si en local tiene drive_url o datos más recientes, no degradar estado a borrador si el de list es emitido
-              if (list[existingIdx].estado === 'emitido') {
-                item.estado = 'emitido';
-              }
-            }
-          });
-        }
-      } catch (e) {}
-    }
     return list;
   }
 
   async actualizarEstadoOficio(folioOrId: string, nuevoEstado: 'borrador' | 'emitido'): Promise<void> {
-    // 1. Actualizar localStorage
-    try {
-      const list = getLocal<OficioData[]>('esol_oficios_guardados_local', []);
-      const idx = list.findIndex(o => o.folio === folioOrId || o.id === folioOrId);
-      if (idx >= 0) {
-        list[idx] = {
-          ...list[idx],
-          estado: nuevoEstado,
-          updated_at: new Date().toISOString()
-        };
-        setLocal('esol_oficios_guardados_local', list);
-      }
-    } catch (e) {
-      console.warn('Error al actualizar estado en local:', e);
-    }
-
-    // 2. Actualizar Supabase
+    // 1. Actualizar Supabase exclusivamente
     try {
       const { error } = await supabase
         .from('oficios_obra')

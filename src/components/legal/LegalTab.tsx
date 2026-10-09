@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool, Award } from 'lucide-react';
+import { FileText, Shield, Cloud, Settings, HardHat, Users, PenTool, Award, ScrollText } from 'lucide-react';
 import ContratosPanelesTab from './ContratosPanelesTab';
 import SubcontratacionTab from './SubcontratacionTab';
+import OficiosTab from './oficios/OficiosTab';
 import InstaladoresManagerTab from './InstaladoresManagerTab';
 import ExtensionGarantiaTab from './ExtensionGarantiaTab';
 import PolizaGarantiaTab from './PolizaGarantiaTab';
 
 interface LegalTabProps {
   initialBudgetId?: string | null;
-  initialSubTab?: 'contratos_paneles' | 'subcontratacion' | 'extension_garantia' | 'poliza_garantia' | 'instaladores' | 'ajustes';
+  initialSubTab?: 'contratos_paneles' | 'subcontratacion' | 'oficios' | 'extension_garantia' | 'poliza_garantia' | 'instaladores' | 'ajustes';
 }
 
 export default function LegalTab({ initialBudgetId, initialSubTab }: LegalTabProps) {
-  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'extension_garantia' | 'poliza_garantia' | 'instaladores' | 'ajustes'>(() => {
+  const [legalSubTab, setLegalSubTab] = useState<'contratos_paneles' | 'subcontratacion' | 'oficios' | 'extension_garantia' | 'poliza_garantia' | 'instaladores' | 'ajustes'>(() => {
     const saved = localStorage.getItem('esol_legal_active_subtab');
-    if (saved && saved !== 'oficios' && saved !== 'personal') {
+    if (saved && saved !== 'personal') {
       localStorage.removeItem('esol_legal_active_subtab');
       return saved as any;
     }
@@ -24,7 +25,7 @@ export default function LegalTab({ initialBudgetId, initialSubTab }: LegalTabPro
 
   useEffect(() => {
     const saved = localStorage.getItem('esol_legal_active_subtab');
-    if (saved && saved !== 'oficios' && saved !== 'personal') {
+    if (saved && saved !== 'personal') {
       setLegalSubTab(saved as any);
       localStorage.removeItem('esol_legal_active_subtab');
     }
@@ -69,6 +70,18 @@ export default function LegalTab({ initialBudgetId, initialSubTab }: LegalTabPro
           >
             <HardHat className="w-4 h-4" />
             Subcontratación
+          </button>
+
+          <button
+            onClick={() => setLegalSubTab('oficios')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              legalSubTab === 'oficios'
+                ? 'border-gold text-gold bg-gold/5'
+                : 'border-transparent text-cream-muted hover:text-cream hover:bg-dark-3'
+            }`}
+          >
+            <ScrollText className="w-4 h-4" />
+            Oficios de Obra
           </button>
 
           <button
@@ -131,6 +144,10 @@ export default function LegalTab({ initialBudgetId, initialSubTab }: LegalTabPro
 
         {legalSubTab === 'subcontratacion' && (
           <SubcontratacionTab initialBudgetId={initialBudgetId} />
+        )}
+
+        {legalSubTab === 'oficios' && (
+          <OficiosTab initialBudgetId={initialBudgetId} />
         )}
 
         {legalSubTab === 'extension_garantia' && (

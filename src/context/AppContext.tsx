@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { auditService } from '../services/auditService';
 
 // Define Types
 export type UserRole = 'user' | 'admin' | 'master';
@@ -750,6 +751,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
             setCurrentUser(user);
             localStorage.setItem('esol_current_user', JSON.stringify(user));
+
+            // Log de auditoría de inicio de sesión
+            if (_event === 'SIGNED_IN') {
+              auditService.log({
+                action: 'LOGIN',
+                module: 'Autenticación',
+                description: `Inicio de sesión exitoso por credencial de ${user.name} (${user.role})`,
+                user
+              });
+            }
           } else {
             // Fallback user mapping
             const email = session.user.email || '';
@@ -779,6 +790,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
             setCurrentUser(fallbackUser);
             localStorage.setItem('esol_current_user', JSON.stringify(fallbackUser));
+
+            if (_event === 'SIGNED_IN') {
+              auditService.log({
+                action: 'LOGIN',
+                module: 'Autenticación',
+                description: `Inicio de sesión exitoso de ${fallbackUser.name} (${fallbackUser.role})`,
+                user: fallbackUser
+              });
+            }
           }
         } catch (e) {
           console.error("Error fetching user profile:", e);
@@ -792,7 +812,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Registrar hora de salida o cierre de pestaña del usuario
+    const handleBeforeUnload = () => {
+      try {
+        const storedUser = localStorage.getItem('esol_current_user');
+        if (storedUser) {
+          const u = JSON.parse(storedUser);
+          auditService.log({
+            action: 'LOGOUT',
+            module: 'Sesión / Navegador',
+            description: `Usuario ${u.name || 'Usuario'} cerró la ventana o salió de la plataforma`,
+            user: u
+          });
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
 
   // View State (Landing vs Portal)
@@ -1395,6 +1436,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async () => {
+    if (currentUser) {
+      auditService.log({
+        action: 'LOGOUT',
+        module: 'Autenticación',
+        description: `Usuario ${currentUser.name} (${currentUser.role}) cerró sesión`,
+        user: currentUser
+      });
+    }
     await supabase.auth.signOut();
     setCurrentUser(null);
     localStorage.removeItem('esol_current_user');
@@ -1450,6 +1499,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setCurrentUser(mockUser);
     localStorage.setItem('esol_current_user', JSON.stringify(mockUser));
+
+    auditService.log({
+      action: 'LOGIN',
+      module: 'Autenticación',
+      description: `Inicio de sesión exitoso como ${name} (${role})`,
+      user: mockUser
+    });
   };
 
   // CMS functions

@@ -11,11 +11,27 @@ import { Footer } from './components/Footer';
 import { Portal } from './components/Portal';
 import { LoginModal } from './components/LoginModal';
 import PresupuestoDashboardPage from './components/cotizador/PresupuestoDashboardPage';
-import EsunPropuestaViewer from './components/esun/EsunPropuestaViewer';
 import { SistemaAdministrativoApp } from './modules/sistema-administrativo/SistemaAdministrativoApp';
+import { auditService } from './services/auditService';
 
 function AppContent() {
   const { currentView, isPortalOpen, closePortal, currentUser, content } = useApp();
+
+  // Registrar auditoría de ingreso del visitante o usuario al abrir la aplicación
+  useEffect(() => {
+    const isFirstVisitKey = 'esol_session_visit_logged';
+    if (!sessionStorage.getItem(isFirstVisitKey)) {
+      sessionStorage.setItem(isFirstVisitKey, '1');
+      auditService.log({
+        action: 'VIEW',
+        module: 'Sitio Web Principal',
+        description: currentUser 
+          ? `Usuario ${currentUser.name} (${currentUser.role}) ingresó al sitio web`
+          : 'Visitante ingresó al sitio web eSol Energías',
+        user: currentUser
+      });
+    }
+  }, [currentUser?.id]);
 
   // Automatically clean up old chatbot test leads to avoid CRM contamination
   useEffect(() => {

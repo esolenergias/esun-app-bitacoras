@@ -68,11 +68,28 @@ export async function verifyAndRegisterDevice(
   project: SolarProject,
   proposal: Proposal
 ): Promise<DeviceVerificationResult> {
-  const maxDevices = proposal.security?.max_devices || 2;
-  const authorizedDevices = proposal.security?.authorized_devices || [];
+  const currentDeviceId = getOrCreateDeviceFingerprint();
 
-  // 1. Si es Staff autenticado de ESOL, otorgar acceso libre de supervisión
+  // 1. Si es Staff autenticado de ESOL, otorgar acceso libre de supervisión y registrar auditoría
   if (isStaffUser()) {
+    auditService.log({
+      action: 'ESUN_VIEW',
+      module: 'Esun Solar (Presentaciones)',
+      description: `Staff/Ingeniero abrió la presentación "${proposal.name}" de "${project.client_name}"`,
+      user: { name: 'Staff ESOL', role: 'staff' },
+      metadata: {
+        projectId,
+        proposalId,
+        clientName: project.client_name,
+        proposalName: proposal.name,
+        systemPowerKw: proposal.system?.system_size_kw || proposal.system?.dc_capacity_kw,
+        investmentTotal: proposal.financial?.total_investment_mxn,
+        isStaff: true,
+        devicesCount: authorizedDevices.length,
+        maxDevices
+      }
+    });
+
     return {
       authorized: true,
       isStaff: true,
@@ -81,12 +98,30 @@ export async function verifyAndRegisterDevice(
     };
   }
 
-  const currentDeviceId = getOrCreateDeviceFingerprint();
-
   // 2. Si el dispositivo ya está previamente autorizado (el cliente o el ingeniero re-abriendo el link)
   if (authorizedDevices.includes(currentDeviceId)) {
     // Actualizar last_accessed_at en segundo plano
     updateDeviceAccessTime(projectId, proposalId, project);
+
+    auditService.log({
+      action: 'ESUN_VIEW',
+      module: 'Esun Solar (Presentaciones)',
+      description: `El cliente "${project.client_name}" re-abrió la presentación "${proposal.name}" (${authorizedDevices.length}/${maxDevices} dispositivos)`,
+      user: { name: project.client_name || 'Cliente Solar', email: project.client_email, role: 'client' },
+      metadata: {
+        projectId,
+        proposalId,
+        clientName: project.client_name,
+        proposalName: proposal.name,
+        systemPowerKw: proposal.system?.system_size_kw || proposal.system?.dc_capacity_kw,
+        investmentTotal: proposal.financial?.total_investment_mxn,
+        isStaff: false,
+        deviceId: currentDeviceId,
+        devicesCount: authorizedDevices.length,
+        maxDevices
+      }
+    });
+
     return {
       authorized: true,
       devicesCount: authorizedDevices.length,
@@ -99,6 +134,26 @@ export async function verifyAndRegisterDevice(
     const updatedDevices = [...authorizedDevices, currentDeviceId];
     await persistAuthorizedDevices(projectId, proposalId, project, updatedDevices, maxDevices);
 
+    auditService.log({
+      action: 'ESUN_VIEW',
+      module: 'Esun Solar (Presentaciones)',
+      description: `Nuevo dispositivo autorizado (${updatedDevices.length}/${maxDevices}) abrió la presentación "${proposal.name}" para "${project.client_name}"`,
+      user: { name: project.client_name || 'Cliente Solar', email: project.client_email, role: 'client' },
+      metadata: {
+        projectId,
+        proposalId,
+        clientName: project.client_name,
+        proposalName: proposal.name,
+        systemPowerKw: proposal.system?.system_size_kw || proposal.system?.dc_capacity_kw,
+        investmentTotal: proposal.financial?.total_investment_mxn,
+        isStaff: false,
+        newDeviceRegistered: true,
+        deviceId: currentDeviceId,
+        devicesCount: updatedDevices.length,
+        maxDevices
+      }
+    });
+
     return {
       authorized: true,
       devicesCount: updatedDevices.length,
@@ -107,6 +162,23 @@ export async function verifyAndRegisterDevice(
   }
 
   // 4. Si ya se ocuparon los cupos autorizados (3er dispositivo o reenvío no autorizado)
+  auditService.log({
+    action: 'ESUN_VIEW',
+    module: 'Esun Solar (Presentaciones)',
+    description: `⚠️ Intento de acceso bloqueado (Límite superado: ${authorizedDevices.length}/${maxDevices}) a la presentación "${proposal.name}" de "${project.client_name}"`,
+    user: { name: 'Dispositivo No Autorizado', role: 'anonymous' },
+    metadata: {
+      projectId,
+      proposalId,
+      clientName: project.client_name,
+      proposalName: proposal.name,
+      attemptBlocked: true,
+      deviceId: currentDeviceId,
+      devicesCount: authorizedDevices.length,
+      maxDevices
+    }
+  });
+
   return {
     authorized: false,
     reason: 'device_limit_reached',

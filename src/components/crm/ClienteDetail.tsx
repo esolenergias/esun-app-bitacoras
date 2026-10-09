@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, FileText, Sun, Calendar, TrendingUp, Edit3, Save, X, MapPin, ScrollText, Download, Cloud, Eye, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../context/supabase';
+import { useApp } from '../../context/AppContext';
+import { auditService } from '../../services/auditService';
 import type { OficioData } from '../legal/oficios/types';
 import OficioPreviewModal from '../legal/oficios/OficioPreviewModal';
 import { generateOficioPdf } from '../legal/oficios/oficioPdfGenerator';
@@ -13,6 +15,7 @@ interface ClienteDetailProps {
 }
 
 export default function ClienteDetail({ cliente: initialCliente, onBack, onNavigateTo }: ClienteDetailProps) {
+  const { currentUser } = useApp();
   const [cliente, setCliente] = useState(initialCliente);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(initialCliente);
@@ -390,6 +393,14 @@ export default function ClienteDetail({ cliente: initialCliente, onBack, onNavig
                   if (error) throw error;
                   setCliente(editForm);
                   setIsEditing(false);
+
+                  auditService.log({
+                    action: 'UPDATE',
+                    module: 'CRM Clientes',
+                    description: `${currentUser?.name} actualizó los datos del cliente "${editForm.nombre_razon_social}"`,
+                    user: currentUser,
+                    metadata: { clientId: cliente.id, clientName: editForm.nombre_razon_social, email: editForm.email }
+                  });
                 } catch (e: any) {
                   alert("Error al actualizar cliente: " + e.message);
                 }

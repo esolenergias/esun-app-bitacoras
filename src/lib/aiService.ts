@@ -47,7 +47,12 @@ export async function generateAIContent(
       };
     }
 
-    const modelsToTry = [geminiModel, 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+    const modelsToTry = [
+      'gemini-3.5-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-3.8-flash',
+      'gemini-flash-latest'
+    ];
     
     let lastError = null;
 
@@ -74,9 +79,7 @@ export async function generateAIContent(
         return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       } catch (err: any) {
         lastError = err;
-        // If it's a 400 (Bad Request), it might be a prompt issue, don't retry models
-        if (err.message && err.message.includes('400')) break;
-        // Continue to next model
+        // Continue trying next compatible active model
       }
     }
     

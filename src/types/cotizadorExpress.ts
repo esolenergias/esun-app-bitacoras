@@ -1,4 +1,9 @@
-export type EstadoCotizacionExpress = 'borrador' | 'emitido' | 'aprobada' | 'rechazada' | 'cobrada';
+export type EstadoCotizacionExpress = 
+  | 'emitido' 
+  | 'borrador' 
+  | 'rechazado' 
+  | 'cancelado' 
+  | 'aceptado';
 
 export interface PartidaCotizacionExpress {
   id: string;
@@ -30,7 +35,7 @@ export interface CotizacionExpressData {
   // Propuesta & Asunto
   asunto: string;
   vocativo: string;
-  tipo_servicio: 'visita_tecnica' | 'servicios_profesionales' | 'suministro_insumos' | 'mantenimiento' | 'libre';
+  tipo_servicio: 'visita_tecnica' | 'servicios_profesionales' | 'expediente_tecnico' | 'suministro_insumos' | 'mantenimiento' | 'libre';
   descripcion_alcance: string; // Cuerpo explicativo del servicio
 
   // Opciones de Estructura de Hojas (Habilitar / Inhabilitar)

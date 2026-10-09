@@ -11,7 +11,7 @@ import {
   ArrowRight, Sun, Moon, Zap, Leaf, 
   DollarSign, MessageSquare, Package, Truck, Users, Activity, Building2,
   Settings, Trash2, ChevronDown, ChevronRight, ChevronUp, Store, LayoutTemplate, Wrench,
-  ExternalLink
+  ExternalLink, ShieldAlert
 } from 'lucide-react';
 import InsumosTab from './cotizador/InsumosTab';
 import MatricesTab from './cotizador/MatricesTab';
@@ -25,6 +25,9 @@ import WhatsAppConfig from './legal/WhatsAppConfig';
 import ClientesTab from './crm/ClientesTab';
 import { CotizadorExpressTab } from './cotizador-express/CotizadorExpressTab';
 import { SistemaAdministrativoApp } from '../modules/sistema-administrativo/SistemaAdministrativoApp';
+import { MasterAuditModal } from './audit/MasterAuditModal';
+import { auditService } from '../services/auditService';
+import { LoginModal } from './LoginModal';
 
 const CATEGORIES = [
   'Paneles Solares',
@@ -93,6 +96,42 @@ export function Portal() {
     }
   }, [currentUser, activeTab]);
 
+  // Auditoría: Registrar cada vez que el usuario navega a un módulo dentro del Portal
+  useEffect(() => {
+    if (currentUser && activeTab) {
+      const tabNames: Record<string, string> = {
+        dashboard: 'Dashboard General',
+        clientes: 'CRM Clientes',
+        cfemanager: 'CFE Manager',
+        esun: 'Esun Solar (Propuestas)',
+        cotizador: 'Presupuestos eSol',
+        legal: 'Legal eSol & Contratos',
+        bitacoras: 'Bitácoras de Obra',
+        mantenimientos: 'Mantenimientos',
+        cms: 'Editor CMS Landing',
+        modules: 'Gestión de Módulos',
+        seo: 'Lighthouse & SEO',
+        inventory: 'Catálogo Productos B2B',
+        agents: 'Motores Chat IA',
+        roles: 'Roles & Permisos',
+        cfeconfig: 'Configuración General',
+        cotizador_express: 'Cotizaciones Rápidas',
+        projects: 'Mis Proyectos 3D',
+        cfe: 'Recibos CFE',
+        chat: 'Asistente IA Cliente'
+      };
+
+      const moduleName = tabNames[activeTab] || `Módulo: ${activeTab}`;
+      auditService.log({
+        action: 'VIEW',
+        module: moduleName,
+        description: `${currentUser.name} (${currentUser.role}) abrió la vista "${moduleName}"`,
+        user: currentUser,
+        metadata: { tab: activeTab }
+      });
+    }
+  }, [activeTab, currentUser?.id]);
+
   // Collapsed sidebar state (for mobile responsiveness)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -105,6 +144,9 @@ export function Portal() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [editProfileName, setEditProfileName] = useState('');
   const [editProfileAvatar, setEditProfileAvatar] = useState('');
+
+  // Master Audit & Traffic Modal State
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
   // Load esun quotes to feed general dashboard statistics
   // Load presupuestos for dashboard statistics
@@ -371,7 +413,35 @@ export function Portal() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* Botón exclusivo para rol MASTER: Auditoría & Tráfico */}
+          {currentUser?.role === 'master' && (
+            <button
+              onClick={() => setIsAuditModalOpen(true)}
+              className="px-3 py-2 rounded-xl border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-sm shadow-red-950/30"
+              title="Centro de Auditoría, Bitácora y KPIs de Tráfico (Exclusivo Master)"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-red-400 animate-pulse" />
+              <span className="hidden md:inline">Auditoría & Tráfico</span>
+            </button>
+          )}
+
+          {/* Botón directo a Cotizaciones Rápidas */}
+          {(currentUser?.role === 'admin' || currentUser?.role === 'master') && (
+            <button
+              onClick={() => setActiveTab('cotizador_express')}
+              className={`px-3 py-2 rounded-xl border text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-sm ${
+                activeTab === 'cotizador_express'
+                  ? 'bg-gold text-dark-1 border-gold shadow-gold/20'
+                  : 'bg-dark-1 hover:bg-dark-3 text-gold border-gold/40 hover:border-gold'
+              }`}
+              title="Ir a Cotizaciones Rápidas"
+            >
+              <FileText className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span className="hidden sm:inline">Cotizaciones Rápidas</span>
+            </button>
+          )}
+
           {/* Theme Switcher Toggle */}
           <button
             onClick={toggleTheme}
@@ -397,12 +467,31 @@ export function Portal() {
       <div className="flex-1 flex flex-col md:flex-row min-h-0 w-full relative">
         
         {/* ==================================================== */}
-        {/* REDIRECTING / LOADING STATE */}
+        {/* SECURE LOGIN REQUIRED STATE */}
         {/* ==================================================== */}
         {!currentUser ? (
-          <div className="flex-1 flex flex-col items-center justify-center bg-dark-1 select-none py-12">
-            <RefreshCw className="w-8 h-8 animate-spin text-gold" />
-            <p className="text-[10px] font-mono uppercase tracking-widest text-cream-muted mt-3 font-bold">Redirigiendo al portal...</p>
+          <div className="flex-1 flex flex-col items-center justify-center bg-dark-1 select-none py-16 px-4">
+            <LoginModal isOpen={true} onClose={closePortal} />
+            <div className="max-w-md w-full bg-dark-2 border border-dark-4 rounded-3xl p-8 shadow-2xl text-center space-y-5">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-gold/10 border border-gold/30 flex items-center justify-center text-gold">
+                <Shield className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-display font-black text-cream tracking-wide">Acceso Restringido</h3>
+                <p className="text-xs text-cream-muted mt-2">
+                  Debes iniciar sesión con tu cuenta autorizada para acceder al portal profesional.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-dark-4">
+                <button
+                  onClick={closePortal}
+                  className="px-5 py-2.5 bg-dark-3 hover:bg-dark-4 border border-dark-4 text-xs font-bold uppercase tracking-wider text-cream-muted hover:text-gold rounded-xl transition-all cursor-pointer"
+                >
+                  &larr; Volver a la página principal
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           
@@ -559,18 +648,6 @@ export function Portal() {
                         >
                           <Sun className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Esun Solar</span>}
-                        </button>
-                        <button
-                          onClick={() => setActiveTab('cotizador_express')}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                            activeTab === 'cotizador_express'
-                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
-                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
-                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
-                          title="Cotizaciones Rápidas"
-                        >
-                          <FileText className="w-4 h-4 stroke-[2] text-gold flex-shrink-0" />
-                          {!sidebarCollapsed && <span>Cotizaciones Rápidas</span>}
                         </button>
                         <button
                           onClick={() => setActiveTab('cotizador')}
@@ -2408,6 +2485,15 @@ export function Portal() {
           </div>
         )}
       </div>
+
+      {/* MASTER AUDIT & TRAFFIC MODAL */}
+      {currentUser?.role === 'master' && (
+        <MasterAuditModal
+          isOpen={isAuditModalOpen}
+          onClose={() => setIsAuditModalOpen(false)}
+          currentUser={currentUser}
+        />
+      )}
 
     </div>
   );

@@ -58,29 +58,76 @@ export const cotizadorExpressService = {
     }
   },
 
-  // Generar el siguiente folio oficial COT-ESOL-YYYY-XXX
+  // Generar el siguiente folio oficial a partir del último emitido
+  // Soporta COT-ESOL-YYYY-XXX, COT-ESOL-XXX, COT-YYYY-XXX, etc.
   generateNextFolio(existing: CotizacionExpressData[]): string {
     const year = new Date().getFullYear();
-    const pattern = new RegExp(`^COT-ESOL-${year}-(\\d+)$`, 'i');
+    // Patrones comunes para buscar el número más alto emitido
+    const patternYear = new RegExp(`^COT(?:-ESOL)?-${year}-(\\d+)$`, 'i');
+    const patternGeneric = /COT(?:-ESOL)?-(?:\d{4}-)?(\d+)/i;
     let max = 0;
 
     existing.forEach(c => {
-      if (c.folio) {
-        const match = c.folio.match(pattern);
-        if (match && match[1]) {
-          const n = parseInt(match[1], 10);
+      // Solo tomamos en cuenta cotizaciones que NO sean borradores provisionales
+      if (c.folio && !c.folio.toUpperCase().startsWith('BORR-') && c.estado !== 'borrador') {
+        const matchYear = c.folio.match(patternYear);
+        if (matchYear && matchYear[1]) {
+          const n = parseInt(matchYear[1], 10);
           if (!isNaN(n) && n > max) max = n;
+        } else {
+          const matchGen = c.folio.match(patternGeneric);
+          if (matchGen && matchGen[1]) {
+            const n = parseInt(matchGen[1], 10);
+            if (!isNaN(n) && n > max) max = n;
+          }
         }
       }
     });
 
-    return `COT-ESOL-${year}-${String(max + 1).padStart(3, '0')}`;
+    const nextNumber = max + 1;
+    return `COT-ESOL-${year}-${String(nextNumber).padStart(3, '0')}`;
   },
 
-  // Generar folio borrador provisional
+  // Generar folio borrador provisional consecutivo
   generateDraftFolio(existing: CotizacionExpressData[]): string {
-    const count = existing.filter(c => c.estado === 'borrador').length + 1;
-    return `BORR-${String(count).padStart(3, '0')}`;
+    let maxDraft = 0;
+    const patternDraft = /^BORR-(\d+)$/i;
+
+    existing.forEach(c => {
+      if (c.folio) {
+        const match = c.folio.match(patternDraft);
+        if (match && match[1]) {
+          const n = parseInt(match[1], 10);
+          if (!isNaN(n) && n > maxDraft) maxDraft = n;
+        }
+      }
+    });
+
+    const nextDraft = maxDraft + 1;
+    return `BORR-${String(nextDraft).padStart(3, '0')}`;
+  },
+
+  // Cambiar directamente una cotización de Borrador a Emitido asignándole folio consecutivo oficial
+  async emitirBorrador(id: string): Promise<CotizacionExpressData> {
+    const list = await this.getCotizaciones();
+    const cot = list.find(c => c.id === id);
+    if (!cot) {
+      throw new Error('Cotización no encontrada');
+    }
+
+    // Obtener siguiente folio oficial a partir del último emitido
+    const nextFolio = this.generateNextFolio(list);
+    const now = new Date().toISOString();
+
+    const updated: CotizacionExpressData = {
+      ...cot,
+      estado: 'emitido',
+      folio: nextFolio,
+      fecha_emision: now.split('T')[0],
+      updated_at: now
+    };
+
+    return await this.saveCotizacion(updated);
   },
 
   // Guardar o actualizar cotización (borrador o emitido)
@@ -95,8 +142,8 @@ export const cotizadorExpressService = {
       created_at: cotizacion.created_at || now
     };
 
-    // Si pasa a emitido y tiene folio borrador, asignarle folio oficial definitivo
-    if (record.estado !== 'borrador' && (!record.folio || record.folio.startsWith('BORR-'))) {
+    // Si pasa a emitido y no tiene folio oficial definitivo, asignarle el siguiente
+    if (record.estado !== 'borrador' && (!record.folio || record.folio.toUpperCase().startsWith('BORR-'))) {
       record.folio = this.generateNextFolio(list);
       record.fecha_emision = record.fecha_emision || now.split('T')[0];
     }

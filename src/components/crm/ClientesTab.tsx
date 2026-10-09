@@ -3,6 +3,7 @@ import { Users, Search, Plus, UserCircle, MapPin, Mail, Phone, ExternalLink, Tra
 import { supabase } from '../../context/supabase';
 import { useApp } from '../../context/AppContext';
 import ClienteDetail from './ClienteDetail';
+import { auditService } from '../../services/auditService';
 
 interface Cliente {
   id: string;
@@ -33,12 +34,21 @@ export default function ClientesTab({ onNavigateTo }: ClientesTabProps) {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    const clienteToDelete = clientes.find(c => c.id === id);
     if (!window.confirm('¿Estás seguro de que deseas eliminar este cliente? Esta acción no se puede deshacer.')) return;
     
     try {
       const { error } = await supabase.from('clientes').delete().eq('id', id);
       if (error) throw error;
       setClientes(clientes.filter(c => c.id !== id));
+
+      auditService.log({
+        action: 'DELETE',
+        module: 'CRM Clientes',
+        description: `${currentUser?.name} eliminó al cliente "${clienteToDelete?.nombre_razon_social || id}"`,
+        user: currentUser,
+        metadata: { clientId: id, clientName: clienteToDelete?.nombre_razon_social }
+      });
     } catch (err) {
       console.error('Error deleting cliente:', err);
       alert('Error al eliminar el cliente');
@@ -69,6 +79,14 @@ export default function ClientesTab({ onNavigateTo }: ClientesTabProps) {
         setNewClientName('');
         setNewClientEmail('');
         setNewClientPhone('');
+
+        auditService.log({
+          action: 'CREATE',
+          module: 'CRM Clientes',
+          description: `${currentUser?.name} registró al nuevo cliente "${payload.nombre_razon_social}" en CRM`,
+          user: currentUser,
+          metadata: { clientId: data[0].id, clientName: payload.nombre_razon_social, email: payload.email, phone: payload.telefono }
+        });
       }
     } catch (err: any) {
       console.error(err);

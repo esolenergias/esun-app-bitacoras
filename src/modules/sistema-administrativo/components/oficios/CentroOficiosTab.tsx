@@ -709,7 +709,13 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
         (o.destinatarioNombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (o.asunto || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesTipo = filterTipo === 'todos' || o.tipoOficio === filterTipo;
+      let matchesTipo = filterTipo === 'todos' || o.tipoOficio === filterTipo;
+      if (!matchesTipo && filterTipo === 'oficio_legal') {
+        // Any general legal/formal template matches oficio_legal
+        const erpTypes = ['solicitud_compra', 'orden_compra', 'recepcion_mercancia', 'solicitud_material', 'vale_entrega'];
+        matchesTipo = !erpTypes.includes(o.tipoOficio || '');
+      }
+
       const matchesEstado = filterEstado === 'todos' || o.estado === filterEstado;
 
       return matchesSearch && matchesTipo && matchesEstado;

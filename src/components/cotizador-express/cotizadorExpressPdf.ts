@@ -82,25 +82,29 @@ function getHeaderHtml(cot: CotizacionExpressData, numeroHoja: number, totalHoja
       <div style="display: flex; align-items: center; gap: 12px;">
         <img src="${logoUrl}" alt="ESOL Energías" style="height: 48px; object-fit: contain;" />
         <div>
-          <div style="font-size: 13px; font-weight: 900; color: #0f172a; letter-spacing: 0.5px;">ESOL ENERGÍAS RENOVABLES</div>
+          <div style="font-size: 13px; font-weight: 900; color: #0f172a; letter-spacing: 0.5px;">ESOL ENERGÍAS</div>
           <div style="font-size: 8.5px; font-weight: 700; color: #b89130; text-transform: uppercase; letter-spacing: 1px;">Ingeniería, Suministros y Soluciones Energéticas</div>
           <div style="font-size: 7.5px; color: #64748b; margin-top: 2px;">Tepic, Nayarit • contacto@esolenergias.com • Tel: 311 234 3034</div>
         </div>
       </div>
 
-      <div style="text-align: right;">
-        <div style="display: inline-block; background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 10px; margin-bottom: 4px;">
-          <div style="font-size: 7.5px; font-weight: 800; color: #64748b; text-transform: uppercase;">Folio de Propuesta</div>
-          <div style="font-size: 12px; font-weight: 900; color: ${cot.estado === 'borrador' ? '#d97706' : '#b89130'}; font-family: monospace;">
-            ${cot.folio || 'BORRADOR'}
-          </div>
-        </div>
-        <div style="font-size: 8px; color: #64748b;">
+      <div style="text-align: right; min-width: 140px;">
+        <table style="border-collapse: collapse; margin-left: auto; margin-bottom: 4px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 6px;">
+          <tr>
+            <td style="padding: 4px 10px; text-align: center;">
+              <div style="font-size: 8px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">FOLIO DE PROPUESTA</div>
+              <div style="font-size: 13px; font-weight: 900; color: ${cot.estado === 'borrador' ? '#b45309' : '#0f172a'}; margin-top: 2px;">
+                ${cot.folio || 'BORRADOR'}
+              </div>
+            </td>
+          </tr>
+        </table>
+        <div style="font-size: 8px; color: #64748b; margin-top: 3px;">
           <strong>Emisión:</strong> ${cot.lugar || 'Tepic, Nayarit'}, a ${fechaTexto}
         </div>
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 2px;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 3px;">
           <span style="font-size: 7.5px; color: #b89130; font-weight: 700;">Vigencia: ${cot.vigencia_dias || 15} días</span>
-          <span style="font-size: 7.5px; background-color: #0f172a; color: #ffffff; padding: 1px 6px; border-radius: 4px; font-weight: 700;">PÁG. ${numeroHoja} DE ${totalHojas}</span>
+          <span style="font-size: 7.5px; background: #0f172a; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-weight: 700;">PÁG. ${numeroHoja} DE ${totalHojas}</span>
         </div>
       </div>
     </div>
@@ -117,33 +121,36 @@ function getHeaderHtml(cot: CotizacionExpressData, numeroHoja: number, totalHoja
 function getFooterHtml(cot: CotizacionExpressData, numeroHoja: number, totalHojas: number): string {
   return `
     <div style="margin-top: auto; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 7.5px; color: #94a3b8;">
-      <div>ESOL ENERGÍAS RENOVABLES S.A. DE C.V. • R.F.C. EEN190412XYZ • TEPIC, NAYARIT</div>
+      <div>ESOL ENERGÍAS • TEPIC, NAYARIT</div>
       <div>${cot.folio || 'BORRADOR'} | Hoja ${numeroHoja} de ${totalHojas}</div>
     </div>
   `;
 }
 
-// Bloque de Firmas Reutilizable (en Hoja 3 o al final de Hoja 2 cuando Hoja 3 está inhabilitada)
+// Bloque de Firmas Reutilizable (en Hoja 2 justo arriba del pie de página)
 function getFirmasHtml(cot: CotizacionExpressData): string {
   return `
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 30px; margin-top: 14px; page-break-inside: avoid;">
-      <div style="flex: 1; text-align: center;">
-        <div style="height: 44px; display: flex; align-items: center; justify-content: center;">
-          ${cot.incluir_firma_digital && cot.firma_digital ? `<img src="${cot.firma_digital}" style="max-height: 42px; object-fit: contain;" alt="Firma" />` : ''}
+    <div style="margin-top: auto; padding-top: 18px; margin-bottom: 8px; page-break-inside: avoid;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 36px;">
+        <div style="flex: 1; text-align: center;">
+          <div style="height: 75px; display: flex; align-items: center; justify-content: center;">
+            ${cot.incluir_firma_digital && cot.firma_digital ? `<img src="${cot.firma_digital}" style="max-height: 70px; object-fit: contain;" alt="Firma" />` : ''}
+          </div>
+          <div style="border-top: 1.5px solid #64748b; padding-top: 5px;">
+            <div style="font-size: 9.5px; font-weight: 800; color: #0f172a;">${cot.remitente_nombre || 'Ing. Manuel de Jesús Fregoso Samaniega'}</div>
+            <div style="font-size: 8px; color: #b89130; font-weight: 700; text-transform: uppercase;">${cot.remitente_cargo || 'Representante Legal / Dirección de Operaciones'}</div>
+            <div style="font-size: 7.5px; color: #64748b;">ESOL ENERGÍAS</div>
+          </div>
         </div>
-        <div style="border-top: 1px solid #94a3b8; padding-top: 4px;">
-          <div style="font-size: 9.5px; font-weight: 800; color: #0f172a;">${cot.remitente_nombre || 'Ing. Manuel de Jesús Fregoso Samaniega'}</div>
-          <div style="font-size: 8px; color: #b89130; font-weight: 600; text-transform: uppercase;">${cot.remitente_cargo || 'Representante Legal / Dirección de Operaciones'}</div>
-          <div style="font-size: 7.5px; color: #64748b;">ESOL ENERGÍAS RENOVABLES</div>
-        </div>
-      </div>
 
-      <div style="flex: 1; text-align: center;">
-        <div style="height: 44px;"></div>
-        <div style="border-top: 1px solid #94a3b8; padding-top: 4px;">
-          <div style="font-size: 9.5px; font-weight: 800; color: #0f172a;">${cot.cliente_atencion || cot.cliente_nombre || 'Cliente / Representante Autorizado'}</div>
-          <div style="font-size: 8px; color: #64748b; font-weight: 600; text-transform: uppercase;">Aceptación y Visto Bueno de Propuesta</div>
-          <div style="font-size: 7.5px; color: #94a3b8;">Firma de Conformidad</div>
+        <div style="flex: 1; text-align: center;">
+          <!-- Espacio amplio de ~2 cm adicionales para firma física holgada -->
+          <div style="height: 75px;"></div>
+          <div style="border-top: 1.5px solid #64748b; padding-top: 5px;">
+            <div style="font-size: 9.5px; font-weight: 800; color: #0f172a;">${cot.cliente_atencion || cot.cliente_nombre || 'Cliente / Representante Autorizado'}</div>
+            <div style="font-size: 8px; color: #475569; font-weight: 700; text-transform: uppercase;">Aceptación y Visto Bueno de Propuesta</div>
+            <div style="font-size: 7.5px; color: #94a3b8;">Firma de Conformidad en Original</div>
+          </div>
         </div>
       </div>
     </div>
@@ -213,13 +220,13 @@ export function buildCotizacionExpressHtml(cot: CotizacionExpressData): string {
   `;
 
   return `
-    <div style="font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; color: #0f172a; width: 7.5in; margin: 0 auto; box-sizing: border-box; line-height: 1.4;">
+    <div class="cotizacion-document" style="font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; width: 7.5in; margin: 0 auto; box-sizing: border-box; line-height: 1.45;">
       
       <!-- ============================================================== -->
       <!-- HOJA 1: CONDICIONES DE SERVICIO (SI ESTÁ HABILITADA)          -->
       <!-- ============================================================== -->
       ${hasHoja1 ? `
-        <div style="min-height: 10.2in; max-height: 10.3in; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; ${hasHoja2 || hasHoja3 ? 'page-break-after: always;' : ''}">
+        <div id="cotizacion-page-hoja1" class="cotizacion-page" style="min-height: 10.2in; max-height: 10.3in; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; ${hasHoja2 || hasHoja3 ? 'page-break-after: always;' : ''}">
           <div>
             ${getHeaderHtml(cot, paginaHoja1, totalHojas, 'SECCIÓN I: PRESENTACIÓN INSTITUCIONAL Y CONDICIONES DE SERVICIO')}
 
@@ -236,24 +243,28 @@ export function buildCotizacionExpressHtml(cot: CotizacionExpressData): string {
             </div>
 
             <!-- OBJETIVO Y ALCANCE GENERAL DEL SERVICIO -->
-            <div style="margin-bottom: 14px;">
-              <div style="font-size: 9px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
-                <span style="color: #b89130;">■</span> 1. ALCANCE Y OBJETIVOS DEL SERVICIO
+            ${cot.descripcion_alcance ? `
+              <div style="margin-bottom: 14px;">
+                <div style="font-size: 9px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #b89130;">■</span> 1. ALCANCE Y OBJETIVOS DEL SERVICIO
+                </div>
+                <div style="font-size: 9px; line-height: 1.5; color: #1e293b; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 10px 12px; border-radius: 6px;">
+                  ${cot.descripcion_alcance}
+                </div>
               </div>
-              <div style="font-size: 9px; line-height: 1.5; color: #1e293b; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 10px 12px; border-radius: 6px;">
-                ${cot.descripcion_alcance}
-              </div>
-            </div>
+            ` : ''}
 
             <!-- CONDICIONES GENERALES DEL SERVICIO -->
-            <div style="margin-bottom: 14px;">
-              <div style="font-size: 9px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
-                <span style="color: #b89130;">■</span> 2. TÉRMINOS, ESPECIFICACIONES Y MARCO NORMATIVO
+            ${cot.condiciones_servicio ? `
+              <div style="margin-bottom: 14px;">
+                <div style="font-size: 9px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #b89130;">■</span> 2. TÉRMINOS, ESPECIFICACIONES Y MARCO NORMATIVO
+                </div>
+                <div style="font-size: 8.5px; line-height: 1.5; color: #334155; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 10px 12px; border-radius: 6px;">
+                  ${cot.condiciones_servicio}
+                </div>
               </div>
-              <div style="font-size: 8.5px; line-height: 1.5; color: #334155; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 10px 12px; border-radius: 6px;">
-                ${cot.condiciones_servicio || 'Los servicios descritos se prestarán bajo los más altos estándares de calidad en ingeniería y cumplimiento de la NOM-001-SEDE-2012 y lineamientos de la Comisión Reguladora de Energía (CRE).'}
-              </div>
-            </div>
+            ` : ''}
 
             <!-- METODOLOGÍA Y ENTREGABLES -->
             ${cot.metodologia_servicio ? `
@@ -276,7 +287,7 @@ export function buildCotizacionExpressHtml(cot: CotizacionExpressData): string {
       <!-- ============================================================== -->
       <!-- HOJA 2: CUERPO DE COTIZACIÓN (ECONÓMICA)                       -->
       <!-- ============================================================== -->
-      <div style="min-height: 10.2in; max-height: 10.3in; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; ${hasHoja3 ? 'page-break-after: always;' : ''}">
+      <div id="cotizacion-page-hoja2" class="cotizacion-page" style="min-height: 10.2in; max-height: 10.3in; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; ${hasHoja3 ? 'page-break-after: always;' : ''}">
         <div>
           ${getHeaderHtml(cot, paginaHoja2, totalHojas, hasHoja1 ? 'SECCIÓN II: CUERPO DE COTIZACIÓN Y DESGLOSE ECONÓMICO' : 'COTIZACIÓN ECONÓMICA DE SERVICIOS')}
 
@@ -358,69 +369,74 @@ export function buildCotizacionExpressHtml(cot: CotizacionExpressData): string {
           </div>
 
           <!-- RESUMEN DE CONDICIONES COMERCIALES Y CUENTA BANCARIA -->
-          <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #b89130; border-radius: 4px; padding: 8px 12px; font-size: 8px; line-height: 1.45; color: #334155;">
-            <div style="font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 3px;">Datos Financieros y Términos Comerciales:</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-              <div>• <strong>Tiempo de Ejecución:</strong> ${cot.tiempo_entrega || 'Inmediata / A convenir'}</div>
-              <div>• <strong>Forma de Liquidación:</strong> ${cot.condiciones_pago || '50% anticipo, 50% finiquito'}</div>
-              <div>• <strong>Institución Bancaria:</strong> ${cot.banco_receptor || 'BBVA Bancomer Esol Energías'}</div>
-              <div>• <strong>CLABE Interbancaria:</strong> ${cot.cuenta_clabe || 'Solicitar cuenta CLABE para transferencia SPEI'}</div>
+          ${(cot.tiempo_entrega || cot.condiciones_pago || cot.banco_receptor || cot.cuenta_clabe) ? `
+            <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #b89130; border-radius: 4px; padding: 8px 12px; font-size: 8px; line-height: 1.45; color: #334155;">
+              <div style="font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 3px;">Datos Financieros y Términos Comerciales:</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                ${cot.tiempo_entrega ? `<div>• <strong>Tiempo de Ejecución:</strong> ${cot.tiempo_entrega}</div>` : ''}
+                ${cot.condiciones_pago ? `<div>• <strong>Forma de Liquidación:</strong> ${cot.condiciones_pago}</div>` : ''}
+                ${cot.banco_receptor ? `<div>• <strong>Institución Bancaria:</strong> ${cot.banco_receptor}</div>` : ''}
+                ${cot.cuenta_clabe ? `<div>• <strong>CLABE Interbancaria:</strong> ${cot.cuenta_clabe}</div>` : ''}
+              </div>
             </div>
-          </div>
-
-          <!-- Si Hoja 3 está inhabilitada, agregamos el bloque de firmas directamente aquí al final del cuerpo económico -->
-          ${!hasHoja3 ? getFirmasHtml(cot) : ''}
+          ` : ''}
         </div>
+
+        <!-- FIRMAS DE EMISIÓN Y ACEPTACIÓN DIRECTAMENTE HASTA ABAJO ARRIBA DEL PIE DE PÁGINA -->
+        ${getFirmasHtml(cot)}
 
         ${getFooterHtml(cot, paginaHoja2, totalHojas)}
       </div>
 
 
       <!-- ============================================================== -->
-      <!-- HOJA 3: CONDICIONES DE TRABAJO Y FIRMAS (SI ESTÁ HABILITADA)   -->
+      <!-- HOJA 3: CONDICIONES DE TRABAJO Y SEGURIDAD (SI ESTÁ HABILITADA) -->
       <!-- ============================================================== -->
       ${hasHoja3 ? `
-        <div style="min-height: 10.2in; max-height: 10.3in; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+        <div id="cotizacion-page-hoja3" class="cotizacion-page" style="min-height: 10.2in; max-height: 10.3in; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
           <div>
             ${getHeaderHtml(cot, paginaHoja3, totalHojas, 'SECCIÓN III: CONDICIONES DE TRABAJO, SEGURIDAD Y CONFORMIDAD')}
 
             <!-- SEGURIDAD Y CONDICIONES EN SITIO -->
-            <div style="margin-bottom: 12px;">
-              <div style="font-size: 9px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
-                <span style="color: #b89130;">■</span> 1. REQUISITOS OPERATIVOS Y SEGURIDAD INDUSTRIAL
+            ${cot.condiciones_trabajo ? `
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 9.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+                  <span style="color: #b89130;">■</span> 1. REQUISITOS OPERATIVOS Y SEGURIDAD INDUSTRIAL
+                </div>
+                <div style="font-size: 8.5px; line-height: 1.6; color: #334155; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 12px 14px; border-radius: 6px;">
+                  ${cot.condiciones_trabajo}
+                </div>
               </div>
-              <div style="font-size: 8.5px; line-height: 1.5; color: #334155; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 9px 12px; border-radius: 6px;">
-                ${cot.condiciones_trabajo || 'El personal técnico de ESOL Energías contará con Equipo de Protección Personal (EPP) completo, acreditación técnica y cumplimiento estricto de las normativas de seguridad e higiene aplicables.'}
-              </div>
-            </div>
+            ` : ''}
 
             <!-- RESPONSABILIDADES DEL CLIENTE -->
-            <div style="margin-bottom: 12px;">
-              <div style="font-size: 9px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
-                <span style="color: #b89130;">■</span> 2. FACILIDADES Y RESPONSABILIDADES DEL CLIENTE
+            ${cot.responsabilidades_cliente ? `
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 9.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+                  <span style="color: #b89130;">■</span> 2. FACILIDADES Y RESPONSABILIDADES DEL CLIENTE
+                </div>
+                <div style="font-size: 8.5px; line-height: 1.6; color: #334155; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 12px 14px; border-radius: 6px;">
+                  ${cot.responsabilidades_cliente}
+                </div>
               </div>
-              <div style="font-size: 8.5px; line-height: 1.5; color: #334155; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 9px 12px; border-radius: 6px;">
-                ${cot.responsabilidades_cliente || 'El cliente se compromete a otorgar los accesos indispensables al inmueble, áreas de azotea y tableros eléctricos, así como designar un enlace técnico responsable durante la jornada de trabajo.'}
-              </div>
-            </div>
+            ` : ''}
 
             <!-- EXCLUSIONES Y TÉRMINOS DE GARANTÍA -->
-            <div style="margin-bottom: 12px;">
-              <div style="font-size: 9px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
-                <span style="color: #b89130;">■</span> 3. EXCLUSIONES GENERALES Y TÉRMINOS DE GARANTÍA
+            ${cot.exclusiones_garantias ? `
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 9.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+                  <span style="color: #b89130;">■</span> 3. EXCLUSIONES GENERALES Y TÉRMINOS DE GARANTÍA
+                </div>
+                <div style="font-size: 8.5px; line-height: 1.6; color: #334155; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 12px 14px; border-radius: 6px;">
+                  ${cot.exclusiones_garantias}
+                </div>
               </div>
-              <div style="font-size: 8.5px; line-height: 1.5; color: #334155; text-align: justify; white-space: pre-line; background-color: #fafafa; border: 1px solid #f1f5f9; padding: 9px 12px; border-radius: 6px;">
-                ${cot.exclusiones_garantias || 'No se incluyen obras civiles mayores, pago de derechos gubernamentales ante dependencias no estipuladas, ni adecuaciones eléctricas no descritas en el cuerpo de la cotización.'}
-              </div>
-            </div>
+            ` : ''}
 
             <!-- DECLARACIÓN DE CONFORMIDAD -->
-            <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; font-size: 8px; color: #475569; text-align: justify; line-height: 1.4; margin-bottom: 12px;">
-              <strong>DECLARACIÓN DE ACEPTACIÓN:</strong> La aceptación de la presente cotización (mediante firma, confirmación por correo electrónico o pago de anticipo) convalida la plena conformidad de ambas partes respecto a los alcances técnicos, importes económicos y condiciones estipuladas.
+            <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #b89130; border-radius: 6px; padding: 12px 14px; font-size: 8.5px; color: #334155; text-align: justify; line-height: 1.6; margin-top: 14px;">
+              <strong>DECLARACIÓN DE ACEPTACIÓN:</strong> La aceptación de la presente cotización (mediante firma en la Sección II, confirmación por correo electrónico o pago de anticipo) convalida la plena conformidad de ambas partes respecto a los alcances técnicos, importes económicos y condiciones estipuladas en el presente documento.
             </div>
-
-            <!-- FIRMAS DE EMISIÓN Y ACEPTACIÓN -->
-            ${getFirmasHtml(cot)}
           </div>
 
           ${getFooterHtml(cot, paginaHoja3, totalHojas)}
@@ -431,72 +447,218 @@ export function buildCotizacionExpressHtml(cot: CotizacionExpressData): string {
   `;
 }
 
+// Generador del documento HTML completo e interactivo (idéntico al de la vista previa Blob)
+export function buildCotizacionExpressFullDocument(cot: CotizacionExpressData): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+        <title>Cotización - ${cot.folio || 'ESOL'}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          html, body {
+            background-color: #0b0f17;
+            min-height: 100vh;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+          }
+          body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 16px;
+          }
+          .doc-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 8.5in;
+          }
+          .cotizacion-document {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 36px;
+            width: 100% !important;
+          }
+          /* Cada hoja con dimensiones y márgenes idénticos a la vista previa */
+          .cotizacion-page {
+            background-color: #ffffff !important;
+            width: 7.5in !important;
+            min-height: 10.3in !important;
+            box-shadow: 0 16px 38px -6px rgba(0, 0, 0, 0.7), 0 8px 16px -6px rgba(0, 0, 0, 0.5) !important;
+            border-radius: 8px !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            position: relative !important;
+            padding: 28px 32px !important;
+            line-height: 1.5 !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+          }
+
+          @page {
+            size: letter portrait;
+            margin: 0.35in 0.45in;
+          }
+
+          @media print {
+            html, body {
+              background-color: #ffffff !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .no-print {
+              display: none !important;
+            }
+            .doc-wrapper {
+              max-width: 100% !important;
+              width: 100% !important;
+            }
+            .cotizacion-document {
+              gap: 0 !important;
+              width: 100% !important;
+            }
+            .cotizacion-page {
+              width: 100% !important;
+              min-height: 10in !important;
+              box-shadow: none !important;
+              border: none !important;
+              border-radius: 0 !important;
+              padding: 10px 0 !important;
+              page-break-after: always !important;
+              break-after: page !important;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print" style="position: sticky; top: 12px; z-index: 9999; display: flex; gap: 10px; align-items: center; background: rgba(15, 23, 42, 0.95); padding: 10px 18px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 24px;">
+          <span style="color: #b89130; font-weight: 800; font-size: 13px;">${cot.folio || 'COTIZACIÓN'}</span>
+          <span style="color: #94a3b8; font-size: 12px;">| ${cot.cliente_nombre || 'Cliente'}</span>
+          
+          <!-- BOTÓN DESCARGAR PDF DIRECTO -->
+          <button id="btn-descargar-pdf" onclick="descargarPdfDirecto()" style="background: #b89130; color: #000; font-weight: 800; border: none; padding: 7px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; margin-left: 10px; box-shadow: 0 2px 8px rgba(184, 145, 48, 0.4); display: flex; align-items: center; gap: 6px;">
+            <span>📥 Descargar PDF</span>
+          </button>
+
+          <!-- BOTÓN IMPRIMIR OPCIONAL -->
+          <button onclick="window.print()" style="background: #1e293b; color: #f1f5f9; border: 1px solid #475569; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit;">
+            🖨️ Imprimir
+          </button>
+
+          <button onclick="window.close()" style="background: #334155; color: #fff; border: none; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit;">
+            Cerrar
+          </button>
+        </div>
+        <div class="doc-wrapper" id="documento-impresion">
+          ${buildCotizacionExpressHtml(cot)}
+        </div>
+        <script>
+          // Generar y descargar PDF con fidelidad exacta al Blob (hoja por hoja sin desajustes)
+          async function descargarPdfDirecto() {
+            var btn = document.getElementById('btn-descargar-pdf');
+            if (btn) btn.innerHTML = '<span>⏳ Generando PDF...</span>';
+
+            try {
+              var pages = document.querySelectorAll('.cotizacion-page');
+              if (!pages || pages.length === 0) {
+                window.print();
+                if (btn) btn.innerHTML = '<span>📥 Descargar PDF</span>';
+                return;
+              }
+
+              // Usar jsPDF con html2canvas integrado
+              const { jsPDF } = window.jspdf || window;
+              const pdf = new (window.jspdf ? window.jspdf.jsPDF : window.jsPDF)({
+                orientation: 'portrait',
+                unit: 'in',
+                format: 'letter'
+              });
+
+              // Esperar a que las tipografías estén 100% cargadas en el documento
+              if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+              }
+
+              for (var i = 0; i < pages.length; i++) {
+                if (i > 0) pdf.addPage('letter', 'portrait');
+                var pageEl = pages[i];
+                var canvas = await html2canvas(pageEl, {
+                  scale: 2,
+                  useCORS: true,
+                  backgroundColor: '#ffffff',
+                  logging: false,
+                  windowWidth: 1024,
+                  onclone: function(clonedDoc) {
+                    var boxes = clonedDoc.querySelectorAll('*');
+                    boxes.forEach(function(el) {
+                      // Asegurar que ningún elemento tenga texto transparente o colapsado
+                      if (window.getComputedStyle(el).opacity === '0') {
+                        el.style.opacity = '1';
+                      }
+                    });
+                  }
+                });
+                var imgData = canvas.toDataURL('image/jpeg', 0.98);
+                // Hoja carta: 8.5 x 11 in. Margen: 0.5 in horizontal, 0.45 in vertical. Ancho imagen: 7.5 in, Alto imagen: 10.1 in
+                pdf.addImage(imgData, 'JPEG', 0.5, 0.45, 7.5, 10.1, undefined, 'FAST');
+              }
+
+              var filename = '${(cot.folio || 'Cotizacion').replace(/[/\\?%*:|"<>]/g, '_')}_${(cot.cliente_nombre || 'Cliente').replace(/[/\\?%*:|"<>]/g, '_')}.pdf';
+              pdf.save(filename);
+            } catch (err) {
+              console.error('Error generando PDF de alta precisión:', err);
+              // Como fallback si canvas es bloqueado por navegador
+              window.print();
+            } finally {
+              if (btn) btn.innerHTML = '<span>📥 Descargar PDF</span>';
+            }
+          }
+        </script>
+      </body>
+    </html>
+  `;
+}
+
 export async function generateCotizacionExpressPdf(
   cotizacion: CotizacionExpressData,
   onDriveStatus?: (status: 'uploading' | 'success' | 'none') => void
-): Promise<{ blob: Blob; blobUrl: string; filename: string; driveUrl: string | null }> {
-  const win = window.open('about:blank', '_blank');
-
+): Promise<{ blob?: Blob; blobUrl?: string; filename: string; driveUrl: string | null }> {
   const cleanFolio = (cotizacion.folio || 'BORRADOR').replace(/[/\\?%*:|"<>]/g, '_');
   const cleanCliente = (cotizacion.cliente_nombre || 'Cliente').replace(/[/\\?%*:|"<>]/g, '_');
   const filename = `Propuesta_${cleanFolio}_${cleanCliente}.pdf`;
 
-  const container = document.createElement('div');
-  container.style.position = 'fixed';
-  container.style.top = '-10000px';
-  container.style.left = '-10000px';
-  container.style.width = '7.5in';
-  container.style.backgroundColor = '#FFFFFF';
-  container.style.zIndex = '-9999';
-  container.innerHTML = buildCotizacionExpressHtml(cotizacion);
-  document.body.appendChild(container);
+  // Construir documento HTML autónomo idéntico al de vista previa
+  const fullHtml = buildCotizacionExpressFullDocument(cotizacion);
 
-  const opt = {
-    margin: [0.35, 0.35, 0.35, 0.35],
-    filename: filename,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-  };
+  // Crear Blob URL con tipo HTML para abrir una URL blob: real y respetable
+  const htmlBlob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+  const htmlBlobUrl = URL.createObjectURL(htmlBlob);
 
-  try {
-    const pdfBlob: Blob = await new Promise((resolve, reject) => {
-      html2pdf()
-        .set(opt)
-        .from(container)
-        .outputPdf('blob')
-        .then(resolve)
-        .catch(reject);
-    });
+  // Abrir directamente la URL blob: en nueva pestaña
+  window.open(htmlBlobUrl, '_blank');
 
-    const blobUrl = URL.createObjectURL(pdfBlob);
-
-    if (win && !win.closed) {
-      win.location.replace(blobUrl);
-    } else {
-      window.open(blobUrl, '_blank');
-    }
-
-    // Subir a Drive si está emitida
-    let driveUrl: string | null = null;
-    if (cotizacion.estado !== 'borrador') {
+  let driveUrl: string | null = null;
+  // Subir a Drive si la cotización está emitida
+  if (cotizacion.estado !== 'borrador') {
+    try {
       onDriveStatus?.('uploading');
-      driveUrl = await cotizadorExpressService.uploadToDrive(pdfBlob, filename, cotizacion);
-      if (driveUrl) {
-        onDriveStatus?.('success');
-      } else {
-        onDriveStatus?.('none');
-      }
-    }
-
-    return { blob: pdfBlob, blobUrl, filename, driveUrl };
-  } catch (error) {
-    if (win) win.close();
-    console.error('Error generando PDF de cotización:', error);
-    throw error;
-  } finally {
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
+      driveUrl = await cotizadorExpressService.uploadToDrive(htmlBlob, filename.replace('.pdf', '.html'), cotizacion);
+      onDriveStatus?.(driveUrl ? 'success' : 'none');
+    } catch (e) {
+      console.warn('Error subiendo a Drive:', e);
+      onDriveStatus?.('none');
     }
   }
+
+  return { blob: htmlBlob, blobUrl: htmlBlobUrl, filename, driveUrl };
 }

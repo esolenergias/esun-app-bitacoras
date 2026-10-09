@@ -1556,3 +1556,259 @@ export const MaterialesAdminView: React.FC<InsumosViewProps> = ({ insumos, canEd
     </div>
   );
 };
+
+/* =========================================================================
+   4. RESUMEN EJECUTIVO DE OFICIOS FORMAL / LEGAL (SUPABASE CENTRAL)
+   ========================================================================= */
+interface OficiosAdminViewProps {
+  userRole?: string;
+  canEdit?: boolean;
+  onNavigateToOficios?: (folio?: string) => void;
+  onRefresh?: () => void;
+}
+
+export const OficiosAdminView: React.FC<OficiosAdminViewProps> = ({
+  userRole = 'master',
+  canEdit = true,
+  onNavigateToOficios,
+  onRefresh
+}) => {
+  const [oficios, setOficios] = useState<OficioData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterEstado, setFilterEstado] = useState<'todos' | 'emitido' | 'borrador'>('todos');
+  const [selectedPreviewOficio, setSelectedPreviewOficio] = useState<OficioData | null>(null);
+
+  const fetchOficios = async () => {
+    try {
+      setLoading(true);
+      const data = await adminDbService.getOficiosCompletos();
+      setOficios(data);
+    } catch (e) {
+      console.warn('Error cargando oficios:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOficios();
+  }, []);
+
+  const filteredOficios = oficios.filter(o => {
+    const matchesSearch =
+      (o.folio || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (o.asunto || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (o.destinatarioNombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (o.destinatarioEmpresa || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (o.nombreObra || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (o.clienteFinal || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesEstado = filterEstado === 'todos' || o.estado === filterEstado;
+    return matchesSearch && matchesEstado;
+  });
+
+  const totalEmitidos = oficios.filter(o => o.estado === 'emitido').length;
+  const ultimoFolio = oficios.length > 0 ? oficios[0].folio : 'N/A';
+  const clientesUnicos = new Set(oficios.map(o => o.clienteFinal || o.destinatarioEmpresa).filter(Boolean)).size;
+
+  return (
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-dark-2 via-dark-3 to-dark-2 p-6 rounded-3xl border border-dark-4 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gold/15 border border-gold/40 flex items-center justify-center text-gold shadow-lg shadow-gold/10">
+              <FileSignature className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-cream font-display tracking-tight flex items-center gap-2">
+                RESUMEN DE OFICIOS FORMAL / LEGAL
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-gold/15 text-gold border border-gold/30">
+                  Supabase DB
+                </span>
+              </h2>
+              <p className="text-xs text-cream-muted mt-0.5">
+                Control central de comunicaciones oficiales, peticiones a dependencias, accesos a obra y oficios de contratista.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {onNavigateToOficios && (
+            <button
+              onClick={() => onNavigateToOficios()}
+              className="px-4 py-2.5 bg-gradient-to-r from-gold to-gold-light hover:brightness-110 text-dark-1 text-xs font-black uppercase tracking-wider rounded-xl shadow-lg shadow-gold/15 flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>Elaborar Nuevo Oficio</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        <div className="bg-dark-2 border border-dark-4 rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cream-dim">Total Oficios</span>
+          <p className="text-2xl font-display font-black text-cream mt-1">{oficios.length}</p>
+          <span className="text-[10px] text-cream-dim">Registrados en la nube</span>
+        </div>
+
+        <div className="bg-dark-2 border border-dark-4 rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">Emitidos Oficiales</span>
+          <p className="text-2xl font-display font-black text-emerald-400 mt-1">{totalEmitidos}</p>
+          <span className="text-[10px] text-cream-dim">Con validez legal</span>
+        </div>
+
+        <div className="bg-dark-2 border border-dark-4 rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gold">Último Folio</span>
+          <p className="text-lg font-mono font-black text-gold mt-1 truncate">{ultimoFolio}</p>
+          <span className="text-[10px] text-cream-dim">Consecutivo activo</span>
+        </div>
+
+        <div className="bg-dark-2 border border-dark-4 rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cream-dim">Empresas / Entidades</span>
+          <p className="text-2xl font-display font-black text-cream mt-1">{clientesUnicos}</p>
+          <span className="text-[10px] text-cream-dim">Destinatarios vinculados</span>
+        </div>
+      </div>
+
+      {/* Search & Filters */}
+      <div className="bg-dark-2 p-4 rounded-2xl border border-dark-4 flex flex-col md:flex-row gap-3 justify-between items-center">
+        <div className="relative w-full md:w-96">
+          <Search className="w-4 h-4 text-cream-dim absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Buscar por folio, destinatario, asunto, obra..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 bg-dark-1 border border-dark-4 rounded-xl text-xs text-cream focus:border-gold focus:outline-none"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <select
+            value={filterEstado}
+            onChange={(e: any) => setFilterEstado(e.target.value)}
+            className="px-3 py-2 bg-dark-1 border border-dark-4 rounded-xl text-xs text-cream focus:border-gold focus:outline-none"
+          >
+            <option value="todos">Todos los Estados</option>
+            <option value="emitido">Emitidos</option>
+            <option value="borrador">Borradores</option>
+          </select>
+
+          <button
+            onClick={fetchOficios}
+            className="p-2 bg-dark-1 hover:bg-dark-3 border border-dark-4 text-cream-dim hover:text-gold rounded-xl transition-colors cursor-pointer"
+            title="Recargar desde Supabase"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Table of Oficios */}
+      <div className="bg-dark-2 border border-dark-4 rounded-2xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-dark-3/80 text-[10px] uppercase font-mono tracking-wider text-cream-muted border-b border-dark-4">
+              <tr>
+                <th className="py-3.5 px-4 font-bold">Folio</th>
+                <th className="py-3.5 px-4 font-bold">Fecha</th>
+                <th className="py-3.5 px-4 font-bold">Destinatario</th>
+                <th className="py-3.5 px-4 font-bold">Asunto / Petición</th>
+                <th className="py-3.5 px-4 font-bold">Obra / Expediente</th>
+                <th className="py-3.5 px-4 font-bold">Estado</th>
+                <th className="py-3.5 px-4 font-bold text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dark-4/40">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-cream-dim">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-gold mb-2" />
+                    Cargando oficios desde Supabase...
+                  </td>
+                </tr>
+              ) : filteredOficios.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-cream-muted">
+                    No se encontraron oficios registrados.
+                  </td>
+                </tr>
+              ) : (
+                filteredOficios.map((ofc) => (
+                  <tr key={ofc.id || ofc.folio} className="hover:bg-dark-3/40 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-gold">
+                      {ofc.folio}
+                    </td>
+                    <td className="py-3.5 px-4 text-cream-muted font-mono text-[11px]">
+                      {ofc.fecha}
+                    </td>
+                    <td className="py-3.5 px-4 text-cream font-medium">
+                      <div>{ofc.destinatarioNombre || 'Sin destinatario'}</div>
+                      <div className="text-[10px] text-cream-dim font-mono">{ofc.destinatarioEmpresa || ofc.destinatarioCargo}</div>
+                    </td>
+                    <td className="py-3.5 px-4 max-w-xs truncate text-cream" title={ofc.asunto}>
+                      {ofc.asunto || 'Sin asunto'}
+                    </td>
+                    <td className="py-3.5 px-4 text-cream-muted">
+                      <div>{ofc.nombreObra || ofc.clienteFinal || 'General'}</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-mono font-bold ${
+                        ofc.estado === 'emitido'
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                      }`}>
+                        {ofc.estado === 'emitido' ? 'EMITIDO' : 'BORRADOR'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => setSelectedPreviewOficio(ofc)}
+                          className="p-1.5 bg-dark-1 hover:bg-dark-3 border border-dark-4 hover:border-gold/40 text-cream-dim hover:text-gold rounded-lg transition-colors cursor-pointer"
+                          title="Previsualizar Oficio"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => generateOficioPdf(ofc, 'download')}
+                          className="p-1.5 bg-dark-1 hover:bg-dark-3 border border-dark-4 hover:border-gold/40 text-cream-dim hover:text-emerald-400 rounded-lg transition-colors cursor-pointer"
+                          title="Descargar PDF Oficial"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                        {onNavigateToOficios && (
+                          <button
+                            onClick={() => onNavigateToOficios(ofc.folio)}
+                            className="p-1.5 bg-dark-1 hover:bg-dark-3 border border-dark-4 hover:border-gold/40 text-cream-dim hover:text-gold rounded-lg transition-colors cursor-pointer"
+                            title="Editar en Centro de Oficios"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Preview Modal */}
+      {selectedPreviewOficio && (
+        <OficioPreviewModal
+          isOpen={true}
+          onClose={() => setSelectedPreviewOficio(null)}
+          oficio={selectedPreviewOficio}
+        />
+      )}
+    </div>
+  );
+};

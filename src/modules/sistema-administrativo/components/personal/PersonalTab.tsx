@@ -575,6 +575,30 @@ export const PersonalTab: React.FC<PersonalTabProps> = ({
     setIsRegistroModalOpen(true);
   };
 
+  const handleDuplicateRegistro = (reg: RegistroSemanal) => {
+    const { monday, sunday } = getMondayAndSunday(new Date());
+    const currentWeek = getWeekNumber(new Date(monday));
+    const currentYear = new Date(monday).getFullYear();
+    const newFolio = generarFolioCentralizado('PER', reg.trabajador_nombre || 'RECIBO', Math.floor(Math.random() * 900 + 100));
+
+    setEditingRegistroId(null);
+    setRegistroForm({
+      ...reg,
+      id: undefined,
+      folio: newFolio,
+      fecha_inicio: monday,
+      fecha_fin: sunday,
+      numero_semana: currentWeek,
+      ano: currentYear,
+      estado_pago: 'pendiente',
+      fecha_pago: '',
+      cuenta_origen_id: reg.cuenta_origen_id || cuentas.find(c => c.tipo === 'banco')?.id || cuentas[0]?.id || '',
+      resumen_semanal: reg.resumen_semanal || '',
+      observaciones: reg.observaciones || ''
+    });
+    setIsRegistroModalOpen(true);
+  };
+
   const handleSelectTrabajadorForRegistro = (trabId: string) => {
     const trab = trabajadores.find(t => t.id === trabId);
     if (!trab) return;
@@ -1898,6 +1922,14 @@ OBRA CIVIL Y MANIOBRAS:
                                     </button>
 
                                     <button
+                                      onClick={() => handleDuplicateRegistro(reg)}
+                                      title="Duplicar recibo para semana actual"
+                                      className="p-1.5 bg-dark-3 hover:bg-gold/20 text-cream-muted hover:text-gold border border-dark-4 hover:border-gold/30 rounded-lg transition-colors"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <button
                                       onClick={() => handleEditRegistro(reg)}
                                       title="Editar registro"
                                       className="p-1.5 bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-cream border border-dark-4 rounded-lg transition-colors"
@@ -2002,6 +2034,14 @@ OBRA CIVIL Y MANIOBRAS:
                               className="p-1.5 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded-lg transition-colors"
                             >
                               <Printer className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => handleDuplicateRegistro(reg)}
+                              title="Duplicar recibo para semana actual"
+                              className="p-1.5 bg-dark-3 hover:bg-gold/20 text-cream-muted hover:text-gold border border-dark-4 hover:border-gold/30 rounded-lg transition-colors"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
                             </button>
 
                             <button

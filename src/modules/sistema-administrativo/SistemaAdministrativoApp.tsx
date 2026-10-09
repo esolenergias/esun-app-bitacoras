@@ -20,7 +20,7 @@ import { CajaBancosTab } from './components/finanzas/CajaBancosTab';
 import { IngresosTab } from './components/finanzas/IngresosTab';
 import { EgresosTab } from './components/finanzas/EgresosTab';
 import { ProveedoresTab } from './components/catalogos/ProveedoresTab';
-import { ClientesAdminView, ProyectosAdminView, MaterialesAdminView } from './components/catalogos/VistasEntidadesReales';
+import { ClientesAdminView, ProyectosAdminView, MaterialesAdminView, OficiosAdminView } from './components/catalogos/VistasEntidadesReales';
 import { CentroOficiosTab } from './components/oficios/CentroOficiosTab';
 import { PersonalTab } from './components/personal/PersonalTab';
 
@@ -30,7 +30,7 @@ import {
   Layers, RefreshCw, ShieldAlert, Sparkles, FileText, ChevronRight, ChevronDown, 
   ExternalLink, Menu, X, Landmark, Wallet, CheckCircle2, ShieldCheck, Box, Eye,
   Boxes, HardHat, AlertTriangle, ArrowUpRight, ArrowDownRight, FolderKanban, ClipboardCheck, PackageCheck,
-  UserCheck
+  UserCheck, ScrollText
 } from 'lucide-react';
 
 interface SistemaAdministrativoAppProps {
@@ -655,6 +655,31 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               </div>
 
               {/* ----------------------------------------------------- */}
+              {/* RESUMEN DE OFICIOS FORMAL / LEGAL (ARRIBA DE PERSONAL) */}
+              {/* ----------------------------------------------------- */}
+              <div className="space-y-1 pt-2 border-t border-dark-4/50">
+                <button
+                  onClick={() => setActiveTab('db_oficios')}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    activeTab === 'db_oficios'
+                      ? 'bg-gold/20 text-gold border-l-2 border-gold shadow-inner shadow-gold/10'
+                      : 'text-cream-muted hover:text-cream hover:bg-dark-3 bg-dark-1/40 border border-dark-4/60'
+                  } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                  title="Oficios Formal / Legal"
+                >
+                  <div className="flex items-center gap-3">
+                    <ScrollText className="w-4 h-4 stroke-[2] text-gold flex-shrink-0" />
+                    {!sidebarCollapsed && <span>Oficios Formal / Legal</span>}
+                  </div>
+                  {!sidebarCollapsed && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
+                      Legal
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* ----------------------------------------------------- */}
               {/* MÓDULO 5: RECURSOS HUMANOS (PERSONAL & NÓMINA) */}
               {/* ----------------------------------------------------- */}
               <div className="space-y-1 pt-2 border-t border-dark-4/50">
@@ -941,6 +966,15 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               insumos={insumos}
               userRole={effectiveRole}
               canEdit={canEdit}
+              onRefresh={cargarDatos}
+            />
+          )}
+
+          {activeTab === 'db_oficios' && (
+            <OficiosAdminView
+              userRole={effectiveRole}
+              canEdit={canEdit}
+              onNavigateToOficios={handleOpenOficiosModule}
               onRefresh={cargarDatos}
             />
           )}

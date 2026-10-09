@@ -16,6 +16,7 @@ import {
 import { CotizadorKpis } from './CotizadorKpis';
 import { CotizadorTabla } from './CotizadorTabla';
 import { CotizadorModalEditor } from './CotizadorModalEditor';
+import { auditService } from '../../services/auditService';
 
 export const CotizadorExpressTab: React.FC = () => {
   const { currentUser, globalGeminiApiKey, siliconFlowApiKey } = useApp();
@@ -29,7 +30,7 @@ export const CotizadorExpressTab: React.FC = () => {
   const [driveStatus, setDriveStatus] = useState<'idle' | 'uploading' | 'success' | 'none'>('idle');
 
   // Filtros de listado
-  const [activeTabSub, setActiveTabSub] = useState<'emitidas' | 'borradores' | 'todas'>('emitidas');
+  const [activeTabSub, setActiveTabSub] = useState<'todas' | 'aceptadas' | 'emitidas' | 'borradores'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Modo Editor / Formulario
@@ -120,13 +121,25 @@ export const CotizadorExpressTab: React.FC = () => {
     };
   };
 
-  // Abrir nuevo
+  // Abrir nuevo (Si no se especifica presetId, abre una cotización totalmente en blanco)
   const handleOpenNew = (presetId?: string) => {
-    const preset = PLANTILLAS_EXPRESS.find(p => p.id === presetId) || PLANTILLAS_EXPRESS[0];
-    const initialPartidas: PartidaCotizacionExpress[] = preset.partidasDefault.map(p => ({
-      ...p,
-      id: `p_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`
-    }));
+    const preset = presetId ? PLANTILLAS_EXPRESS.find(p => p.id === presetId) : null;
+    
+    const initialPartidas: PartidaCotizacionExpress[] = preset
+      ? preset.partidasDefault.map(p => ({
+          ...p,
+          id: `p_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`
+        }))
+      : [
+          {
+            id: `p_${Date.now()}_1`,
+            descripcion: '',
+            unidad: 'Servicio',
+            cantidad: 1,
+            precio_unitario: 0,
+            importe: 0
+          }
+        ];
 
     const totals = recomputeTotals(initialPartidas, 0, 16);
 
@@ -144,24 +157,24 @@ export const CotizadorExpressTab: React.FC = () => {
       cliente_direccion: '',
       cliente_telefono: '',
       cliente_email: '',
-      asunto: preset.asuntoDefault,
+      asunto: preset ? preset.asuntoDefault : '',
       vocativo: 'Estimado(a) Cliente / Representante Autorizado:',
-      tipo_servicio: preset.tipo_servicio,
-      descripcion_alcance: preset.alcanceDefault,
+      tipo_servicio: preset ? preset.tipo_servicio : 'servicios_profesionales',
+      descripcion_alcance: preset ? preset.alcanceDefault : '',
       incluir_condiciones_servicio: true,
       incluir_condiciones_trabajo: true,
-      condiciones_servicio: preset.condicionesServicioDefault || '',
-      metodologia_servicio: preset.metodologiaServicioDefault || '',
+      condiciones_servicio: preset?.condicionesServicioDefault || '',
+      metodologia_servicio: preset?.metodologiaServicioDefault || '',
       partidas: initialPartidas,
       ...totals,
-      tiempo_entrega: preset.tiempoEntregaDefault,
-      condiciones_pago: preset.condicionesPagoDefault,
+      tiempo_entrega: preset?.tiempoEntregaDefault || '',
+      condiciones_pago: preset?.condicionesPagoDefault || '',
       banco_receptor: 'BBVA Bancomer Esol Energías',
       cuenta_clabe: '',
-      notas_comerciales: 'Precios expresados en Moneda Nacional (MXN). Validez sujeta a vigencia estipulada.',
-      condiciones_trabajo: preset.condicionesTrabajoDefault || '',
-      responsabilidades_cliente: preset.responsabilidadesClienteDefault || '',
-      exclusiones_garantias: preset.exclusionesGarantiasDefault || '',
+      notas_comerciales: '',
+      condiciones_trabajo: preset?.condicionesTrabajoDefault || '',
+      responsabilidades_cliente: preset?.responsabilidadesClienteDefault || '',
+      exclusiones_garantias: preset?.exclusionesGarantiasDefault || '',
       remitente_nombre: currentUser?.name || 'Ing. Manuel de Jesús Fregoso Samaniega',
       remitente_cargo: 'Representante Legal / Dirección de Operaciones',
       incluir_firma_digital: true
@@ -245,8 +258,8 @@ export const CotizadorExpressTab: React.FC = () => {
     setFormData(prev => ({ ...prev, partidas: updated, ...totals }));
   };
 
-  // Guardar (Borrador o Emitir)
-  const handleSave = async (estadoTarget: 'borrador' | 'emitido') => {
+  // Guardar (con estado objetivo o el seleccionado en formulario)
+  const handleSave = async (estadoTarget?: EstadoCotizacionExpress) => {
     if (!formData.cliente_nombre.trim()) {
       alert('Por favor especifica el nombre o razón social del cliente.');
       return;
@@ -257,17 +270,93 @@ export const CotizadorExpressTab: React.FC = () => {
     }
 
     try {
-      const recordToSave = { ...formData, estado: estadoTarget };
-      if (estadoTarget === 'borrador' && (!recordToSave.folio || !recordToSave.folio.startsWith('BORR-'))) {
+      const finalEstado = estadoTarget || formData.estado || 'borrador';
+      const recordToSave = { ...formData, estado: finalEstado };
+      if (finalEstado === 'borrador' && (!recordToSave.folio || !recordToSave.folio.startsWith('BORR-'))) {
         recordToSave.folio = cotizadorExpressService.generateDraftFolio(cotizaciones);
       }
       const saved = await cotizadorExpressService.saveCotizacion(recordToSave);
       setFormData(saved);
       setIsEditorOpen(false);
       await loadData();
-      alert(estadoTarget === 'borrador' ? 'Borrador guardado exitosamente.' : `Cotización emitida con éxito con folio ${saved.folio}.`);
+
+      // Registro de auditoría
+      auditService.log({
+        action: finalEstado === 'borrador' ? 'CREATE' : 'UPDATE',
+        module: 'Cotizaciones Rápidas',
+        description: `Guardó cotización ${saved.folio} con estado "${finalEstado}" para "${saved.cliente_nombre}" por ${formatCurrency(saved.total)}`,
+        user: currentUser,
+        metadata: { folio: saved.folio, cliente: saved.cliente_nombre, total: saved.total, estado: finalEstado }
+      });
+
+      alert(finalEstado === 'borrador' 
+        ? 'Borrador guardado exitosamente.' 
+        : `Cotización guardada con éxito (Estado: ${finalEstado.toUpperCase()}) con folio ${saved.folio}.`
+      );
     } catch (err: any) {
       alert('Error al guardar cotización: ' + err.message);
+    }
+  };
+
+  // Cambio directo de estado desde la tabla
+  const handleUpdateEstado = async (cot: CotizacionExpressData, nuevoEstado: EstadoCotizacionExpress) => {
+    try {
+      let recordToUpdate = { ...cot, estado: nuevoEstado };
+      
+      // Si era borrador y pasa a emitido o aceptado, asignarle folio oficial si no tiene uno
+      if (nuevoEstado !== 'borrador' && (!recordToUpdate.folio || recordToUpdate.folio.startsWith('BORR-'))) {
+        recordToUpdate.folio = cotizadorExpressService.generateNextFolio(cotizaciones);
+        recordToUpdate.fecha_emision = new Date().toISOString().split('T')[0];
+      }
+
+      await cotizadorExpressService.saveCotizacion(recordToUpdate);
+      await loadData();
+
+      // Registro de auditoría
+      auditService.log({
+        action: 'UPDATE',
+        module: 'Cotizaciones Rápidas',
+        description: `Cambió estado de cotización ${recordToUpdate.folio} a "${nuevoEstado}" para "${cot.cliente_nombre}"`,
+        user: currentUser,
+        metadata: { folio: recordToUpdate.folio, cliente: cot.cliente_nombre, estadoAnterior: cot.estado, nuevoEstado }
+      });
+    } catch (err: any) {
+      alert('Error al actualizar estado: ' + err.message);
+    }
+  };
+
+  // Cambiar cotización de Borrador a Emitido con confirmación y asignación de folio consecutivo
+  const handleEmitir = async (cot: CotizacionExpressData) => {
+    if (!cot.cliente_nombre?.trim()) {
+      alert('La cotización debe tener asignado el nombre del cliente para poder emitirse.');
+      return;
+    }
+    if (!cot.partidas || cot.partidas.length === 0) {
+      alert('La cotización debe incluir al menos una partida para poder emitirse.');
+      return;
+    }
+
+    const nextFolioEstimado = cotizadorExpressService.generateNextFolio(cotizaciones);
+    if (!confirm(`¿Deseas emitir oficialmente esta cotización para el cliente "${cot.cliente_nombre}"?\n\nSe asignará el folio oficial consecutivo: ${nextFolioEstimado}`)) {
+      return;
+    }
+
+    try {
+      const emitida = await cotizadorExpressService.emitirBorrador(cot.id);
+      await loadData();
+
+      // Registro de auditoría
+      auditService.log({
+        action: 'UPDATE',
+        module: 'Cotizaciones Rápidas',
+        description: `Emitió formalmente la cotización ${emitida.folio} (anteriormente borrador) para "${emitida.cliente_nombre}" por ${formatCurrency(emitida.total)}`,
+        user: currentUser,
+        metadata: { folio: emitida.folio, cliente: emitida.cliente_nombre, total: emitida.total }
+      });
+
+      alert(`¡Cotización emitida con éxito!\nFolio oficial asignado: ${emitida.folio}`);
+    } catch (err: any) {
+      alert('Error al emitir cotización: ' + err.message);
     }
   };
 
@@ -276,6 +365,15 @@ export const CotizadorExpressTab: React.FC = () => {
     setGeneratingPdf(true);
     setDriveStatus('idle');
     try {
+      // Registro de auditoría
+      auditService.log({
+        action: 'EXPORT',
+        module: 'Cotizaciones Rápidas',
+        description: `Visualizó / Descargó el PDF oficial de la cotización ${cot.folio || 'BORRADOR'} de "${cot.cliente_nombre}"`,
+        user: currentUser,
+        metadata: { folio: cot.folio, cliente: cot.cliente_nombre }
+      });
+
       const res = await generateCotizacionExpressPdf(cot, (status) => {
         setDriveStatus(status);
       });
@@ -304,6 +402,16 @@ export const CotizadorExpressTab: React.FC = () => {
     try {
       const folioIngreso = await cotizadorExpressService.generarCuentaPorCobrar(cot);
       await loadData();
+
+      // Registro de auditoría
+      auditService.log({
+        action: 'FINANCIAL',
+        module: 'Tesorería & CxC',
+        description: `Generó cuenta por cobrar en Tesorería con folio ${folioIngreso} para cotización ${cot.folio} por ${formatCurrency(cot.total)}`,
+        user: currentUser,
+        metadata: { folioCotizacion: cot.folio, folioIngreso, total: cot.total }
+      });
+
       alert(`¡Cuenta por cobrar generada exitosamente con folio ${folioIngreso || 'de Tesorería'}!`);
     } catch (e: any) {
       alert('Error al conectar con Tesorería: ' + e.message);
@@ -372,29 +480,36 @@ Reglas:
     }
   };
 
-  // Filtros de listado
+  // Filtros de listado con blindaje ante campos nulos o vacíos
   const filteredList = useMemo(() => {
+    const term = (searchTerm || '').trim().toLowerCase();
     return cotizaciones.filter(c => {
-      const matchesSearch = 
-        c.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.asunto.toLowerCase().includes(searchTerm.toLowerCase());
+      const folioStr = (c.folio || '').toLowerCase();
+      const clienteStr = (c.cliente_nombre || '').toLowerCase();
+      const asuntoStr = (c.asunto || '').toLowerCase();
+
+      const matchesSearch = !term || 
+        folioStr.includes(term) ||
+        clienteStr.includes(term) ||
+        asuntoStr.includes(term);
       
       const matchesTab = 
         activeTabSub === 'todas' ? true :
+        activeTabSub === 'aceptadas' ? c.estado === 'aceptado' :
         activeTabSub === 'borradores' ? c.estado === 'borrador' :
-        c.estado !== 'borrador';
+        c.estado === 'emitido';
 
       return matchesSearch && matchesTab;
     });
   }, [cotizaciones, searchTerm, activeTabSub]);
 
-  // Contadores KPIs
-  const totalEmitidas = cotizaciones.filter(c => c.estado !== 'borrador').length;
-  const totalBorradores = cotizaciones.filter(c => c.estado === 'borrador').length;
-  const montoTotalEmitido = cotizaciones
-    .filter(c => c.estado !== 'borrador')
+  // Contadores KPIs: Solo se suman en valor monetario y aprobadas las cotizaciones con estatus "aceptado"
+  const totalAceptadas = cotizaciones.filter(c => c.estado === 'aceptado').length;
+  const montoTotalAceptado = cotizaciones
+    .filter(c => c.estado === 'aceptado')
     .reduce((acc, c) => acc + (c.total || 0), 0);
+  const totalBorradores = cotizaciones.filter(c => c.estado === 'borrador').length;
+  const totalCotizaciones = cotizaciones.length;
 
   return (
     <div className="space-y-6 animate-fade-in p-4 sm:p-6 max-w-7xl mx-auto">
@@ -426,7 +541,7 @@ Reglas:
           </button>
 
           <button
-            onClick={() => handleOpenNew('visita_tecnica')}
+            onClick={() => handleOpenNew()}
             className="flex items-center gap-2 px-4 py-2.5 bg-gold hover:bg-gold-light text-dark-1 font-bold text-xs rounded-xl shadow-lg shadow-gold/20 transition-all cursor-pointer hover:scale-[1.02]"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
@@ -435,11 +550,12 @@ Reglas:
         </div>
       </div>
 
-      {/* KPIS RÁPIDOS (COMPONENTE MODULAR) */}
+      {/* KPIS RÁPIDOS (COMPONENTE MODULAR) - Solo se suman cotizaciones "Aceptadas" */}
       <CotizadorKpis 
-        totalEmitidas={totalEmitidas}
+        totalAceptadas={totalAceptadas}
+        montoTotalAceptado={montoTotalAceptado}
+        totalCotizaciones={totalCotizaciones}
         totalBorradores={totalBorradores}
-        montoTotalEmitido={montoTotalEmitido}
       />
 
       {/* PLANTILLAS PRECONFIGURADAS RÁPIDAS EN CABECERA */}
@@ -477,7 +593,27 @@ Reglas:
 
       {/* BARRA DE FILTROS Y BÚSQUEDA */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-dark-2 border border-dark-4 p-3 rounded-xl">
-        <div className="flex items-center gap-1.5 p-1 bg-dark-3 rounded-lg border border-dark-4">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-dark-3 rounded-lg border border-dark-4">
+          <button
+            onClick={() => setActiveTabSub('todas')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              activeTabSub === 'todas' 
+                ? 'bg-dark-4 text-cream shadow-sm' 
+                : 'text-cream-dim hover:text-cream'
+            }`}
+          >
+            Todas ({cotizaciones.length})
+          </button>
+          <button
+            onClick={() => setActiveTabSub('aceptadas')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              activeTabSub === 'aceptadas' 
+                ? 'bg-emerald-500 text-dark-1 shadow-sm font-black' 
+                : 'text-emerald-400/80 hover:text-emerald-400'
+            }`}
+          >
+            Aceptadas ({totalAceptadas})
+          </button>
           <button
             onClick={() => setActiveTabSub('emitidas')}
             className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
@@ -486,7 +622,7 @@ Reglas:
                 : 'text-cream-dim hover:text-cream'
             }`}
           >
-            Emitidas ({totalEmitidas})
+            Emitidas ({cotizaciones.filter(c => c.estado === 'emitido').length})
           </button>
           <button
             onClick={() => setActiveTabSub('borradores')}
@@ -497,16 +633,6 @@ Reglas:
             }`}
           >
             Borradores ({totalBorradores})
-          </button>
-          <button
-            onClick={() => setActiveTabSub('todas')}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-              activeTabSub === 'todas' 
-                ? 'bg-dark-4 text-cream shadow-sm' 
-                : 'text-cream-dim hover:text-cream'
-            }`}
-          >
-            Todas ({cotizaciones.length})
           </button>
         </div>
 
@@ -540,7 +666,9 @@ Reglas:
             cotizaciones={filteredList}
             generatingPdf={generatingPdf}
             onPrint={handlePrint}
+            onEmitir={handleEmitir}
             onMandarACobrar={handleMandarACobrar}
+            onUpdateEstado={handleUpdateEstado}
             onEdit={(cot) => {
               setEditingId(cot.id);
               setFormData({

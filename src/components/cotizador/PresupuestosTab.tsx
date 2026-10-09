@@ -24,6 +24,7 @@ import {
 import type { PresupuestoDetalle } from '../../lib/cotizadorService';
 import type { Presupuesto, PresupuestoConcepto, Matriz, Insumo, InsumoType, InsumoSubcategory } from '../../types/cotizador';
 import { MATERIAL_SUBCATEGORIES } from '../../types/cotizador';
+import { auditService } from '../../services/auditService';
 
 const getBase64ImageFromUrl = async (imageUrl: string): Promise<string> => {
   try {
@@ -712,6 +713,19 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
       
       await fetchBudgets();
       handleCloseEditor();
+
+      auditService.log({
+        action: editingPresupuesto?.id ? 'UPDATE' : 'CREATE',
+        module: 'Presupuestos eSol',
+        description: `${currentUser?.name} ${editingPresupuesto?.id ? 'modificó' : 'creó'} el presupuesto "${budgetData.name}" para "${budgetData.client_name}"`,
+        user: currentUser,
+        metadata: {
+          budgetName: budgetData.name,
+          clientName: budgetData.client_name,
+          status: budgetData.status,
+          conceptsCount: cleanedConcepts.length
+        }
+      });
     } catch (err: any) {
       console.error('Error saving budget:', err);
       setFormValidationError(err.message || 'Error al guardar el presupuesto.');
@@ -733,10 +747,19 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
 
   const handleDelete = async () => {
     if (!deleteConfirmId) return;
+    const deletedName = deleteConfirmName;
     try {
       await deletePresupuesto(deleteConfirmId);
       setPresupuestos(prev => prev.filter(item => item.id !== deleteConfirmId));
       handleCloseDeleteConfirm();
+
+      auditService.log({
+        action: 'DELETE',
+        module: 'Presupuestos eSol',
+        description: `${currentUser?.name} eliminó el presupuesto "${deletedName}"`,
+        user: currentUser,
+        metadata: { budgetId: deleteConfirmId, budgetName: deletedName }
+      });
     } catch (err: any) {
       console.error('Error deleting budget:', err);
       alert('Error al intentar eliminar el presupuesto.');
@@ -750,6 +773,14 @@ export default function PresupuestosTab({ onGenerateContract }: PresupuestosTabP
       setLoading(true);
       await duplicatePresupuesto(id);
       await fetchBudgets();
+
+      auditService.log({
+        action: 'CREATE',
+        module: 'Presupuestos eSol',
+        description: `${currentUser?.name} duplicó el presupuesto "${name}"`,
+        user: currentUser,
+        metadata: { originalBudgetId: id, budgetName: name }
+      });
       alert('Presupuesto duplicado exitosamente.');
     } catch (err: any) {
       console.error('Error duplicando presupuesto:', err);

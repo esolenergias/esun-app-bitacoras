@@ -6,6 +6,8 @@ import OficioPreviewModal from './OficioPreviewModal';
 import OficiosHistoryModal from './OficiosHistoryModal';
 import { generateOficioPdf } from './oficioPdfGenerator';
 import { supabase } from '../../../context/supabase';
+import { useApp } from '../../../context/AppContext';
+import { auditService } from '../../../services/auditService';
 import { CheckCircle2 } from 'lucide-react';
 
 interface OficiosTabProps {
@@ -126,6 +128,7 @@ export const getDefaultOficio = (
 };
 
 export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
+  const { currentUser } = useApp();
   const [oficio, setOficio] = useState<OficioData>(() => getDefaultOficio(initialBudgetId));
   const [oficiosList, setOficiosList] = useState<OficioData[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -188,25 +191,7 @@ export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
         combinedList = mapped;
       }
     } catch (err) {
-      console.warn('Supabase not available, using local cache');
-    }
-
-    // 2. Merge with LocalStorage fallback
-    try {
-      const local = localStorage.getItem(STORAGE_KEY);
-      if (local) {
-        const parsed: OficioData[] = JSON.parse(local);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(localItem => {
-            const exists = combinedList.some(o => o.id === localItem.id || o.folio === localItem.folio);
-            if (!exists) {
-              combinedList.push(localItem);
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing local oficios:', e);
+      console.warn('Error fetching oficios from Supabase:', err);
     }
 
     setOficiosList(combinedList);
@@ -297,32 +282,55 @@ export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
 
       const { error } = await supabase.from('oficios_obra').upsert(dbPayload);
       if (error) {
-        console.warn('Advertencia Supabase:', error);
+        console.warn('Advertencia Supabase con columnas extendidas, reintentando con columnas base:', error);
+        // Fallback defensivo a las columnas base comprobadas en la tabla
+        const corePayload = {
+          id: updatedRecord.id,
+          folio: updatedRecord.folio,
+          fecha: updatedRecord.fecha,
+          lugar: updatedRecord.lugar,
+          presupuesto_id: updatedRecord.presupuestoId || null,
+          nombre_obra: updatedRecord.nombreObra,
+          ubicacion_obra: updatedRecord.ubicacionObra,
+          cliente_final: updatedRecord.clienteFinal,
+          tipo_oficio: updatedRecord.tipoOficio,
+          destinatario_titulo: updatedRecord.destinatarioTitulo,
+          destinatario_nombre: updatedRecord.destinatarioNombre,
+          destinatario_cargo: updatedRecord.destinatarioCargo,
+          destinatario_empresa: updatedRecord.destinatarioEmpresa,
+          destinatario_atencion: updatedRecord.destinatarioAtencion,
+          asunto: updatedRecord.asunto,
+          referencia: updatedRecord.referencia,
+          vocativo: updatedRecord.vocativo,
+          antecedentes: updatedRecord.antecedentes,
+          cuerpo: updatedRecord.cuerpo,
+          fundamentacion: updatedRecord.fundamentacion,
+          peticion: updatedRecord.peticion,
+          despedida: updatedRecord.despedida,
+          remitente_nombre: updatedRecord.remitenteNombre,
+          remitente_cargo: updatedRecord.remitenteCargo,
+          remitente_cedula: updatedRecord.remitenteCedula,
+          empresa_razon_social: updatedRecord.empresaRazonSocial,
+          empresa_rfc: updatedRecord.empresaRFC,
+          empresa_domicilio: updatedRecord.empresaDomicilio,
+          empresa_telefono: updatedRecord.empresaTelefono,
+          empresa_email: updatedRecord.empresaEmail,
+          ccp: updatedRecord.ccp,
+          anexos: updatedRecord.anexos,
+          estado: updatedRecord.estado || 'emitido',
+          updated_at: updatedRecord.updated_at
+        };
+        const { error: coreErr } = await supabase.from('oficios_obra').upsert(corePayload);
+        if (coreErr) {
+          console.error('Error persistente guardando en oficios_obra:', coreErr);
+        }
       }
     } catch (dbErr) {
       console.warn('Error saving to Supabase:', dbErr);
     }
 
-    // 2. ALWAYS Save to localStorage
-    try {
-      const localStr = localStorage.getItem(STORAGE_KEY);
-      let localList: OficioData[] = localStr ? JSON.parse(localStr) : [];
-      if (!Array.isArray(localList)) localList = [];
-
-      const existingIdx = localList.findIndex(item => item.id === updatedRecord.id || item.folio === updatedRecord.folio);
-      if (existingIdx >= 0) {
-        localList[existingIdx] = updatedRecord;
-      } else {
-        localList = [updatedRecord, ...localList];
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(localList));
-
-      // Update state
-      setOficiosList(localList);
-    } catch (lsErr) {
-      console.error('Error saving to localStorage:', lsErr);
-    }
-
+    // Actualizar lista en vivo desde Supabase
+    await loadOficios();
     setOficio(updatedRecord);
     return updatedRecord;
   };
@@ -352,6 +360,14 @@ export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
           : `Oficio ${saved.folio} guardado y emitido formalmente.`
       });
       setTimeout(() => setNotification(null), 4000);
+
+      auditService.log({
+        action: targetEstado === 'borrador' ? 'UPDATE' : 'CREATE',
+        module: 'Legal eSol (Oficios)',
+        description: `${currentUser?.name} guardó el oficio ${saved.folio} (${targetEstado.toUpperCase()}) para ${saved.clienteFinal || saved.destinatarioNombre}`,
+        user: currentUser,
+        metadata: { folio: saved.folio, estado: targetEstado, destinatario: saved.destinatarioNombre, cliente: saved.clienteFinal }
+      });
     } catch (err: any) {
       console.error('Error al guardar oficio:', err);
       setNotification({
@@ -365,26 +381,26 @@ export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
 
   const handleDeleteOficio = async (idOrFolio: string) => {
     try {
-      try {
-        await supabase
-          .from('oficios_obra')
-          .delete()
-          .or(`id.eq.${idOrFolio},folio.eq.${idOrFolio}`);
-      } catch (e) {
-        // ignore
-      }
+      await supabase
+        .from('oficios_obra')
+        .delete()
+        .or(`id.eq.${idOrFolio},folio.eq.${idOrFolio}`);
 
-      setOficiosList(prev => {
-        const updated = prev.filter(o => o.id !== idOrFolio && o.folio !== idOrFolio);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        return updated;
-      });
+      await loadOficios();
 
       setNotification({
         type: 'success',
         message: 'Oficio eliminado del historial.'
       });
       setTimeout(() => setNotification(null), 3000);
+
+      auditService.log({
+        action: 'DELETE',
+        module: 'Legal eSol (Oficios)',
+        description: `${currentUser?.name} eliminó el oficio ${idOrFolio}`,
+        user: currentUser,
+        metadata: { folioOrId: idOrFolio }
+      });
     } catch (err) {
       console.error('Error al eliminar oficio:', err);
     }
@@ -428,6 +444,14 @@ export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
           : `Oficio ${targetOficio.folio} cambiado a BORRADOR.`
       });
       setTimeout(() => setNotification(null), 4000);
+
+      auditService.log({
+        action: 'UPDATE',
+        module: 'Legal eSol (Oficios)',
+        description: `${currentUser?.name} cambió el estado del oficio ${targetOficio.folio} a ${newStatus.toUpperCase()}`,
+        user: currentUser,
+        metadata: { folio: targetOficio.folio, nuevoEstado: newStatus }
+      });
     } catch (err: any) {
       console.error('Error al cambiar estatus:', err);
       setNotification({
@@ -464,6 +488,14 @@ export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
         message: `Oficio ${savedOficio.folio} generado y guardado exitosamente.`
       });
       setTimeout(() => setNotification(null), 5000);
+
+      auditService.log({
+        action: 'EXPORT',
+        module: 'Legal eSol (Oficios)',
+        description: `${currentUser?.name} generó y descargó el PDF del oficio ${savedOficio.folio} para ${savedOficio.clienteFinal || savedOficio.destinatarioNombre}`,
+        user: currentUser,
+        metadata: { folio: savedOficio.folio, destinatario: savedOficio.destinatarioNombre }
+      });
     } catch (error: any) {
       console.error('Error generando PDF:', error);
       setNotification({
