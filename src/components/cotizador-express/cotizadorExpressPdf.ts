@@ -84,7 +84,10 @@ function getHeaderHtml(cot: CotizacionExpressData, numeroHoja: number, totalHoja
         <div>
           <div style="font-size: 13px; font-weight: 900; color: #0f172a; letter-spacing: 0.5px;">ESOL ENERGÍAS</div>
           <div style="font-size: 8.5px; font-weight: 700; color: #b89130; text-transform: uppercase; letter-spacing: 1px;">Ingeniería, Suministros y Soluciones Energéticas</div>
-          <div style="font-size: 7.5px; color: #64748b; margin-top: 2px;">Tepic, Nayarit • contacto@esolenergias.com • Tel: 311 234 3034</div>
+          <div style="font-size: 7.5px; color: #64748b; margin-top: 2px; line-height: 1.35;">
+            <div>Av. Insurgentes 56-A, Int. A, Col. Centro, C.P. 63000, Tepic, Nayarit</div>
+            <div><strong>RFC:</strong> SIN190211IC4 • energiasesol@gmail.com • Tel: 311 234 3034</div>
+          </div>
         </div>
       </div>
 
