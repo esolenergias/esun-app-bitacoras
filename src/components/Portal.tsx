@@ -11,8 +11,9 @@ import {
   ArrowRight, Sun, Moon, Zap, Leaf, 
   DollarSign, MessageSquare, Package, Truck, Users, Activity, Building2,
   Settings, Trash2, ChevronDown, ChevronRight, ChevronUp, Store, LayoutTemplate, Wrench,
-  ExternalLink, ShieldAlert
+  ExternalLink, ShieldAlert, ClipboardCheck
 } from 'lucide-react';
+import VisitasTecnicasTab from './visitas-tecnicas/VisitasTecnicasTab';
 import InsumosTab from './cotizador/InsumosTab';
 import MatricesTab from './cotizador/MatricesTab';
 import PresupuestosTab from './cotizador/PresupuestosTab';
@@ -106,6 +107,7 @@ export function Portal() {
         esun: 'Esun Solar (Propuestas)',
         cotizador: 'Presupuestos eSol',
         legal: 'Legal eSol & Contratos',
+        visita_tecnica: 'Visita Técnica',
         bitacoras: 'Bitácoras de Obra',
         mantenimientos: 'Mantenimientos',
         cms: 'Editor CMS Landing',
@@ -672,6 +674,18 @@ export function Portal() {
                         >
                           <Shield className="w-4 h-4 stroke-[2] flex-shrink-0" />
                           {!sidebarCollapsed && <span>Legal Esol</span>}
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('visita_tecnica')}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            activeTab === 'visita_tecnica'
+                              ? 'bg-gold/10 text-gold border-l-2 border-gold font-black shadow-inner shadow-gold/5'
+                              : 'text-cream-muted hover:text-cream hover:bg-dark-3'
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title="Visita técnica"
+                        >
+                          <ClipboardCheck className="w-4 h-4 stroke-[2] flex-shrink-0" />
+                          {!sidebarCollapsed && <span>Visita técnica</span>}
                         </button>
                         <button
                           onClick={() => setActiveTab('bitacoras')}
@@ -2297,6 +2311,10 @@ export function Portal() {
               {activeTab === 'legal' && (
                 <LegalTab initialBudgetId={legalTargetBudgetId} />
               )}
+              {activeTab === 'visita_tecnica' && (
+                <VisitasTecnicasTab />
+              )}
+
 
               {activeTab === 'sistema_administrativo' && (
                 <div className="-m-6 lg:-m-8 animate-fade-in">

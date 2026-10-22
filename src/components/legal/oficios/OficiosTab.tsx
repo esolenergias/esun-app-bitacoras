@@ -148,46 +148,55 @@ export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        const mapped: OficioData[] = data.map((d: any) => ({
-          id: d.id,
-          folio: d.folio || '',
-          fecha: d.fecha || '',
-          lugar: d.lugar || 'Tepic, Nayarit',
-          presupuestoId: d.presupuesto_id || '',
-          nombreObra: d.nombre_obra || '',
-          ubicacionObra: d.ubicacion_obra || '',
-          clienteFinal: d.cliente_final || '',
-          tipoOficio: d.tipo_oficio || 'libre',
-          destinatarioTitulo: d.destinatario_titulo || '',
-          destinatarioNombre: d.destinatario_nombre || '',
-          destinatarioCargo: d.destinatario_cargo || '',
-          destinatarioEmpresa: d.destinatario_empresa || '',
-          destinatarioAtencion: d.destinatario_atencion || '',
-          asunto: d.asunto || '',
-          referencia: d.referencia || '',
-          vocativo: d.vocativo || '',
-          antecedentes: d.antecedentes || '',
-          cuerpo: d.cuerpo || '',
-          fundamentacion: d.fundamentacion || '',
-          peticion: d.peticion || '',
-          despedida: d.despedida || '',
-          remitenteNombre: d.remitente_nombre || 'Manuel de Jesus Fregoso Samaniega',
-          remitenteCargo: d.remitente_cargo || 'REPRESENTANTE LEGAL',
-          remitenteCedula: d.remitente_cedula || '',
-          empresaRazonSocial: d.empresa_razon_social || 'ESOL ENERGIAS',
-          empresaRFC: d.empresa_rfc || '',
-          empresaDomicilio: d.empresa_domicilio || 'Tepic, Nayarit, México',
-          empresaTelefono: d.empresa_telefono || '3112343034',
-          empresaEmail: d.empresa_email || '',
-          ccp: Array.isArray(d.ccp) ? d.ccp : [],
-          anexos: Array.isArray(d.anexos) ? d.anexos : [],
-          estado: d.estado || 'emitido',
-          drive_url: d.drive_url,
-          firmaDigital: d.firma_digital || undefined,
-          incluirFirmaDigital: d.incluir_firma_digital ?? true,
-          created_at: d.created_at,
-          updated_at: d.updated_at
-        }));
+        const mapped: OficioData[] = data.map((d: any) => {
+          const jsonExtra = d.datos_json && typeof d.datos_json === 'object' ? d.datos_json : {};
+          const partidasRecuperadas = (Array.isArray(d.partidas) && d.partidas.length > 0)
+            ? d.partidas
+            : (Array.isArray(jsonExtra.partidas) && jsonExtra.partidas.length > 0 ? jsonExtra.partidas : []);
+
+          return {
+            id: d.id,
+            folio: d.folio || '',
+            fecha: d.fecha || '',
+            lugar: d.lugar || 'Tepic, Nayarit',
+            presupuestoId: d.presupuesto_id || '',
+            nombreObra: d.nombre_obra || jsonExtra.nombreObra || '',
+            ubicacionObra: d.ubicacion_obra || jsonExtra.ubicacionObra || '',
+            clienteFinal: d.cliente_final || jsonExtra.clienteFinal || '',
+            tipoOficio: d.tipo_oficio || jsonExtra.tipoOficio || 'libre',
+            destinatarioTitulo: d.destinatario_titulo || jsonExtra.destinatarioTitulo || '',
+            destinatarioNombre: d.destinatario_nombre || jsonExtra.destinatarioNombre || '',
+            destinatarioCargo: d.destinatario_cargo || jsonExtra.destinatarioCargo || '',
+            destinatarioEmpresa: d.destinatario_empresa || jsonExtra.destinatarioEmpresa || '',
+            destinatarioAtencion: d.destinatario_atencion || jsonExtra.destinatarioAtencion || '',
+            asunto: d.asunto || jsonExtra.asunto || '',
+            referencia: d.referencia || jsonExtra.referencia || '',
+            vocativo: d.vocativo || jsonExtra.vocativo || '',
+            antecedentes: d.antecedentes || jsonExtra.antecedentes || '',
+            cuerpo: d.cuerpo || d.contenido || jsonExtra.cuerpo || '',
+            fundamentacion: d.fundamentacion || jsonExtra.fundamentacion || '',
+            peticion: d.peticion || jsonExtra.peticion || '',
+            despedida: d.despedida || jsonExtra.despedida || '',
+            partidas: partidasRecuperadas,
+            mostrarPreciosEnPdf: d.mostrar_precios_en_pdf ?? jsonExtra.mostrarPreciosEnPdf ?? true,
+            remitenteNombre: d.remitente_nombre || 'Manuel de Jesus Fregoso Samaniega',
+            remitenteCargo: d.remitente_cargo || 'REPRESENTANTE LEGAL',
+            remitenteCedula: d.remitente_cedula || '',
+            empresaRazonSocial: d.empresa_razon_social || 'ESOL ENERGIAS',
+            empresaRFC: d.empresa_rfc || '',
+            empresaDomicilio: d.empresa_domicilio || 'Tepic, Nayarit, México',
+            empresaTelefono: d.empresa_telefono || '3112343034',
+            empresaEmail: d.empresa_email || '',
+            ccp: Array.isArray(d.ccp) ? d.ccp : [],
+            anexos: Array.isArray(d.anexos) ? d.anexos : [],
+            estado: d.estado || 'emitido',
+            drive_url: d.drive_url,
+            firmaDigital: d.firma_digital || undefined,
+            incluirFirmaDigital: d.incluir_firma_digital ?? true,
+            created_at: d.created_at,
+            updated_at: d.updated_at
+          };
+        });
         combinedList = mapped;
       }
     } catch (err) {
@@ -273,10 +282,13 @@ export default function OficiosTab({ initialBudgetId }: OficiosTabProps) {
         empresa_email: updatedRecord.empresaEmail,
         ccp: updatedRecord.ccp,
         anexos: updatedRecord.anexos,
+        partidas: updatedRecord.partidas || [],
+        mostrar_precios_en_pdf: updatedRecord.mostrarPreciosEnPdf ?? true,
         estado: updatedRecord.estado || 'emitido',
         drive_url: updatedRecord.drive_url || null,
         firma_digital: updatedRecord.firmaDigital || null,
         incluir_firma_digital: updatedRecord.incluirFirmaDigital ?? true,
+        datos_json: updatedRecord,
         updated_at: updatedRecord.updated_at
       };
 

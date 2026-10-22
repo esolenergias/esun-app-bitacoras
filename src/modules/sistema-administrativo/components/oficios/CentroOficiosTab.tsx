@@ -519,10 +519,17 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
         message: 'Generando PDF oficial con firma y sellos digitales...'
       });
 
-      // 1. Generar el PDF y obtener Blob
+      // 1. Preparar documento consolidado con partidas y opciones visuales
+      const oficioPreparado: OficioData = {
+        ...oficio,
+        partidas: partidas,
+        mostrarPreciosEnPdf: mostrarPreciosEnPdf
+      };
+
+      // Generar el PDF y obtener Blob
       let generatedDriveUrl = oficio.drive_url;
       try {
-        const pdfResult = await generateOficioPdf(oficio);
+        const pdfResult = await generateOficioPdf(oficioPreparado);
         if (pdfResult.driveUrl) {
           generatedDriveUrl = pdfResult.driveUrl;
         }
@@ -532,7 +539,7 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
 
       // 2. Guardar con estatus emitido y URL de PDF
       const oficioFinal: OficioData = {
-        ...oficio,
+        ...oficioPreparado,
         estado: 'emitido',
         drive_url: generatedDriveUrl || oficio.drive_url
       };
@@ -591,6 +598,8 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
     try {
       const borrador: OficioData = {
         ...oficio,
+        partidas: partidas,
+        mostrarPreciosEnPdf: mostrarPreciosEnPdf,
         estado: 'borrador'
       };
       const saved = await adminDbService.guardarOficioErp(borrador);
@@ -607,9 +616,16 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
   };
 
   const handleCargarOficioHistorial = (item: OficioData) => {
-    setOficio({ ...item });
-    setPartidas(item.partidas || []);
-    setMostrarPreciosEnPdf(item.mostrarPreciosEnPdf ?? true);
+    // Recuperar partidas desde columna o desde datos_json evitando que array vacío oculte los datos
+    const partidasRecuperadas = (Array.isArray(item.partidas) && item.partidas.length > 0)
+      ? item.partidas
+      : ((item as any).datos_json?.partidas && Array.isArray((item as any).datos_json.partidas))
+        ? (item as any).datos_json.partidas
+        : [];
+    const itemNormalizado = { ...item, partidas: partidasRecuperadas };
+    setOficio(itemNormalizado);
+    setPartidas(partidasRecuperadas);
+    setMostrarPreciosEnPdf(item.mostrarPreciosEnPdf ?? (item as any).datos_json?.mostrarPreciosEnPdf ?? true);
 
     // 1. Restaurar Tipo de Trámite / Petición
     const tramitesValidos: TipoTramitePeticion[] = [
@@ -698,6 +714,19 @@ export const CentroOficiosTab: React.FC<CentroOficiosTabProps> = ({
     setAiSuggestions(null);
     setViewMode('redactar');
   };
+
+  // Listener para botón global "Nuevo oficio"
+  useEffect(() => {
+    const handleTrigger = () => {
+      handleNuevoOficio();
+    };
+    if (localStorage.getItem('esol_trigger_nuevo_oficio')) {
+      localStorage.removeItem('esol_trigger_nuevo_oficio');
+      handleNuevoOficio();
+    }
+    window.addEventListener('esol_crear_nuevo_oficio', handleTrigger);
+    return () => window.removeEventListener('esol_crear_nuevo_oficio', handleTrigger);
+  }, [oficiosList]);
 
   // Filtrado de historial
   const filteredHistorial = useMemo(() => {

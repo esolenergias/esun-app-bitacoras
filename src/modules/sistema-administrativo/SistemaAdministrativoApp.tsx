@@ -30,7 +30,7 @@ import {
   Layers, RefreshCw, ShieldAlert, Sparkles, FileText, ChevronRight, ChevronDown, 
   ExternalLink, Menu, X, Landmark, Wallet, CheckCircle2, ShieldCheck, Box, Eye,
   Boxes, HardHat, AlertTriangle, ArrowUpRight, ArrowDownRight, FolderKanban, ClipboardCheck, PackageCheck,
-  UserCheck, ScrollText
+  UserCheck, ScrollText, FilePlus
 } from 'lucide-react';
 
 interface SistemaAdministrativoAppProps {
@@ -222,16 +222,21 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-gold' : ''}`} />
             </button>
 
-            <a
-              href="/?sistema_administrativo=1"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-dark-3 hover:bg-dark-4 text-cream-muted hover:text-cream border border-dark-4 rounded-xl text-xs font-bold transition-all"
-              title="Abrir en ventana independiente"
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem('esol_trigger_nuevo_oficio', Date.now().toString());
+                setActiveTab('oficios_central');
+                setTimeout(() => {
+                  window.dispatchEvent(new Event('esol_crear_nuevo_oficio'));
+                }, 50);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gold/15 hover:bg-gold text-gold hover:text-dark-1 border border-gold/40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm shadow-gold/5"
+              title="Crear un nuevo oficio formal"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-gold" />
-              <span>Nueva Ventana</span>
-            </a>
+              <FilePlus className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Nuevo oficio</span>
+            </button>
 
             <div className="flex items-center gap-2 pl-2 border-l border-dark-4 text-xs">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs border ${
@@ -660,19 +665,19 @@ export const SistemaAdministrativoApp: React.FC<SistemaAdministrativoAppProps> =
               <div className="space-y-1 pt-2 border-t border-dark-4/50">
                 <button
                   onClick={() => setActiveTab('db_oficios')}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-2.5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-tight transition-all cursor-pointer ${
                     activeTab === 'db_oficios'
                       ? 'bg-gold/20 text-gold border-l-2 border-gold shadow-inner shadow-gold/10'
                       : 'text-cream-muted hover:text-cream hover:bg-dark-3 bg-dark-1/40 border border-dark-4/60'
                   } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
                   title="Oficios Formal / Legal"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
                     <ScrollText className="w-4 h-4 stroke-[2] text-gold flex-shrink-0" />
-                    {!sidebarCollapsed && <span>Oficios Formal / Legal</span>}
+                    {!sidebarCollapsed && <span className="whitespace-nowrap truncate">Oficios Formal / Legal</span>}
                   </div>
                   {!sidebarCollapsed && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gold/15 text-gold border border-gold/30">
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gold/15 text-gold border border-gold/30 shrink-0 ml-1">
                       Legal
                     </span>
                   )}

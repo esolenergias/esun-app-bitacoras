@@ -1622,9 +1622,9 @@ export const OficiosAdminView: React.FC<OficiosAdminViewProps> = ({
               <FileSignature className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-cream font-display tracking-tight flex items-center gap-2">
-                RESUMEN DE OFICIOS FORMAL / LEGAL
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-gold/15 text-gold border border-gold/30">
+              <h2 className="text-lg md:text-xl font-black text-cream font-display tracking-tight flex flex-wrap sm:flex-nowrap items-center gap-2 whitespace-nowrap">
+                <span>RESUMEN DE OFICIOS FORMAL / LEGAL</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-gold/15 text-gold border border-gold/30 shrink-0">
                   Supabase DB
                 </span>
               </h2>
